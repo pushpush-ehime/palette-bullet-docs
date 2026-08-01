@@ -10,7 +10,8 @@ export default defineConfig({
     nav: [
       { text: 'ホーム', link: '/' },
       { text: 'Player仕様', link: '/spec/player/basic-movement' },
-      { text: 'タスク', link: '/tasks/player/pb-ply-001' }
+      { text: 'タスク', link: '/tasks/player/pb-ply-001' },
+      { text: '更新方法', link: '/guide/updating-site' }
     ],
 
     sidebar: [
@@ -31,6 +32,16 @@ export default defineConfig({
           {
             text: 'PB-PLY-001 基本移動',
             link: '/tasks/player/pb-ply-001'
+          }
+        ]
+      },
+      {
+        text: 'ガイド',
+        collapsed: false,
+        items: [
+          {
+            text: 'サイトの更新方法',
+            link: '/guide/updating-site'
           }
         ]
       }
