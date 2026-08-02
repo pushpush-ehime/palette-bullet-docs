@@ -44,3 +44,5 @@ Palette Bulletの正式な仕様・設計・タスク説明を共有します。
 | 未決 | 決定するまで実装しない |
 | 対象外 | このページやタスクでは扱わない |
 | 廃止 | 使用しない |
+
+[このページを編集](https://github.com/pushpush-ehime/palette-bullet-docs/edit/main/docs/index.md)
