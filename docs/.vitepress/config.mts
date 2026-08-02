@@ -28,7 +28,13 @@ export default defineConfig({
           { text: '新しいページを作る', link: '/guide/new-page' }
         ]
       },
-      { text: '仕様・設計', link: '/spec/' },
+      {
+        text: '仕様・設計',
+        items: [
+          { text: '仕様・設計一覧', link: '/spec/' },
+          { text: '仕様・タスク対応', link: '/relations' }
+        ]
+      },
       { text: 'タスク説明', link: '/tasks/' },
       { text: '用語集', link: '/glossary' }
     ],
@@ -63,6 +69,7 @@ export default defineConfig({
             { text: 'このサイトの使い方', link: '/guide/how-to-use' },
             { text: 'ゲーム概要', link: '/game-overview' },
             { text: '仕様・設計', link: '/spec/' },
+            { text: '仕様・タスク対応', link: '/relations' },
             { text: 'タスク説明', link: '/tasks/' },
             { text: '新しいページを作る', link: '/guide/new-page' },
             { text: '用語集', link: '/glossary' }

@@ -12,7 +12,6 @@ status: 未決
 ## ページ概要
 
 - 対象担当：プログラム
-- 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[Player状態](/spec/player/states)、[ドローシステム](/spec/draw-system/)
 
 ## 目的
@@ -49,4 +48,4 @@ status: 未決
 
 ## 関連タスク
 
-- [Playerタスク](/tasks/player/)
+<PageRelations />

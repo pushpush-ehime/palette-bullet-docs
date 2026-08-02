@@ -12,7 +12,6 @@ status: 未決
 ## ページ概要
 
 - 対象担当：プログラム
-- 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[Player概要](/spec/player/)、[カメラ](/spec/camera/)
 
 ## 目的
@@ -49,4 +48,4 @@ Playerとカメラの接続を定義します。
 
 ## 関連タスク
 
-- [Playerタスク](/tasks/player/)
+<PageRelations />

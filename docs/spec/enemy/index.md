@@ -13,7 +13,6 @@ status: 未決
 ## ページ概要
 
 - 対象担当：未決
-- 関連タスク：[その他タスク](/tasks/other/)
 - 関連ページ：[戦闘](/spec/combat/)、[ステージ](/spec/stage/)
 
 ## 目的
@@ -50,4 +49,4 @@ status: 未決
 
 ## 関連タスク
 
-- [その他タスク](/tasks/other/)
+<PageRelations />

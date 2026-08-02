@@ -12,7 +12,6 @@ status: 未決
 ## ページ概要
 
 - 対象担当：プログラム
-- 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[Player概要](/spec/player/)、[基本移動](/spec/player/basic-movement)
 
 ## 目的
@@ -49,4 +48,4 @@ Playerが受け付ける入力と操作を定義します。
 
 ## 関連タスク
 
-- [Playerタスク](/tasks/player/)
+<PageRelations />

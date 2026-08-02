@@ -12,6 +12,7 @@ status: 未決
 
 ## ページ概要
 
+
 - 対象担当：全担当
 - 関連ページ：[ゲーム概要](/game-overview)、[仕様・設計一覧](/spec/)
 
@@ -92,4 +93,4 @@ status: 未決
 
 ## 関連タスク
 
-- [その他タスク](/tasks/other/)
+<PageRelations />

@@ -17,4 +17,5 @@ sidebarTitle: タスク一覧
 
 ## 関連ページ
 
+- [仕様・タスク対応](/relations)
 - [仕様・設計](/spec/)

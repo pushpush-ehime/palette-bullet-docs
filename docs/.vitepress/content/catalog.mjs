@@ -333,6 +333,10 @@ export function buildSidebars(catalog) {
     {
       text: specRoot?.frontmatter.sidebarTitle ?? '仕様・設計一覧',
       link: specRoot?.url ?? '/spec/'
+    },
+    {
+      text: '仕様・タスク対応',
+      link: '/relations'
     }
   ]
 
@@ -367,6 +371,10 @@ export function buildSidebars(catalog) {
     {
       text: taskRoot?.frontmatter.sidebarTitle ?? 'タスク一覧',
       link: taskRoot?.url ?? '/tasks/'
+    },
+    {
+      text: '仕様・タスク対応',
+      link: '/relations'
     }
   ]
 
@@ -431,6 +439,31 @@ function validateRequiredHeadings(entry, requiredHeadings, errors) {
   }
 }
 
+function validateRelationComponent(entry, headingText, errors) {
+  const content = getSectionContent(entry.structure, headingText)
+  if (content !== '<PageRelations />') {
+    errors.push(
+      `${entry.relativePath}: 「## ${headingText}」の内容は<PageRelations />だけにしてください。`
+    )
+  }
+}
+
+function expectedPageType(relativePath) {
+  const parts = relativePath.split('/')
+
+  if (parts[0] === 'spec') {
+    return relativePath === 'spec/index.md' ? 'spec-index' : 'spec'
+  }
+
+  if (parts[0] === 'tasks') {
+    if (relativePath === 'tasks/index.md') return 'task-index'
+    if (parts.length === 3 && parts[2] === 'index.md') return 'task-category'
+    return 'task'
+  }
+
+  return ''
+}
+
 export function validateCatalog(catalog) {
   const errors = []
   const urls = new Map(catalog.map((entry) => [entry.url, entry]))
@@ -458,6 +491,28 @@ export function validateCatalog(catalog) {
     if (!entry.description) errors.push(`${entry.relativePath}: descriptionがありません。`)
     if (entry.structure.hasUnclosedFence) {
       errors.push(`${entry.relativePath}: コードブロックが閉じられていません。`)
+    }
+
+    const requiredPageType = expectedPageType(entry.relativePath)
+    if (requiredPageType && entry.pageType !== requiredPageType) {
+      errors.push(
+        `${entry.relativePath}: pageTypeを${requiredPageType}にしてください。`
+      )
+    }
+
+    if (entry.frontmatter.relatedTasks !== undefined) {
+      errors.push(
+        `${entry.relativePath}: relatedTasksは使わず、タスク側のrelatedSpecsで関係を指定してください。`
+      )
+    }
+
+    if (
+      entry.frontmatter.relatedSpecs !== undefined &&
+      entry.pageType !== 'task'
+    ) {
+      errors.push(
+        `${entry.relativePath}: relatedSpecsはタスクページだけで使用してください。`
+      )
     }
 
     const h1 = entry.structure.headings.filter((heading) => heading.level === 1)
@@ -505,6 +560,7 @@ export function validateCatalog(catalog) {
       }
 
       validateRequiredHeadings(entry, SPEC_HEADINGS, errors)
+      validateRelationComponent(entry, '関連タスク', errors)
     }
 
     if (entry.pageType === 'task-category') {
@@ -551,6 +607,10 @@ export function validateCatalog(catalog) {
         errors.push(`${entry.relativePath}: relatedSpecsを1件以上指定してください。`)
       }
 
+      if (new Set(entry.relatedSpecs).size !== entry.relatedSpecs.length) {
+        errors.push(`${entry.relativePath}: relatedSpecsに同じ仕様が重複しています。`)
+      }
+
       for (const relatedSpec of entry.relatedSpecs) {
         const target = urls.get(relatedSpec)
         if (!target || target.pageType !== 'spec') {
@@ -564,6 +624,7 @@ export function validateCatalog(catalog) {
       }
 
       validateRequiredHeadings(entry, TASK_HEADINGS, errors)
+      validateRelationComponent(entry, '関連する仕様', errors)
     }
   }
 

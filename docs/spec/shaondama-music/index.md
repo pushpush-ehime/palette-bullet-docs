@@ -13,7 +13,6 @@ status: 未決
 ## ページ概要
 
 - 対象担当：未決
-- 関連タスク：[その他タスク](/tasks/other/)
 - 関連ページ：[シャオンダマ選択との接続](/spec/player/shaondama-selection-connection)、[ドローシステム](/spec/draw-system/)
 
 ## 目的
@@ -50,4 +49,4 @@ status: 未決
 
 ## 関連タスク
 
-- [その他タスク](/tasks/other/)
+<PageRelations />

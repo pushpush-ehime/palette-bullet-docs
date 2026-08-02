@@ -21,7 +21,7 @@ relatedSpecs:
 
 ## 関連する仕様
 
-- [関連仕様](/spec/player/spec-page)
+<PageRelations />
 
 ## 実施内容
 

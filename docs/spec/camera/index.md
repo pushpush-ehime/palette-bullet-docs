@@ -13,7 +13,6 @@ status: 未決
 ## ページ概要
 
 - 対象担当：未決
-- 関連タスク：[カメラタスク](/tasks/camera/)
 - 関連ページ：[Playerとカメラの接続](/spec/player/camera-connection)、[ゲーム全体](/spec/game/)
 
 ## 目的
@@ -50,4 +49,4 @@ status: 未決
 
 ## 関連タスク
 
-- [カメラタスク](/tasks/camera/)
+<PageRelations />

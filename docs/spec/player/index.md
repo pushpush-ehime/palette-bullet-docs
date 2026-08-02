@@ -14,7 +14,6 @@ collapsed: false
 ## ページ概要
 
 - 対象担当：プログラム
-- 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[ゲーム全体](/spec/game/)、[ゲーム概要](/game-overview)
 
 ## 目的
@@ -61,4 +60,4 @@ Playerに関する仕様の入口にします。
 
 ## 関連タスク
 
-- [Playerタスク](/tasks/player/)
+<PageRelations />

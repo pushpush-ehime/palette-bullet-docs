@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { data as catalog } from '../../content/catalog.data.js'
 import { pageHref } from '../utils'
+import { indexTasksBySpec, relationState, relationStateLabels } from '../relations'
 import StatusBadge from './StatusBadge.vue'
 
 const props = withDefaults(
@@ -27,6 +28,15 @@ const specs = catalog
   )
 
 const categories = [...new Set(specs.map((spec) => spec.category))]
+const tasksBySpec = indexTasksBySpec(catalog)
+
+function relatedTasks(specUrl: string) {
+  return tasksBySpec.get(specUrl) ?? []
+}
+
+function relationLabel(spec: (typeof specs)[number]) {
+  return relationStateLabels[relationState(spec, relatedTasks(spec.url).length)]
+}
 
 const filteredSpecs = computed(() => {
   const search = query.value.trim().toLocaleLowerCase('ja')
@@ -34,11 +44,14 @@ const filteredSpecs = computed(() => {
   const status = props.status || selectedStatus.value
 
   return specs.filter((spec) => {
+    const taskSearch = relatedTasks(spec.url)
+      .flatMap((task) => [task.taskId, task.title])
+      .join(' ')
     const matchesCategory = !category || spec.category === category
     const matchesStatus = !status || spec.status === status
     const matchesSearch =
       !search ||
-      `${spec.title} ${spec.description} ${spec.category}`
+      `${spec.title} ${spec.description} ${spec.category} ${taskSearch}`
         .toLocaleLowerCase('ja')
         .includes(search)
     return matchesCategory && matchesStatus && matchesSearch
@@ -84,6 +97,7 @@ const filteredSpecs = computed(() => {
             <th>仕様</th>
             <th v-if="!props.category">分類</th>
             <th>状態</th>
+            <th>関連タスク</th>
           </tr>
         </thead>
         <tbody>
@@ -91,6 +105,15 @@ const filteredSpecs = computed(() => {
             <td><a :href="pageHref(spec.url)">{{ spec.title }}</a></td>
             <td v-if="!props.category">{{ spec.category }}</td>
             <td><StatusBadge :status="spec.status" /></td>
+            <td>
+              <template v-if="relatedTasks(spec.url).length">
+                <template v-for="(task, index) in relatedTasks(spec.url)" :key="task.url">
+                  <span v-if="index">、</span>
+                  <a :href="pageHref(task.url)">{{ task.taskId }}</a>
+                </template>
+              </template>
+              <span v-else class="relation-list-state">{{ relationLabel(spec) }}</span>
+            </td>
           </tr>
         </tbody>
       </table>
