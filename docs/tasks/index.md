@@ -19,7 +19,7 @@ description: Palette Bulletのタスク説明一覧
 
 - [Player](/tasks/player/)
 - [カメラ](/tasks/camera/)
-- [ドローシステム](/tasks/draw-system/)
+- [ドローモード](/tasks/draw-system/)
 - [その他](/tasks/other/)
 
 ## 関連ページ
