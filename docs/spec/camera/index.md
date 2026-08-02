@@ -1,13 +1,17 @@
 ---
 title: カメラ
 description: Palette Bulletのカメラ仕様
+pageType: spec
+category: カメラ
+categoryOrder: 30
+order: 0
+status: 未決
 ---
 
 # カメラ
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：未決
 - 関連タスク：[カメラタスク](/tasks/camera/)
 - 関連ページ：[Playerとカメラの接続](/spec/player/camera-connection)、[ゲーム全体](/spec/game/)

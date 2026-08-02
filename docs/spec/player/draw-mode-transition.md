@@ -1,13 +1,16 @@
 ---
 title: ドローモードへの移行
 description: Palette Bulletのドローモード移行仕様
+pageType: spec
+category: Player
+order: 40
+status: 未決
 ---
 
 # ドローモードへの移行
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：プログラム
 - 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[Player状態](/spec/player/states)、[ドローシステム](/spec/draw-system/)

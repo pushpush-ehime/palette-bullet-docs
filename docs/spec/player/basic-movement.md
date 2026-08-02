@@ -1,13 +1,16 @@
 ---
 title: Player基本移動
 description: Palette BulletにおけるPlayerの基本移動仕様
+pageType: spec
+category: Player
+order: 20
+status: 仮仕様
 ---
 
 # Player基本移動
 
 ## ページ概要
 
-- 仕様状態：仮仕様
 - 対象担当：プログラム
 - 関連タスク：[PB-TASK-0001](/tasks/player/pb-task-0001)
 - 関連ページ：[入力と操作](/spec/player/input-and-controls)、[カメラとの接続](/spec/player/camera-connection)

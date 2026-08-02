@@ -1,13 +1,16 @@
 ---
 title: シャオンダマ選択との接続
 description: Playerとシャオンダマ選択の接続仕様
+pageType: spec
+category: Player
+order: 50
+status: 未決
 ---
 
 # シャオンダマ選択との接続
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：プログラム
 - 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[Player概要](/spec/player/)、[シャオンダマ・音楽連動](/spec/shaondama-music/)

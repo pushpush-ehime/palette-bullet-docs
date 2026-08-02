@@ -1,13 +1,17 @@
 ---
 title: 戦闘
 description: Palette Bulletの戦闘仕様
+pageType: spec
+category: 戦闘
+categoryOrder: 60
+order: 0
+status: 未決
 ---
 
 # 戦闘
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：未決
 - 関連タスク：[その他タスク](/tasks/other/)
 - 関連ページ：[Playerと戦闘の接続](/spec/player/combat-connection)、[敵](/spec/enemy/)

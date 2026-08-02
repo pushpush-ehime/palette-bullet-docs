@@ -1,13 +1,17 @@
 ---
 title: ドローシステム
 description: Palette Bulletのドローシステム仕様
+pageType: spec
+category: ドローシステム
+categoryOrder: 40
+order: 0
+status: 未決
 ---
 
 # ドローシステム
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：未決
 - 関連タスク：[ドローシステムタスク](/tasks/draw-system/)
 - 関連ページ：[ドローモードへの移行](/spec/player/draw-mode-transition)、[シャオンダマ・音楽連動](/spec/shaondama-music/)

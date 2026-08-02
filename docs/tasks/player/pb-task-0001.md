@@ -1,6 +1,12 @@
 ---
-title: PB-TASK-0001 Playerの基本移動
+title: Playerの基本移動を実装する
 description: Playerの基本移動を実装するタスク
+pageType: task
+taskId: PB-TASK-0001
+category: Player
+order: 10
+relatedSpecs:
+  - /spec/player/basic-movement
 ---
 
 # PB-TASK-0001｜Playerの基本移動を実装する

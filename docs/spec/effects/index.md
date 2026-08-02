@@ -1,13 +1,17 @@
 ---
 title: 演出
 description: Palette Bulletの演出仕様
+pageType: spec
+category: 演出
+categoryOrder: 100
+order: 0
+status: 未決
 ---
 
 # 演出
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：未決
 - 関連タスク：[その他タスク](/tasks/other/)
 - 関連ページ：[ゲーム全体](/spec/game/)、[UI](/spec/ui/)

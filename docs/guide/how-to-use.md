@@ -41,4 +41,5 @@ description: Palette Bullet設計書の読み方と運用ルール
 ## 関連ページ
 
 - [サイトの更新方法](/guide/updating-site)
+- [新しいページを作る](/guide/new-page)
 - [用語集](/glossary)

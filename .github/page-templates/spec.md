@@ -1,24 +1,23 @@
 ---
-title: 敵
-description: Palette Bulletの敵仕様
+title: 仕様名
+description: この仕様で定義する内容
 pageType: spec
-category: 敵
-categoryOrder: 70
-order: 0
+category: Player
+order: 90
 status: 未決
 ---
 
-# 敵
+# 仕様名
 
 ## ページ概要
 
 - 対象担当：未決
-- 関連タスク：[その他タスク](/tasks/other/)
-- 関連ページ：[戦闘](/spec/combat/)、[ステージ](/spec/stage/)
+- 関連タスク：なし
+- 関連ページ：なし
 
 ## 目的
 
-敵に関するゲーム上の挙動を定義します。
+未決
 
 ## プレイヤーから見た挙動
 
@@ -50,4 +49,4 @@ status: 未決
 
 ## 関連タスク
 
-- [その他タスク](/tasks/other/)
+なし

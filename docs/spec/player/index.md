@@ -1,13 +1,18 @@
 ---
 title: Player概要
 description: Palette BulletのPlayer仕様一覧
+pageType: spec
+category: Player
+categoryOrder: 20
+order: 0
+status: 未決
+collapsed: false
 ---
 
 # Player概要
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：プログラム
 - 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[ゲーム全体](/spec/game/)、[ゲーム概要](/game-overview)

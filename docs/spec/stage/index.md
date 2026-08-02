@@ -1,13 +1,17 @@
 ---
 title: ステージ
 description: Palette Bulletのステージ仕様
+pageType: spec
+category: ステージ
+categoryOrder: 80
+order: 0
+status: 未決
 ---
 
 # ステージ
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：未決
 - 関連タスク：[その他タスク](/tasks/other/)
 - 関連ページ：[ゲーム全体](/spec/game/)、[敵](/spec/enemy/)
