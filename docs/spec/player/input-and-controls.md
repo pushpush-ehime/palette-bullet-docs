@@ -1,13 +1,16 @@
 ---
 title: Player入力と操作
 description: Palette BulletのPlayer入力と操作仕様
+pageType: spec
+category: Player
+order: 10
+status: 未決
 ---
 
 # Player入力と操作
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：プログラム
 - 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[Player概要](/spec/player/)、[基本移動](/spec/player/basic-movement)

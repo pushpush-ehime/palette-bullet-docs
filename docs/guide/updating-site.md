@@ -11,48 +11,51 @@ description: Palette Bullet Designの更新手順
 個人情報、認証情報、非公開URLは書かないでください。
 :::
 
-## 初回準備
+## GitHubで更新
 
-```bash
-git clone https://github.com/pushpush-ehime/palette-bullet-docs.git
-cd palette-bullet-docs
-npm install
-```
+1. ページ下部の「このページを編集」を押します。
+2. Markdownを書き換えます。
+3. `Propose changes`を押します。
+4. Pull Requestを作ります。
 
-## 更新
+新しく追加する場合は、[新しいページを作る](/guide/new-page)から雛形を使います。
+
+## ローカルで更新
 
 ```bash
 git pull
 git switch -c docs/update-name
+npm install
 npm run docs:dev
 ```
 
 Markdownを編集して保存します。
 
-- ホーム：`docs/index.md`
-- ガイド：`docs/guide`
-- ゲーム概要：`docs/game-overview.md`
-- 仕様：`docs/spec`
-- タスク：`docs/tasks`
-- 用語集：`docs/glossary.md`
+新しいファイルを追加した場合だけ、開発画面を一度再起動します。
 
-## ページを追加
+## 確認
 
-1. 同じカテゴリのページを複製します。
-2. ファイル名を英小文字とハイフンにします。
-3. `docs/.vitepress/config.mts`の`sidebar`に追加します。
-4. 仕様とタスクを相互にリンクします。
+```bash
+npm run docs:check
+```
+
+次の内容を確認します。
+
+- 必須項目
+- タスクIDの形式と重複
+- ページ形式
+- 内部リンク
+- サイト全体のビルド
 
 ## 公開
 
 ```bash
-npm run docs:build
 git status
-git add docs/変更したファイル
+git add 変更したファイル
 git commit -m "変更内容"
 git push -u origin docs/update-name
 ```
 
 GitHubでPull Requestを作ります。
 
-`main`へマージすると自動公開されます。
+検査に合格して`main`へマージされると、自動公開されます。

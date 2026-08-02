@@ -1,13 +1,17 @@
 ---
 title: ゲーム全体
 description: Palette Bulletのゲーム全体仕様
+pageType: spec
+category: ゲーム全体
+categoryOrder: 10
+order: 0
+status: 未決
 ---
 
 # ゲーム全体
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：未決
 - 関連タスク：[その他タスク](/tasks/other/)
 - 関連ページ：[ゲーム概要](/game-overview)、[仕様・設計一覧](/spec/)

@@ -1,13 +1,16 @@
 ---
 title: Player状態
 description: Palette BulletのPlayer状態仕様
+pageType: spec
+category: Player
+order: 30
+status: 未決
 ---
 
 # Player状態
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：プログラム
 - 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[Player概要](/spec/player/)、[ドローモードへの移行](/spec/player/draw-mode-transition)

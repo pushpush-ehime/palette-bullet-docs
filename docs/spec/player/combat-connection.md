@@ -1,13 +1,16 @@
 ---
 title: 戦闘システムとの接続
 description: Playerと戦闘システムの接続仕様
+pageType: spec
+category: Player
+order: 60
+status: 未決
 ---
 
 # 戦闘システムとの接続
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：プログラム
 - 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[Player概要](/spec/player/)、[戦闘](/spec/combat/)

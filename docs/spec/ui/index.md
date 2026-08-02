@@ -1,13 +1,17 @@
 ---
 title: UI
 description: Palette BulletのUI仕様
+pageType: spec
+category: UI
+categoryOrder: 90
+order: 0
+status: 未決
 ---
 
 # UI
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：未決
 - 関連タスク：[その他タスク](/tasks/other/)
 - 関連ページ：[ゲーム全体](/spec/game/)、[用語集](/glossary)

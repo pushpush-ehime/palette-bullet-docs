@@ -1,4 +1,13 @@
 import { defineConfig } from 'vitepress'
+import {
+  assertValidCatalog,
+  buildSidebars,
+  loadCatalog
+} from './content/catalog.mjs'
+
+const catalog = loadCatalog()
+assertValidCatalog(catalog)
+const generatedSidebars = buildSidebars(catalog)
 
 export default defineConfig({
   lang: 'ja-JP',
@@ -15,7 +24,8 @@ export default defineConfig({
         items: [
           { text: 'このサイトの使い方', link: '/guide/how-to-use' },
           { text: 'ゲーム概要', link: '/game-overview' },
-          { text: 'サイトの更新方法', link: '/guide/updating-site' }
+          { text: 'サイトの更新方法', link: '/guide/updating-site' },
+          { text: '新しいページを作る', link: '/guide/new-page' }
         ]
       },
       { text: '仕様・設計', link: '/spec/' },
@@ -29,58 +39,8 @@ export default defineConfig({
     },
 
     sidebar: {
-      '/spec/': [
-        {
-          text: '仕様・設計',
-          items: [
-            { text: '仕様・設計一覧', link: '/spec/' },
-            { text: 'ゲーム全体', link: '/spec/game/' },
-            {
-              text: 'Player',
-              collapsed: false,
-              items: [
-                { text: 'Player概要', link: '/spec/player/' },
-                { text: '入力と操作', link: '/spec/player/input-and-controls' },
-                { text: '基本移動', link: '/spec/player/basic-movement' },
-                { text: 'Player状態', link: '/spec/player/states' },
-                { text: 'ドローモードへの移行', link: '/spec/player/draw-mode-transition' },
-                { text: 'シャオンダマ選択との接続', link: '/spec/player/shaondama-selection-connection' },
-                { text: '戦闘システムとの接続', link: '/spec/player/combat-connection' },
-                { text: 'カメラとの接続', link: '/spec/player/camera-connection' }
-              ]
-            },
-            { text: 'カメラ', link: '/spec/camera/' },
-            { text: 'ドローシステム', link: '/spec/draw-system/' },
-            { text: 'シャオンダマ・音楽連動', link: '/spec/shaondama-music/' },
-            { text: '戦闘', link: '/spec/combat/' },
-            { text: '敵', link: '/spec/enemy/' },
-            { text: 'ステージ', link: '/spec/stage/' },
-            { text: 'UI', link: '/spec/ui/' },
-            { text: '演出', link: '/spec/effects/' },
-            { text: '共通技術', link: '/spec/common-technology/' }
-          ]
-        }
-      ],
-
-      '/tasks/': [
-        {
-          text: 'タスク説明',
-          items: [
-            { text: 'タスク一覧', link: '/tasks/' },
-            {
-              text: 'Player',
-              collapsed: false,
-              items: [
-                { text: 'Playerタスク', link: '/tasks/player/' },
-                { text: 'PB-TASK-0001 基本移動', link: '/tasks/player/pb-task-0001' }
-              ]
-            },
-            { text: 'カメラ', link: '/tasks/camera/' },
-            { text: 'ドローシステム', link: '/tasks/draw-system/' },
-            { text: 'その他', link: '/tasks/other/' }
-          ]
-        }
-      ],
+      '/spec/': generatedSidebars.spec,
+      '/tasks/': generatedSidebars.tasks,
 
       '/guide/': [
         {
@@ -89,6 +49,7 @@ export default defineConfig({
             { text: 'このサイトの使い方', link: '/guide/how-to-use' },
             { text: 'ゲーム概要', link: '/game-overview' },
             { text: 'サイトの更新方法', link: '/guide/updating-site' },
+            { text: '新しいページを作る', link: '/guide/new-page' },
             { text: '用語集', link: '/glossary' }
           ]
         }
@@ -103,6 +64,7 @@ export default defineConfig({
             { text: 'ゲーム概要', link: '/game-overview' },
             { text: '仕様・設計', link: '/spec/' },
             { text: 'タスク説明', link: '/tasks/' },
+            { text: '新しいページを作る', link: '/guide/new-page' },
             { text: '用語集', link: '/glossary' }
           ]
         }

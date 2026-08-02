@@ -1,15 +1,17 @@
 ---
 title: Playerタスク
 description: Playerに関するタスク一覧
+pageType: task-category
+category: Player
+categoryOrder: 10
+collapsed: false
 ---
 
 # Playerタスク
 
 ## タスク一覧
 
-| タスクID | タスク名 | 関連仕様 |
-|---|---|---|
-| [PB-TASK-0001](/tasks/player/pb-task-0001) | Playerの基本移動を実装する | [Player基本移動](/spec/player/basic-movement) |
+<TaskList category="Player" />
 
 ## 関連仕様
 

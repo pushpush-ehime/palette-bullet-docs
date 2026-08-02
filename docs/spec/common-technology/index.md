@@ -1,13 +1,17 @@
 ---
 title: 共通技術
 description: Palette Bulletの共通技術仕様
+pageType: spec
+category: 共通技術
+categoryOrder: 110
+order: 0
+status: 未決
 ---
 
 # 共通技術
 
 ## ページ概要
 
-- 仕様状態：未決
 - 対象担当：未決
 - 関連タスク：[その他タスク](/tasks/other/)
 - 関連ページ：[ゲーム全体](/spec/game/)、[仕様・設計一覧](/spec/)

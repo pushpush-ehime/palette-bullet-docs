@@ -1,4 +1,7 @@
 ---
+title: Palette Bullet
+description: Palette Bulletの仕様・設計・タスク説明
+pageType: home
 layout: home
 
 hero:
@@ -34,10 +37,12 @@ Palette Bulletの正式な仕様・設計・タスク説明を共有します。
 
 ## 最近更新されたページ
 
-- [このサイトの使い方](/guide/how-to-use)
-- [ゲーム概要](/game-overview)
-- [Player基本移動](/spec/player/basic-movement)
-- [タスク一覧](/tasks/)
+<RecentPages :limit="5" />
+
+## ページを追加
+
+- [新しい仕様を作る](/guide/new-page#仕様ページ)
+- [新しいタスクを作る](/guide/new-page#タスクページ)
 
 ## 仕様状態
 
@@ -48,5 +53,3 @@ Palette Bulletの正式な仕様・設計・タスク説明を共有します。
 | 未決 | 決定するまで実装しない |
 | 対象外 | このページやタスクでは扱わない |
 | 廃止 | 使用しない |
-
-[このページを編集](https://github.com/pushpush-ehime/palette-bullet-docs/edit/main/docs/index.md)
