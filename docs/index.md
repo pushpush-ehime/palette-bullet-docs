@@ -15,6 +15,9 @@ hero:
     - theme: alt
       text: ゲーム概要
       link: /game-overview
+    - theme: alt
+      text: サイトの全体構成
+      link: /site-map
 ---
 
 ## 目的
