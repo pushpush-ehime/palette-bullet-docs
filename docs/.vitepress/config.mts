@@ -23,6 +23,11 @@ export default defineConfig({
       { text: '用語集', link: '/glossary' }
     ],
 
+    editLink: {
+      pattern: 'https://github.com/pushpush-ehime/palette-bullet-docs/edit/main/docs/:path',
+      text: 'このページを編集'
+    },
+
     sidebar: {
       '/spec/': [
         {
