@@ -12,7 +12,6 @@ status: 仮仕様
 ## ページ概要
 
 - 対象担当：プログラム
-- 関連タスク：[PB-TASK-0001](/tasks/player/pb-task-0001)
 - 関連ページ：[入力と操作](/spec/player/input-and-controls)、[カメラとの接続](/spec/player/camera-connection)
 
 ## 目的
@@ -75,4 +74,4 @@ status: 仮仕様
 
 ## 関連タスク
 
-- [PB-TASK-0001｜Playerの基本移動を実装する](/tasks/player/pb-task-0001)
+<PageRelations />

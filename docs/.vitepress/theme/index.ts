@@ -2,7 +2,9 @@ import { h } from 'vue'
 import DefaultTheme from 'vitepress/theme'
 import OpenQuestions from './components/OpenQuestions.vue'
 import PageMeta from './components/PageMeta.vue'
+import PageRelations from './components/PageRelations.vue'
 import RecentPages from './components/RecentPages.vue'
+import RelationMap from './components/RelationMap.vue'
 import SpecList from './components/SpecList.vue'
 import StatusBadge from './components/StatusBadge.vue'
 import TaskList from './components/TaskList.vue'
@@ -16,7 +18,9 @@ export default {
     }),
   enhanceApp({ app }) {
     app.component('OpenQuestions', OpenQuestions)
+    app.component('PageRelations', PageRelations)
     app.component('RecentPages', RecentPages)
+    app.component('RelationMap', RelationMap)
     app.component('SpecList', SpecList)
     app.component('StatusBadge', StatusBadge)
     app.component('TaskList', TaskList)

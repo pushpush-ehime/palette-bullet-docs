@@ -30,10 +30,11 @@ const filteredTasks = computed(() => {
   const category = props.category || selectedCategory.value
 
   return tasks.filter((task) => {
+    const relatedSpecTitles = task.relatedSpecs.map(specTitle).join(' ')
     const matchesCategory = !category || task.category === category
     const matchesSearch =
       !search ||
-      `${task.taskId} ${task.title} ${task.category}`
+      `${task.taskId} ${task.title} ${task.category} ${relatedSpecTitles}`
         .toLocaleLowerCase('ja')
         .includes(search)
     return matchesCategory && matchesSearch

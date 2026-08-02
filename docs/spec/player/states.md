@@ -12,7 +12,6 @@ status: 未決
 ## ページ概要
 
 - 対象担当：プログラム
-- 関連タスク：[Playerタスク](/tasks/player/)
 - 関連ページ：[Player概要](/spec/player/)、[ドローモードへの移行](/spec/player/draw-mode-transition)
 
 ## 目的
@@ -49,4 +48,4 @@ Playerの状態と状態遷移を定義します。
 
 ## 関連タスク
 
-- [Playerタスク](/tasks/player/)
+<PageRelations />

@@ -13,7 +13,6 @@ status: 未決
 ## ページ概要
 
 - 対象担当：未決
-- 関連タスク：[その他タスク](/tasks/other/)
 - 関連ページ：[Playerと戦闘の接続](/spec/player/combat-connection)、[敵](/spec/enemy/)
 
 ## 目的
@@ -50,4 +49,4 @@ status: 未決
 
 ## 関連タスク
 
-- [その他タスク](/tasks/other/)
+<PageRelations />

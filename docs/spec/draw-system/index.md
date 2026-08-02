@@ -13,7 +13,6 @@ status: 未決
 ## ページ概要
 
 - 対象担当：未決
-- 関連タスク：[ドローシステムタスク](/tasks/draw-system/)
 - 関連ページ：[ドローモードへの移行](/spec/player/draw-mode-transition)、[シャオンダマ・音楽連動](/spec/shaondama-music/)
 
 ## 目的
@@ -50,4 +49,4 @@ status: 未決
 
 ## 関連タスク
 
-- [ドローシステムタスク](/tasks/draw-system/)
+<PageRelations />

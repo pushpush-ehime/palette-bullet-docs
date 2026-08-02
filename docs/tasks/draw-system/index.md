@@ -11,8 +11,3 @@ categoryOrder: 30
 ## タスク一覧
 
 <TaskList category="ドローモード" />
-
-## 関連仕様
-
-- [ドローシステム](/spec/draw-system/)
-- [ドローモードへの移行](/spec/player/draw-mode-transition)

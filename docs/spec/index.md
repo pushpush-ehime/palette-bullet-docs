@@ -17,5 +17,6 @@ sidebarTitle: 仕様・設計一覧
 
 ## 関連ページ
 
+- [仕様・タスク対応](/relations)
 - [タスク一覧](/tasks/)
 - [用語集](/glossary)

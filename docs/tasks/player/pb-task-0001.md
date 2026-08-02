@@ -23,7 +23,7 @@ Playerがキーボード入力でゲーム空間を移動できるようにし�
 
 ## 関連する仕様
 
-- [Player基本移動](/spec/player/basic-movement)
+<PageRelations />
 
 ## 実施内容
 
@@ -86,5 +86,4 @@ Playerがキーボード入力でゲーム空間を移動できるようにし�
 ## 関連リンク
 
 - Notionタスク：未登録
-- [関連仕様](/spec/player/basic-movement)
 - GitHub Pull Request：未登録
