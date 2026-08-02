@@ -85,5 +85,5 @@ Playerがキーボード入力でゲーム空間を移動できるようにし�
 
 ## 関連リンク
 
-- Notionタスク：未登録
+- Notionタスク：[PB-TASK-0001（🎯 パレットブレット タスクDB）](https://app.notion.com/p/3b02f4974b398135a6ddda7d663b9789)
 - GitHub Pull Request：未登録
