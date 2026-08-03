@@ -9,7 +9,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "docs:validate": "node scripts/validate-docs.mjs",
-    "docs:check": "npm run docs:build"
+    "docs:check": "npm run docs:validate && npm run docs:build"
   },
   "keywords": [],
   "author": "",
