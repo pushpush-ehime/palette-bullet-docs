@@ -23,5 +23,5 @@ hero:
 
 ## 仕様・タスクを確認
 
-- [仕様を確認](/spec)
-- [タスクを確認](/tasks)
+- [仕様を確認](/spec/index.md)
+- [タスクを確認](/tasks/index.md)
