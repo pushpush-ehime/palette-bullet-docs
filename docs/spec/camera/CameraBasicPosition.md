@@ -2,7 +2,7 @@
 title: カメラの基準配置
 description: 通常時のカメラの位置、距離、画角の基本値定義
 pageType: spec
-category: カメラの基準配置
+category: カメラ
 order: 1
 status: 未決
 ---

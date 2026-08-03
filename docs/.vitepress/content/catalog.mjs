@@ -187,6 +187,16 @@ export function normalizePageUrl(value) {
   return url
 }
 
+function canonicalCatalogUrl(value) {
+  const normalized = normalizePageUrl(value)
+
+  if (!normalized || normalized === '/') {
+    return normalized
+  }
+
+  return normalized.replace(/\/+$/, '')
+}
+
 function updatedAt(filePath, repositoryRoot) {
   const gitPath = toPosix(relative(repositoryRoot, filePath))
 
@@ -538,14 +548,15 @@ export function validateCatalog(catalog) {
    * 同じURLが作られていないか確認する。
    */
   for (const entry of catalog) {
-    const existingEntry = urls.get(entry.url)
+    const canonicalUrl = canonicalCatalogUrl(entry.url)
+    const existingEntry = urls.get(canonicalUrl)
 
     if (existingEntry) {
       errors.push(
         `${entry.relativePath}: URL「${entry.url}」が${existingEntry.relativePath}と重複しています。`
       )
     } else {
-      urls.set(entry.url, entry)
+      urls.set(canonicalUrl, entry)
     }
   }
 
@@ -758,7 +769,9 @@ export function validateCatalog(catalog) {
           }
 
           for (const relatedSpec of entry.relatedSpecs) {
-            const target = urls.get(relatedSpec)
+            const target = urls.get(
+              canonicalCatalogUrl(relatedSpec)
+            )
 
             if (!target) {
               errors.push(

@@ -2,7 +2,7 @@
 title: カメラの基準配置（ダッシュ時）
 description: ダッシュアクション実行時のカメラの位置、距離、画角の変動値定義
 pageType: spec
-category: カメラの基準配置-ダッシュ時
+category: カメラ
 order: 1
 status: 未決
 ---
