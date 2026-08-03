@@ -329,6 +329,9 @@ export function buildSidebars(catalog) {
   const specRoot = catalog.find((entry) => entry.pageType === 'spec-index')
   const taskRoot = catalog.find((entry) => entry.pageType === 'task-index')
 
+  //
+  // 仕様・設計
+  //
   const specItems = [
     {
       text: specRoot?.frontmatter.sidebarTitle ?? '仕様・設計一覧',
@@ -340,24 +343,27 @@ export function buildSidebars(catalog) {
     }
   ]
 
+  const specCategoryItems = []
+
   for (const categoryIndex of categoryDefinitions(catalog, 'spec', 'spec')) {
     const directory = categoryDirectory(categoryIndex, 'spec')
     const pages = catalog
       .filter(
         (entry) =>
-          entry.pageType === 'spec' && categoryDirectory(entry, 'spec') === directory
+          entry.pageType === 'spec' &&
+          categoryDirectory(entry, 'spec') === directory
       )
       .sort(sortByOrder)
 
     if (pages.length === 1) {
-      specItems.push({
+      specCategoryItems.push({
         text: categoryIndex.frontmatter.sidebarTitle ?? categoryIndex.title,
         link: categoryIndex.url
       })
       continue
     }
 
-    specItems.push({
+    specCategoryItems.push({
       text: categoryIndex.category,
       collapsed: categoryIndex.frontmatter.collapsed ?? true,
       items: pages.map((page) => ({
@@ -367,6 +373,17 @@ export function buildSidebars(catalog) {
     })
   }
 
+  if (specCategoryItems.length > 0) {
+    specItems.push({
+      text: '仕様一覧',
+      collapsed: false,
+      items: specCategoryItems
+    })
+  }
+
+  //
+  // タスク
+  //
   const taskItems = [
     {
       text: taskRoot?.frontmatter.sidebarTitle ?? 'タスク一覧',
@@ -378,24 +395,28 @@ export function buildSidebars(catalog) {
     }
   ]
 
+  const taskCategoryItems = []
+
   for (const categoryIndex of categoryDefinitions(catalog, 'task-category', 'tasks')) {
     const directory = categoryDirectory(categoryIndex, 'tasks')
+
     const tasks = catalog
       .filter(
         (entry) =>
-          entry.pageType === 'task' && categoryDirectory(entry, 'tasks') === directory
+          entry.pageType === 'task' &&
+          categoryDirectory(entry, 'tasks') === directory
       )
       .sort(sortByOrder)
 
     if (tasks.length === 0) {
-      taskItems.push({
+      taskCategoryItems.push({
         text: categoryIndex.category,
         link: categoryIndex.url
       })
       continue
     }
 
-    taskItems.push({
+    taskCategoryItems.push({
       text: categoryIndex.category,
       collapsed: categoryIndex.frontmatter.collapsed ?? true,
       items: [
@@ -411,9 +432,27 @@ export function buildSidebars(catalog) {
     })
   }
 
+  if (taskCategoryItems.length > 0) {
+    taskItems.push({
+      text: 'タスク一覧',
+      collapsed: false,
+      items: taskCategoryItems
+    })
+  }
+
   return {
-    spec: [{ text: '仕様・設計', items: specItems }],
-    tasks: [{ text: 'タスク説明', items: taskItems }]
+    spec: [
+      {
+        text: '仕様・設計',
+        items: specItems
+      }
+    ],
+    tasks: [
+      {
+        text: 'タスク説明',
+        items: taskItems
+      }
+    ]
   }
 }
 

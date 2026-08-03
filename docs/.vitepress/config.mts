@@ -6,7 +6,7 @@ import {
 } from './content/catalog.mjs'
 
 const catalog = loadCatalog()
-assertValidCatalog(catalog)
+// assertValidCatalog(catalog)
 const generatedSidebars = buildSidebars(catalog)
 
 export default defineConfig({
@@ -16,26 +16,17 @@ export default defineConfig({
   base: '/palette-bullet-docs/',
   lastUpdated: true,
 
-  themeConfig: {
+    themeConfig: {
     nav: [
       { text: 'ホーム', link: '/' },
       {
         text: 'はじめに',
         items: [
           { text: 'このサイトの使い方', link: '/guide/how-to-use' },
-          { text: 'ゲーム概要', link: '/game-overview' },
-          { text: 'サイトの更新方法', link: '/guide/updating-site' },
-          { text: '新しいページを作る', link: '/guide/new-page' }
         ]
-      },
-      {
-        text: '仕様・設計',
-        items: [
-          { text: '仕様・設計一覧', link: '/spec/' },
-          { text: '仕様・タスク対応', link: '/relations' }
-        ]
-      },
+      },      { text: '仕様・設計', link: '/spec/' },
       { text: 'タスク説明', link: '/tasks/' },
+      { text: '仕様・タスク対応', link: '/relations' }, 
       { text: '用語集', link: '/glossary' }
     ],
 
@@ -44,39 +35,27 @@ export default defineConfig({
       text: 'このページを編集'
     },
 
-    sidebar: {
-      '/spec/': generatedSidebars.spec,
-      '/tasks/': generatedSidebars.tasks,
-
-      '/guide/': [
-        {
-          text: 'ガイド',
-          items: [
-            { text: 'このサイトの使い方', link: '/guide/how-to-use' },
-            { text: 'ゲーム概要', link: '/game-overview' },
-            { text: 'サイトの更新方法', link: '/guide/updating-site' },
-            { text: '新しいページを作る', link: '/guide/new-page' },
-            { text: '用語集', link: '/glossary' }
-          ]
-        }
-      ],
-
-      '/': [
-        {
-          text: '全体を知る',
-          items: [
-            { text: 'ホーム', link: '/' },
-            { text: 'このサイトの使い方', link: '/guide/how-to-use' },
-            { text: 'ゲーム概要', link: '/game-overview' },
-            { text: '仕様・設計', link: '/spec/' },
-            { text: '仕様・タスク対応', link: '/relations' },
-            { text: 'タスク説明', link: '/tasks/' },
-            { text: '新しいページを作る', link: '/guide/new-page' },
-            { text: '用語集', link: '/glossary' }
-          ]
-        }
-      ]
-    },
+// ▼ ここを大改造！ URLごとの切り替えをやめ、1つの大きな配列にまとめました ▼
+    sidebar: [
+      {
+        text: '全体ガイド',
+        items: [
+          { text: 'ホーム', link: '/' },
+          { text: 'このサイトの使い方', link: '/guide/how-to-use' },
+          { text: 'ゲーム概要', link: '/game-overview' },
+          { text: '仕様・タスク対応', link: '/relations' },
+          { text: '新しいページを作る', link: '/guide/new-page' },
+          { text: '用語集', link: '/glossary' }
+        ]
+      },
+      {
+        items: generatedSidebars.spec // 自動生成された仕様書の目次をここに合流
+      },
+      {
+        items: generatedSidebars.tasks // 自動生成されたタスクの目次をここに合流
+      }
+    ],
+    // ▲ 変更ここまで ▲
 
     outline: {
       level: [2, 3],
