@@ -2,7 +2,7 @@
 title: カメラの通常動作
 description: Palette Bulletのカメラ仕様
 pageType: spec
-category: カメラの通常動作
+category: カメラ
 order: 2
 status: 未決
 ---

@@ -8,16 +8,13 @@ import RelationMap from './components/RelationMap.vue'
 import SpecList from './components/SpecList.vue'
 import StatusBadge from './components/StatusBadge.vue'
 import TaskList from './components/TaskList.vue'
-import CustomSidebar from './components/CustomSidebar.vue'
 import './styles.css'
 
 export default {
   extends: DefaultTheme,
   Layout: () =>
     h(DefaultTheme.Layout, null, {
-      'doc-before': () => h(PageMeta),
-
-      'sidebar-nav-after': () => h(CustomSidebar)
+      'doc-before': () => h(PageMeta)
     }),
   enhanceApp({ app }) {
     app.component('OpenQuestions', OpenQuestions)
@@ -27,6 +24,5 @@ export default {
     app.component('SpecList', SpecList)
     app.component('StatusBadge', StatusBadge)
     app.component('TaskList', TaskList)
-    app.component('CustomSidebar', CustomSidebar)
   }
 }

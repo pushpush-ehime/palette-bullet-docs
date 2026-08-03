@@ -2,7 +2,7 @@
 title: カメラ概要
 description: Palette Bulletのカメラ仕様
 pageType: spec
-category: カメラ概要
+category: カメラ
 categoryOrder: 30
 order: 0
 status: 未決

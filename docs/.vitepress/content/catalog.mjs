@@ -1,6 +1,10 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, relative, resolve } from 'node:path'
+/**
+ * @typedef {import('vitepress').DefaultTheme.SidebarItem} SidebarItem
+ * @typedef {import('vitepress').DefaultTheme.SidebarMulti} SidebarMulti
+ */
 
 export const VALID_STATUSES = ['確定', '仮仕様', '未決', '対象外', '廃止']
 
@@ -324,7 +328,15 @@ function categoryDefinitions(catalog, pageType, rootName) {
         left.category.localeCompare(right.category, 'ja')
     )
 }
-
+/**
+ * @param {ReturnType<typeof loadCatalog>} catalog
+ * @param {{ leadingItems?: SidebarItem[] }} [options]
+ * @returns {{
+ *   spec: SidebarItem[],
+ *   tasks: SidebarItem[],
+ *   sidebar: SidebarMulti
+ * }}
+ */
 export function buildSidebars(catalog, { leadingItems = [] } = {}) {
   const specRoot = catalog.find((entry) => entry.pageType === 'spec-index')
   const taskRoot = catalog.find((entry) => entry.pageType === 'task-index')
@@ -494,8 +506,8 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
     ]
   }
 
+/** @type {SidebarMulti} */
   const sidebar = {}
-
   // VitePressが広いパスより先にカテゴリ固有パスを判定できるよう、
   // カテゴリ固有の設定を先に登録する。
   for (const { categoryIndex, directory } of specCategories) {
