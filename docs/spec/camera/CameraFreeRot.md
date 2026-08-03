@@ -1,13 +1,13 @@
 ---
-title: TPS用フリーカメラ
+title: カメラの通常動作
 description: Palette Bulletのカメラ仕様
 pageType: spec
-category: TPS用フリーカメラ
+category: カメラの通常動作
 order: 2
 status: 未決
 ---
 
-# TPS用フリーカメラ
+# カメラの通常動作
 
 ## 1. 概要
 プレイヤーキャラクターの後方にカメラを配置するTPS視点を基本とし、プレイヤーの入力（右スティック／マウス）によってカメラを任意の方向へ自由に回転させることができる。

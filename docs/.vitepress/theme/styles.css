@@ -457,3 +457,25 @@
     border-left: 5px solid transparent;
   }
 }
+/* 現在のカテゴリ末尾に表示される「ページを追加」リンク */
+.VPSidebar a[href^='https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/'] {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 7px 10px;
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+  border: 1px dashed var(--vp-c-brand-2);
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.VPSidebar a[href^='https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/']:hover {
+  color: var(--vp-c-brand-1);
+  border-style: solid;
+}
+
+.VPSidebar a[href^='https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/']:focus-visible {
+  outline: 2px solid var(--vp-c-brand-2);
+  outline-offset: 2px;
+}

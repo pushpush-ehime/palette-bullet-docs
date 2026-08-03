@@ -7,7 +7,22 @@ import {
 
 const catalog = loadCatalog()
 // assertValidCatalog(catalog)
-const generatedSidebars = buildSidebars(catalog)
+
+const generatedSidebars = buildSidebars(catalog, {
+  leadingItems: [
+    {
+      text: '全体ガイド',
+      items: [
+        { text: 'ホーム', link: '/' },
+        { text: 'このサイトの使い方', link: '/guide/how-to-use' },
+        { text: 'ゲーム概要', link: '/game-overview' },
+        { text: '仕様・タスク対応', link: '/relations' },
+        { text: '新しいページを作る', link: '/guide/new-page' },
+        { text: '用語集', link: '/glossary' }
+      ]
+    }
+  ]
+})
 
 export default defineConfig({
   lang: 'ja-JP',
@@ -16,46 +31,29 @@ export default defineConfig({
   base: '/palette-bullet-docs/',
   lastUpdated: true,
 
-    themeConfig: {
+  themeConfig: {
     nav: [
       { text: 'ホーム', link: '/' },
       {
         text: 'はじめに',
         items: [
-          { text: 'このサイトの使い方', link: '/guide/how-to-use' },
+          { text: 'このサイトの使い方', link: '/guide/how-to-use' }
         ]
-      },      { text: '仕様・設計', link: '/spec/' },
+      },
+      { text: '仕様・設計', link: '/spec/' },
       { text: 'タスク説明', link: '/tasks/' },
-      { text: '仕様・タスク対応', link: '/relations' }, 
+      { text: '仕様・タスク対応', link: '/relations' },
       { text: '用語集', link: '/glossary' }
     ],
 
     editLink: {
-      pattern: 'https://github.com/pushpush-ehime/palette-bullet-docs/edit/main/docs/:path',
+      pattern:
+        'https://github.com/pushpush-ehime/palette-bullet-docs/edit/main/docs/:path',
       text: 'このページを編集'
     },
 
-// ▼ ここを大改造！ URLごとの切り替えをやめ、1つの大きな配列にまとめました ▼
-    sidebar: [
-      {
-        text: '全体ガイド',
-        items: [
-          { text: 'ホーム', link: '/' },
-          { text: 'このサイトの使い方', link: '/guide/how-to-use' },
-          { text: 'ゲーム概要', link: '/game-overview' },
-          { text: '仕様・タスク対応', link: '/relations' },
-          { text: '新しいページを作る', link: '/guide/new-page' },
-          { text: '用語集', link: '/glossary' }
-        ]
-      },
-      {
-        items: generatedSidebars.spec // 自動生成された仕様書の目次をここに合流
-      },
-      {
-        items: generatedSidebars.tasks // 自動生成されたタスクの目次をここに合流
-      }
-    ],
-    // ▲ 変更ここまで ▲
+    // 現在のURLに対応するカテゴリだけ、末尾に「ページを追加」を表示する。
+    sidebar: generatedSidebars.sidebar,
 
     outline: {
       level: [2, 3],
