@@ -11,53 +11,36 @@ collapsed: false
 
 # Player概要
 
-## ページ概要
+このページでは、プレイヤーキャラクターの基本設定およびゲーム内仕様の概要を定義します。
 
-- 対象担当：プログラム
-- 関連ページ：[ゲーム全体](/spec/game/)、[ゲーム概要](/game-overview)
+## キャラクター設定
 
-## 目的
+### ビジュアル
+<img src="/images/player.png" width="300" alt="UIサンプル">
 
-Playerに関する仕様の入口にします。
+### 基本プロフィール
+| 項目 | 設定内容 |
+| :--- | :--- |
+| **名前** | 〇〇 |
+| **年齢** | 〇〇歳 |
+| **出身** | 〇〇 |
+| **身長/体重**| 〇〇cm / 〇〇kg |
 
-## プレイヤーから見た挙動
+### バックボーン
+（キャラクターの背景や、戦う理由などを記述）
 
-以下の詳細ページで管理します。
+## ゲームシステム仕様
 
-## 詳細仕様
+### 基本ステータス
+*   **最大HP:** 100
+*   **移動速度:** 5.0
+*   **当たり判定:** 半径〇〇px（中心足元）
 
-- [入力と操作](/spec/player/input-and-controls)
-- [基本移動](/spec/player/basic-movement)
-- [Player状態](/spec/player/states)
-- [ドローモードへの移行](/spec/player/draw-mode-transition)
-- [シャオンダマ選択との接続](/spec/player/shaondama-selection-connection)
-- [戦闘システムとの接続](/spec/player/combat-connection)
-- [カメラとの接続](/spec/player/camera-connection)
+### メインウェポン
+*   **武器名:** 〇〇
+*   **特徴:** （弾の挙動や威力などの概要）
+*   ※詳細は[Player攻撃仕様](./attack.md)を参照。
 
-## 状態別の挙動
-
-- [通常状態](/spec/player/states)
-- [ドローモードへの移行](/spec/player/draw-mode-transition)
-
-## 他システムとの接続
-
-- [ドローシステム](/spec/draw-system/)
-- [シャオンダマ・音楽連動](/spec/shaondama-music/)
-- [戦闘](/spec/combat/)
-- [カメラ](/spec/camera/)
-
-## 例外・禁止事項
-
-未決
-
-## パラメータ
-
-未決
-
-## 未決事項
-
-未決
-
-## 関連タスク
-
-<PageRelations />
+### 固有スキル
+*   **スキル名:** 〇〇
+*   **効果:** （スキルの概要）
