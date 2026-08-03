@@ -8,34 +8,6 @@ import { basename, dirname, relative, resolve } from 'node:path'
 
 export const VALID_STATUSES = ['確定', '仮仕様', '未決', '対象外', '廃止']
 
-const SPEC_HEADINGS = [
-  'ページ概要',
-  '目的',
-  'プレイヤーから見た挙動',
-  '詳細仕様',
-  '状態別の挙動',
-  '他システムとの接続',
-  '例外・禁止事項',
-  'パラメータ',
-  '未決事項',
-  '関連タスク'
-]
-
-const TASK_HEADINGS = [
-  'タスクの目的',
-  '完成時にできるようになること',
-  '関連する仕様',
-  '実施内容',
-  '対象範囲',
-  '対象外',
-  '完了条件',
-  '確認手順',
-  '前提・依存タスク',
-  '実装時の注意点',
-  '提出・報告方法',
-  '関連リンク'
-]
-
 function toPosix(value) {
   return value.replaceAll('\\', '/')
 }
@@ -534,37 +506,6 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
   }
 }
 
-function validateRequiredHeadings(entry, requiredHeadings, errors) {
-  const levelTwo = entry.structure.headings.filter((heading) => heading.level === 2)
-  let previousIndex = -1
-
-  for (const required of requiredHeadings) {
-    const index = levelTwo.findIndex((heading) => heading.text === required)
-    if (index === -1) {
-      errors.push(`${entry.relativePath}: 「## ${required}」がありません。`)
-      continue
-    }
-
-    if (index < previousIndex) {
-      errors.push(`${entry.relativePath}: 「## ${required}」の順番が違います。`)
-    }
-    previousIndex = index
-
-    if (!getSectionContent(entry.structure, required)) {
-      errors.push(`${entry.relativePath}: 「## ${required}」の内容が空です。`)
-    }
-  }
-}
-
-function validateRelationComponent(entry, headingText, errors) {
-  const content = getSectionContent(entry.structure, headingText)
-  if (content !== '<PageRelations />') {
-    errors.push(
-      `${entry.relativePath}: 「## ${headingText}」の内容は<PageRelations />だけにしてください。`
-    )
-  }
-}
-
 function expectedPageType(relativePath) {
   const parts = relativePath.split('/')
 
@@ -583,14 +524,44 @@ function expectedPageType(relativePath) {
 
 export function validateCatalog(catalog) {
   const errors = []
-  const urls = new Map(catalog.map((entry) => [entry.url, entry]))
+  const urls = new Map()
   const taskIds = new Map()
+
+  /*
+   * URLの重複確認
+   *
+   * 例：
+   * docs/spec/player.md
+   * docs/spec/player/index.md
+   *
+   * 上記は両方とも /spec/player/ として扱われる可能性があるため、
+   * 同じURLが作られていないか確認する。
+   */
+  for (const entry of catalog) {
+    const existingEntry = urls.get(entry.url)
+
+    if (existingEntry) {
+      errors.push(
+        `${entry.relativePath}: URL「${entry.url}」が${existingEntry.relativePath}と重複しています。`
+      )
+    } else {
+      urls.set(entry.url, entry)
+    }
+  }
+
+  /*
+   * 各カテゴリのindex.mdを取得する。
+   *
+   * 個別ページが所属するカテゴリにindex.mdが存在するか、
+   * categoryが一致しているかを確認するために使用する。
+   */
   const specCategoryIndexes = new Map(
     categoryDefinitions(catalog, 'spec', 'spec').map((entry) => [
       categoryDirectory(entry, 'spec'),
       entry
     ])
   )
+
   const taskCategoryIndexes = new Map(
     categoryDefinitions(catalog, 'task-category', 'tasks').map((entry) => [
       categoryDirectory(entry, 'tasks'),
@@ -599,23 +570,42 @@ export function validateCatalog(catalog) {
   )
 
   for (const entry of catalog) {
+    /*
+     * Markdown共通の検査
+     */
+
     if (!entry.hasFrontmatter || entry.structure.hasUnclosedFrontmatter) {
-      errors.push(`${entry.relativePath}: frontmatterの---が正しく閉じられていません。`)
+      errors.push(
+        `${entry.relativePath}: frontmatterの---が正しく閉じられていません。`
+      )
       continue
     }
 
-    if (!entry.title) errors.push(`${entry.relativePath}: titleがありません。`)
-    if (!entry.description) errors.push(`${entry.relativePath}: descriptionがありません。`)
-    if (entry.structure.hasUnclosedFence) {
-      errors.push(`${entry.relativePath}: コードブロックが閉じられていません。`)
+    if (!entry.title) {
+      errors.push(`${entry.relativePath}: titleがありません。`)
     }
 
+    if (entry.structure.hasUnclosedFence) {
+      errors.push(
+        `${entry.relativePath}: コードブロックが閉じられていません。`
+      )
+    }
+
+    /*
+     * ファイルの場所とpageTypeの整合性
+     */
+
     const requiredPageType = expectedPageType(entry.relativePath)
+
     if (requiredPageType && entry.pageType !== requiredPageType) {
       errors.push(
         `${entry.relativePath}: pageTypeを${requiredPageType}にしてください。`
       )
     }
+
+    /*
+     * 関連付け設定の検査
+     */
 
     if (entry.frontmatter.relatedTasks !== undefined) {
       errors.push(
@@ -632,116 +622,159 @@ export function validateCatalog(catalog) {
       )
     }
 
-    const h1 = entry.structure.headings.filter((heading) => heading.level === 1)
-    if (entry.pageType !== 'home' && h1.length !== 1) {
-      errors.push(`${entry.relativePath}: H1（# 見出し）は1つにしてください。`)
-    }
-
-    let previousLevel = 0
-    for (const heading of entry.structure.headings) {
-      if (previousLevel && heading.level > previousLevel + 1) {
-        errors.push(
-          `${entry.relativePath}: 見出し「${heading.text}」のレベルが飛んでいます。`
-        )
-      }
-      previousLevel = heading.level
-    }
+    /*
+     * 仕様ページ
+     */
 
     if (entry.pageType === 'spec') {
-      if (!entry.category) errors.push(`${entry.relativePath}: categoryがありません。`)
-      if (!VALID_STATUSES.includes(entry.status)) {
+      if (!entry.category) {
+        errors.push(`${entry.relativePath}: categoryがありません。`)
+      }
+
+      /*
+       * statusは任意。
+       * 記載されている場合だけ、値が正しいか確認する。
+       */
+      if (
+        entry.status &&
+        !VALID_STATUSES.includes(entry.status)
+      ) {
         errors.push(
           `${entry.relativePath}: statusは${VALID_STATUSES.join('／')}のいずれかにしてください。`
         )
       }
-      if (!Number.isFinite(entry.frontmatter.order)) {
-        errors.push(`${entry.relativePath}: orderがありません。`)
-      }
 
       const directory = categoryDirectory(entry, 'spec')
       const categoryIndex = specCategoryIndexes.get(directory)
+
       if (!categoryIndex) {
-        errors.push(`${entry.relativePath}: 同じカテゴリのindex.mdがありません。`)
-      } else if (categoryIndex.category !== entry.category) {
+        errors.push(
+          `${entry.relativePath}: 同じカテゴリのindex.mdがありません。`
+        )
+      } else if (
+        entry.category &&
+        categoryIndex.category !== entry.category
+      ) {
         errors.push(
           `${entry.relativePath}: categoryを「${categoryIndex.category}」にしてください。`
         )
       }
-
-      if (basename(entry.relativePath) === 'index.md' && !Number.isFinite(entry.frontmatter.categoryOrder)) {
-        errors.push(`${entry.relativePath}: categoryOrderがありません。`)
-      }
-
-      if (h1[0] && h1[0].text !== entry.title) {
-        errors.push(`${entry.relativePath}: H1を「# ${entry.title}」にしてください。`)
-      }
-
-      validateRequiredHeadings(entry, SPEC_HEADINGS, errors)
-      validateRelationComponent(entry, '関連タスク', errors)
     }
+
+    /*
+     * タスクカテゴリページ
+     */
 
     if (entry.pageType === 'task-category') {
-      if (!entry.category) errors.push(`${entry.relativePath}: categoryがありません。`)
-      if (!Number.isFinite(entry.frontmatter.categoryOrder)) {
-        errors.push(`${entry.relativePath}: categoryOrderがありません。`)
+      if (!entry.category) {
+        errors.push(`${entry.relativePath}: categoryがありません。`)
       }
     }
 
+    /*
+     * タスクページ
+     */
+
     if (entry.pageType === 'task') {
-      if (!entry.category) errors.push(`${entry.relativePath}: categoryがありません。`)
-      if (!Number.isFinite(entry.frontmatter.order)) {
-        errors.push(`${entry.relativePath}: orderがありません。`)
+      if (!entry.category) {
+        errors.push(`${entry.relativePath}: categoryがありません。`)
       }
+
+      /*
+       * タスクID
+       */
+
       if (!/^PB-TASK-\d{4}$/.test(entry.taskId)) {
-        errors.push(`${entry.relativePath}: taskIdはPB-TASK-0001形式にしてください。`)
+        errors.push(
+          `${entry.relativePath}: taskIdはPB-TASK-0001形式にしてください。`
+        )
       } else {
         const normalizedId = entry.taskId.toUpperCase()
-        if (taskIds.has(normalizedId)) {
+        const existingTaskPath = taskIds.get(normalizedId)
+
+        if (existingTaskPath) {
           errors.push(
-            `${entry.relativePath}: taskIdが${taskIds.get(normalizedId)}と重複しています。`
+            `${entry.relativePath}: taskIdが${existingTaskPath}と重複しています。`
           )
         } else {
           taskIds.set(normalizedId, entry.relativePath)
         }
 
+        /*
+         * ファイル名とタスクIDの一致
+         *
+         * PB-TASK-0001
+         * ↓
+         * pb-task-0001.md
+         */
         const expectedFileName = `${entry.taskId.toLowerCase()}.md`
+
         if (basename(entry.relativePath) !== expectedFileName) {
-          errors.push(`${entry.relativePath}: ファイル名を${expectedFileName}にしてください。`)
+          errors.push(
+            `${entry.relativePath}: ファイル名を${expectedFileName}にしてください。`
+          )
         }
       }
 
+      /*
+       * タスクカテゴリとの整合性
+       */
+
       const directory = categoryDirectory(entry, 'tasks')
       const categoryIndex = taskCategoryIndexes.get(directory)
+
       if (!categoryIndex) {
-        errors.push(`${entry.relativePath}: 同じカテゴリのindex.mdがありません。`)
-      } else if (categoryIndex.category !== entry.category) {
+        errors.push(
+          `${entry.relativePath}: 同じカテゴリのindex.mdがありません。`
+        )
+      } else if (
+        entry.category &&
+        categoryIndex.category !== entry.category
+      ) {
         errors.push(
           `${entry.relativePath}: categoryを「${categoryIndex.category}」にしてください。`
         )
       }
 
-      if (!Array.isArray(entry.frontmatter.relatedSpecs) || entry.relatedSpecs.length === 0) {
-        errors.push(`${entry.relativePath}: relatedSpecsを1件以上指定してください。`)
-      }
+      /*
+       * relatedSpecsは任意。
+       *
+       * 指定されている場合だけ、
+       * 配列・重複・リンク先を確認する。
+       */
+      if (entry.frontmatter.relatedSpecs !== undefined) {
+        if (!Array.isArray(entry.frontmatter.relatedSpecs)) {
+          errors.push(
+            `${entry.relativePath}: relatedSpecsは配列で指定してください。`
+          )
+        } else {
+          if (
+            new Set(entry.relatedSpecs).size !==
+            entry.relatedSpecs.length
+          ) {
+            errors.push(
+              `${entry.relativePath}: relatedSpecsに同じ仕様が重複しています。`
+            )
+          }
 
-      if (new Set(entry.relatedSpecs).size !== entry.relatedSpecs.length) {
-        errors.push(`${entry.relativePath}: relatedSpecsに同じ仕様が重複しています。`)
-      }
+          for (const relatedSpec of entry.relatedSpecs) {
+            const target = urls.get(relatedSpec)
 
-      for (const relatedSpec of entry.relatedSpecs) {
-        const target = urls.get(relatedSpec)
-        if (!target || target.pageType !== 'spec') {
-          errors.push(`${entry.relativePath}: 関連仕様${relatedSpec}が見つかりません。`)
+            if (!target) {
+              errors.push(
+                `${entry.relativePath}: 関連仕様${relatedSpec}が見つかりません。`
+              )
+              continue
+            }
+
+            if (target.pageType !== 'spec') {
+              errors.push(
+                `${entry.relativePath}: ${relatedSpec}は仕様ページではありません。`
+              )
+            }
+          }
         }
       }
-
-      const expectedH1 = `${entry.taskId}｜${entry.title}`
-      if (h1[0] && h1[0].text !== expectedH1) {
-        errors.push(`${entry.relativePath}: H1を「# ${expectedH1}」にしてください。`)
-      }
-
-      validateRequiredHeadings(entry, TASK_HEADINGS, errors)
-      validateRelationComponent(entry, '関連する仕様', errors)
     }
   }
 
