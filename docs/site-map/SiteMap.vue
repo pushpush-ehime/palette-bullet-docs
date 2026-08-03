@@ -1,5 +1,6 @@
 <script setup>
-// catalog.data.ts からデータを読み込む（※パスは実際の環境に合わせてください）
+import { withBase } from 'vitepress'
+// catalog.data.ts からデータを読み込む
 import { data } from '../.vitepress/content/catalog.data'
 
 // ガイド用のページ（pageTypeが 'guide' のもの）
@@ -7,11 +8,17 @@ const guidePages = data
   .filter(page => page.pageType === 'guide' || page.url.includes('/guide/'))
   .sort((a, b) => (a.order || 99) - (b.order || 99))
 
+// トップレベルの単独ページ（ゲーム概要・仕様タスク対応・用語集）
+const topLevelUrls = ['/game-overview', '/relations', '/glossary']
+const topLevelPages = topLevelUrls
+  .map(url => data.find(page => page.url === url))
+  .filter(Boolean)
+
 // 特定のページタイプ（仕様やタスク）を「カテゴリごと」に分類する関数
 const getGroupedData = (targetPageType) => {
   const pages = data.filter(p => p.pageType === targetPageType)
   const categories = {}
-  
+
   pages.forEach(page => {
     const cat = page.category || 'その他'
     if (!categories[cat]) categories[cat] = []
@@ -22,7 +29,7 @@ const getGroupedData = (targetPageType) => {
   Object.keys(categories).forEach(cat => {
     categories[cat].sort((a, b) => (a.order || 99) - (b.order || 99))
   })
-  
+
   return categories
 }
 
@@ -34,11 +41,14 @@ const taskCategories = getGroupedData('task')
 <template>
   <div class="sitemap-tree">
     <ul>
-      <li><a href="/">ホーム</a></li>
+      <li><a :href="withBase('/')">ホーム</a></li>
 
       <!-- はじめに・ゲーム概要など -->
       <li v-for="page in guidePages" :key="page.url">
-        <a :href="page.url">{{ page.title }}</a>
+        <a :href="withBase(page.url)">{{ page.title }}</a>
+      </li>
+      <li v-for="page in topLevelPages" :key="page.url">
+        <a :href="withBase(page.url)">{{ page.title }}</a>
       </li>
 
       <!-- 仕様・設計（カテゴリごとに階層化） -->
@@ -49,7 +59,7 @@ const taskCategories = getGroupedData('task')
             {{ categoryName }}
             <ul>
               <li v-for="page in pages" :key="page.url">
-                <a :href="page.url">{{ page.title }}</a>
+                <a :href="withBase(page.url)">{{ page.title }}</a>
               </li>
             </ul>
           </li>
@@ -64,7 +74,7 @@ const taskCategories = getGroupedData('task')
             {{ categoryName }}
             <ul>
               <li v-for="page in pages" :key="page.url">
-                <a :href="page.url">{{ page.title }}</a>
+                <a :href="withBase(page.url)">{{ page.title }}</a>
               </li>
             </ul>
           </li>
