@@ -22,7 +22,7 @@ Playerに関する仕様の入口にします。
 
 ## プレイヤーから見た挙動
 
-各詳細ページで管理します。
+以下の詳細ページで管理します。
 
 ## 詳細仕様
 
@@ -36,7 +36,7 @@ Playerに関する仕様の入口にします。
 
 ## 状態別の挙動
 
-- [Player状態](/spec/player/states)
+- [通常状態](/spec/player/states)
 - [ドローモードへの移行](/spec/player/draw-mode-transition)
 
 ## 他システムとの接続
