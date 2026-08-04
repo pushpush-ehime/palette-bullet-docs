@@ -368,15 +368,16 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
   })
 
   function createAddPageItem(rootName, directory) {
-    const defaultFileName =
-      rootName === 'spec' ? 'new-spec.md' : 'pb-task-0000.md'
+    // ファイル名を?filename=で固定プレフィルすると、同名ファイルが
+    // 作られた後は全員コミットに失敗する。カテゴリのディレクトリだけ
+    // 指定して開き、ファイル名は作成者に入力してもらう。
     const encodedDirectory = encodeURIComponent(directory)
 
     return {
       text: '＋ このカテゴリにページを追加',
       link:
         `https://github.com/pushpush-ehime/palette-bullet-docs/` +
-        `new/main/docs/${rootName}?filename=${encodedDirectory}/${defaultFileName}`,
+        `new/main/docs/${rootName}/${encodedDirectory}`,
       target: '_blank',
       rel: 'noopener noreferrer'
     }

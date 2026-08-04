@@ -11,14 +11,14 @@ description: 新しいカテゴリ・仕様・タスクの追加方法
 
 1. 下のテンプレートをコピーします。
 2. 「仕様カテゴリを作成」を押します。
-3. 新しいフォルダ名を付けます。
-4. `index.md`を作成します。
+3. ファイル名欄に「`新しいフォルダ名/index.md`」を入力します（例: `weapon/index.md`）。
+4. テンプレートを貼り付けて内容を書き、コミットします。
 
 ::: details テンプレート
 <<< ../../.github/page-templates/spec.md
 :::
 
-[仕様カテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/spec?filename=new-category/index.md)
+[仕様カテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/spec)
 
 ---
 
@@ -28,13 +28,19 @@ description: 新しいカテゴリ・仕様・タスクの追加方法
 <<< ../../.github/page-templates/task.md
 :::
 
-[タスクカテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/tasks?filename=new-category/index.md)
+[タスクカテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/tasks)
 
 ---
 
 ## 既存カテゴリへ追加する
 
-以下のリンクから追加してください。
+サイドバーで開いているカテゴリの末尾に表示される「＋ このカテゴリにページを追加」から追加できます。
+
+1. リンクを押すと、そのカテゴリのフォルダを開いた状態でGitHubのファイル作成画面が開きます。
+2. ファイル名欄に新しいファイル名を入力します。**すでにあるファイルと同じ名前だとコミットできません。**
+   - 仕様ページ: 内容がわかる英小文字の名前（例: `jump-action.md`）
+   - タスクページ: `pb-task-XXXX.md`（既存のタスクIDの最大番号+1）
+3. 上のテンプレートを貼り付けて内容を書き、コミットします。
 
 ---
 

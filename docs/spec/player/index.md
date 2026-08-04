@@ -16,7 +16,7 @@ collapsed: false
 ## キャラクター設定
 
 ### ビジュアル
-<img src="/images/player.png" width="300" alt="UIサンプル">
+<img src="/images/Player.png" width="300" alt="UIサンプル">
 
 ### 基本プロフィール
 | 項目 | 設定内容 |
