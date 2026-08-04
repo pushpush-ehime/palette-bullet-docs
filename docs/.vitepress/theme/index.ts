@@ -9,6 +9,8 @@ import SpecList from './components/SpecList.vue'
 import StatusBadge from './components/StatusBadge.vue'
 import TaskList from './components/TaskList.vue'
 import CategoryCreateButton from './components/CategoryCreateButton.vue'
+import CreateCategoryForm from './components/CreateCategoryForm.vue'
+import CreatePageForm from './components/CreatePageForm.vue'
 import './styles.css'
 
 export default {
@@ -26,5 +28,7 @@ export default {
     app.component('StatusBadge', StatusBadge)
     app.component('TaskList', TaskList)
     app.component('CategoryCreateButton', CategoryCreateButton)
+    app.component('CreateCategoryForm', CreateCategoryForm)
+    app.component('CreatePageForm', CreatePageForm)
   }
 }
