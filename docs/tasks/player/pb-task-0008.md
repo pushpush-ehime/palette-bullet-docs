@@ -5,7 +5,7 @@ taskId: PB-TASK-0008
 category: "Player"
 ---
 
-# PB-TASK-0008｜PB-TASK-0008｜Player入力アクションを定義する
+# PB-TASK-0008｜Player入力アクションを定義する
 
 ## 実装内容：
 
