@@ -58,6 +58,30 @@ export const DEFAULT_TASK_FIELDS = {
   status: '未着手'
 }
 
+/**
+ * 選択肢の色。タスクDBを作り直すときに使う。
+ * Notionは「teal」を受け付けないので使わない。
+ */
+export const OPTION_COLORS = {
+  企画: 'green',
+  プログラム: 'blue',
+  デザイン: 'pink',
+  サウンド: 'purple',
+  全体管理: 'gray',
+  S: 'red',
+  A: 'orange',
+  B: 'blue',
+  C: 'gray',
+  プロトタイプ: 'red',
+  'α版': 'yellow',
+  'β版': 'blue',
+  完成版: 'green',
+  未着手: 'gray',
+  着手: 'blue',
+  レビュー: 'yellow',
+  完了: 'green'
+}
+
 /** タスクフォルダ名に対応するNotionページの絵文字アイコン */
 export const CATEGORY_ICONS = {
   player: '🎮',

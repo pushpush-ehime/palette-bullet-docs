@@ -10,6 +10,7 @@
     "docs:preview": "vitepress preview docs",
     "docs:validate": "node scripts/validate-docs.mjs",
     "docs:check": "npm run docs:validate && npm run docs:build",
+    "notion:init-db": "node scripts/notion-create-task-db.mjs",
     "notion:sync": "node scripts/notion-sync.mjs",
     "notion:sync:dry": "node scripts/notion-sync.mjs --dry-run"
   },
