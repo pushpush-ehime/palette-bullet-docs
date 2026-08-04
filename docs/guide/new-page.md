@@ -69,3 +69,18 @@ description: 新しいカテゴリ・仕様・タスクの追加方法
 タスクページが`main`へマージされると、NotionのタスクDBへチケットが自動で作られ、
 サイトにチケットへのリンクが出ます。担当や期限を先に決めておきたいときは、
 frontmatterへ書いてからマージします（→[Notionタスクとの連携](/guide/notion-link)）。
+
+---
+
+## コミットから公開までの流れ
+
+`main`ブランチは保護されているため、直接コミットはできません。変更は新しいブランチとPull Requestを経由して反映します。
+
+1. GitHubの編集画面で「Commit changes...」を押します。
+2. 「Create a new branch for this commit and start a pull request」を選びます。
+3. 「Propose changes」を押します。
+4. 続けて表示される画面で「Create pull request」を押します。
+5. CI（自動チェック `docs-check`）の完了を待ちます。
+   - **緑（成功）**：内容を確認して「Merge pull request」を押します。
+   - **赤（失敗）**：エラー内容を確認し、Pull Requestのブランチを修正します。
+6. マージ後、サイトの自動公開が完了すると変更が反映されます。
