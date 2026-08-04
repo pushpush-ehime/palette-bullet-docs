@@ -386,34 +386,38 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
       specItems.push({
         text: '仕様一覧',
         collapsed: false,
-        items: specCategories.map(({ categoryIndex, directory, pages }) => {
-          const items = [
-            {
-              text:
-                categoryIndex.frontmatter.sidebarTitle ?? categoryIndex.title,
-              link: categoryIndex.url
-            },
-            ...pages
-              .filter((page) => page.url !== categoryIndex.url)
-              .map((page) => ({
-                text: page.frontmatter.sidebarTitle ?? page.title,
-                link: page.url
-              }))
-          ]
+        items: [
+          ...specCategories.map(({ categoryIndex, directory, pages }) => {
+            const items = [
+              {
+                text:
+                  categoryIndex.frontmatter.sidebarTitle ??
+                  categoryIndex.title,
+                link: categoryIndex.url
+              },
+              ...pages
+                .filter((page) => page.url !== categoryIndex.url)
+                .map((page) => ({
+                  text: page.frontmatter.sidebarTitle ?? page.title,
+                  link: page.url
+                }))
+            ]
 
-          if (directory === activeDirectory) {
-            items.push(createAddPageItem('spec', directory))
-          }
+            if (directory === activeDirectory) {
+              items.push(createAddPageItem('spec', directory))
+            }
 
-          return {
-            text: categoryIndex.category,
-            collapsed:
-              directory === activeDirectory
-                ? false
-                : (categoryIndex.frontmatter.collapsed ?? true),
-            items
-          }
-        })
+            return {
+              text: categoryIndex.category,
+              collapsed:
+                directory === activeDirectory
+                  ? false
+                  : (categoryIndex.frontmatter.collapsed ?? true),
+              items
+            }
+          }),
+          createAddCategoryItem('spec')
+        ]
       })
     }
 
@@ -424,7 +428,24 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
       }
     ]
   }
+  function createAddCategoryItem(rootName) {
+  const isSpec = rootName === 'spec'
+  const defaultDirectory = isSpec
+    ? 'new-spec-category'
+    : 'new-task-category'
 
+    return {
+      text: isSpec
+        ? '＋ 仕様カテゴリを追加'
+        : '＋ タスクカテゴリを追加',
+      link:
+        `https://github.com/pushpush-ehime/palette-bullet-docs/` +
+        `new/main/docs/${rootName}` +
+        `?filename=${defaultDirectory}/index.md`,
+      target: '_blank',
+      rel: 'noopener noreferrer'
+    }
+  }
   function createTaskSidebar(activeDirectory = '') {
     const taskItems = [
       {
@@ -441,34 +462,38 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
       taskItems.push({
         text: 'タスク一覧',
         collapsed: false,
-        items: taskCategories.map(({ categoryIndex, directory, tasks }) => {
-          const items = [
-            {
-              text:
-                categoryIndex.frontmatter.sidebarTitle ?? categoryIndex.title,
-              link: categoryIndex.url
-            },
-            ...tasks
-              .filter((task) => task.url !== categoryIndex.url)
-              .map((task) => ({
-                text: `${task.taskId} ${task.title}`,
-                link: task.url
-              }))
-          ]
+        items: [
+          ...taskCategories.map(({ categoryIndex, directory, tasks }) => {
+            const items = [
+              {
+                text:
+                  categoryIndex.frontmatter.sidebarTitle ??
+                  categoryIndex.title,
+                link: categoryIndex.url
+              },
+              ...tasks
+                .filter((task) => task.url !== categoryIndex.url)
+                .map((task) => ({
+                  text: `${task.taskId} ${task.title}`,
+                  link: task.url
+                }))
+            ]
 
-          if (directory === activeDirectory) {
-            items.push(createAddPageItem('tasks', directory))
-          }
+            if (directory === activeDirectory) {
+              items.push(createAddPageItem('tasks', directory))
+            }
 
-          return {
-            text: categoryIndex.category,
-            collapsed:
-              directory === activeDirectory
-                ? false
-                : (categoryIndex.frontmatter.collapsed ?? true),
-            items
-          }
-        })
+            return {
+              text: categoryIndex.category,
+              collapsed:
+                directory === activeDirectory
+                  ? false
+                  : (categoryIndex.frontmatter.collapsed ?? true),
+              items
+            }
+          }),
+          createAddCategoryItem('tasks')
+        ]
       })
     }
 

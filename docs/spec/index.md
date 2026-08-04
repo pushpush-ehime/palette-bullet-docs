@@ -10,7 +10,6 @@ sidebarTitle: 仕様・設計一覧
 ## 仕様一覧
 
 <SpecList />
-<CategoryCreateButton type="spec" />
 
 ## 関連ページ
 
