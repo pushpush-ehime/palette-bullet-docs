@@ -26,6 +26,9 @@ jobs:
     env:
       NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
       NOTION_TASK_DB_ID: ${{ secrets.NOTION_TASK_DB_ID }}
+      # mainはルールセットで保護しているため、書き戻しには
+      # バイパスできる権限が要る。DOCS_PUSH_TOKENがあればそれを使う。
+      USES_PUSH_TOKEN: ${{ secrets.DOCS_PUSH_TOKEN != '' }}
 
     steps:
       - name: Checkout
@@ -33,6 +36,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          token: ${{ secrets.DOCS_PUSH_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -70,12 +74,18 @@ jobs:
           git add docs/tasks
           git commit -m "NotionタスクのURLを反映"
           git pull --rebase origin main
-          git push origin HEAD:main
+
+          if ! git push origin HEAD:main; then
+            echo "::error::mainへ書き戻せませんでした。main-protectionのバイパスにGitHub Actionsを追加するか、管理者のトークンをDOCS_PUSH_TOKENへ登録してください。Notionのチケットは作成済みなので、設定後にこのワークフローを再実行すればURLが入ります。"
+            exit 1
+          fi
+
           echo "pushed=true" >> "$GITHUB_OUTPUT"
 
       # GITHUB_TOKENでのpushは公開ワークフローを起動しないため、明示的に実行する。
+      # DOCS_PUSH_TOKENを使ったときは自動で起動するので、実行しない。
       - name: Trigger deployment
-        if: steps.commit.outputs.pushed == 'true'
+        if: steps.commit.outputs.pushed == 'true' && env.USES_PUSH_TOKEN != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh workflow run deploy.yml --ref main

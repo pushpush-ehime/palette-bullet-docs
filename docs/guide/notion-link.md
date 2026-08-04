@@ -81,6 +81,14 @@ relatedSpecs:
 | `NOTION_TOKEN` | Notionインテグレーションのトークン |
 | `NOTION_TASK_DB_ID` | タスクDBのID（DBのURLをそのまま貼っても動きます） |
 
+あわせて、書き戻しが`main`の保護に弾かれないようにします。次のどちらかを行ってください。
+
+- リポジトリのルール`main-protection`のバイパスに`GitHub Actions`を追加する（おすすめ）
+- 管理者の個人アクセストークンを、Secretの`DOCS_PUSH_TOKEN`として登録する
+
+どちらも未設定のときは、Notionのチケットだけが作られ、書き戻しでワークフローが赤くなります。
+設定してからワークフローを再実行すれば、URLが入ります。
+
 1. [Notionのインテグレーション設定](https://www.notion.so/profile/integrations)で内部インテグレーションを作り、トークンを控えます。**内部インテグレーションは、そのワークスペースのオーナーだけが作れます。**
 2. NotionのタスクDBのページで「…」→「接続」から、作ったインテグレーションを追加します。
 3. GitHubの`Settings` → `Secrets and variables` → `Actions`で、上の2つを登録します。
