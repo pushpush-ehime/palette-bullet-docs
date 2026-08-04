@@ -65,5 +65,5 @@ relatedSpecs:
 
 ## 関連リンク
 
-- Notionタスク：未登録（`main`へマージすると自動で入ります）
+- Notionタスク：<NotionTaskLink />
 - GitHub Pull Request：未登録

@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, relative, resolve } from 'node:path'
 import {
   DUE_PATTERN,
+  NOTION_LINKS_FILE,
   NOTION_TASK_FIELDS,
   TASK_ONLY_KEYS
 } from './notion-fields.mjs'
@@ -234,8 +235,29 @@ function updatedAt(filePath, repositoryRoot) {
   return statSync(filePath).mtime.toISOString()
 }
 
+/*
+ * タスクID→NotionチケットURLの対応表を読む。
+ *
+ * 公開の直前に同期スクリプトが作るファイルで、Gitには入っていない。
+ * 手元でのビルドやPull Requestの検査では存在しないため、
+ * 見つからなければ空として扱う。
+ */
+function loadNotionLinks(repositoryRoot) {
+  const linksPath = resolve(repositoryRoot, NOTION_LINKS_FILE)
+  if (!existsSync(linksPath)) return {}
+
+  try {
+    const links = JSON.parse(readFileSync(linksPath, 'utf8'))
+    return typeof links === 'object' && links !== null ? links : {}
+  } catch {
+    console.warn(`${NOTION_LINKS_FILE}を読めませんでした。Notionリンクなしで続けます。`)
+    return {}
+  }
+}
+
 export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), includeUpdated = true } = {}) {
   const repositoryRoot = resolve(docsRoot, '..')
+  const notionLinks = loadNotionLinks(repositoryRoot)
 
   const entries = markdownFiles(docsRoot)
     .map((filePath) => {
@@ -276,7 +298,13 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
           ? frontmatter.assignees.map(toText)
           : [],
         due: toText(frontmatter.due),
-        notionUrl: toText(frontmatter.notionUrl),
+        /*
+         * NotionのURLは対応表から入れる。
+         * frontmatterに手で書いた場合は、そちらを優先する。
+         */
+        notionUrl:
+          toText(frontmatter.notionUrl) ||
+          toText(notionLinks[toText(frontmatter.taskId)]),
         openQuestions: extractOpenQuestions(structure),
         updatedAt: includeUpdated ? updatedAt(filePath, repositoryRoot) : ''
       }
@@ -888,12 +916,12 @@ export function validateCatalog(catalog) {
       }
 
       /*
-       * notionUrlは同期スクリプトが書き込む。
-       * 手で書くこともできるので、形式だけ確認する。
+       * notionUrlは通常、同期スクリプトが作る対応表から入る。
+       * frontmatterへ手で書くこともできるので、その場合だけ形式を確認する。
        */
       if (
         entry.frontmatter.notionUrl !== undefined &&
-        !/^https:\/\/\S+$/.test(entry.notionUrl)
+        !/^https:\/\/\S+$/.test(toText(entry.frontmatter.notionUrl))
       ) {
         errors.push(
           `${entry.relativePath}: notionUrlはhttpsで始まるNotionページのURLにしてください。`

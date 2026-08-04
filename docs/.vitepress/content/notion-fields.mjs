@@ -11,6 +11,14 @@
 /** 公開サイトのURL。Notionの「設計書」プロパティに入れる。 */
 export const SITE_BASE_URL = 'https://pushpush-ehime.github.io/palette-bullet-docs'
 
+/**
+ * タスクID→NotionチケットURLの対応表の置き場所。
+ *
+ * 公開の直前に同期スクリプトが作り、ビルドが読む。
+ * Gitで管理しない（mainへ書き込まずに済ませるため）。
+ */
+export const NOTION_LINKS_FILE = 'docs/.vitepress/content/notion-links.json'
+
 /** Notion「班」の選択肢 */
 export const TEAMS = ['企画', 'プログラム', 'デザイン', 'サウンド', '全体管理']
 

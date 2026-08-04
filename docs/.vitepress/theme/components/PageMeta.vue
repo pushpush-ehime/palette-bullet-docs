@@ -1,11 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useData } from 'vitepress'
+import { data as catalog } from '../../content/catalog.data.js'
 import StatusBadge from './StatusBadge.vue'
 
 const { frontmatter } = useData()
 const isManagedPage = computed(() =>
   ['spec', 'task'].includes(frontmatter.value.pageType)
+)
+
+/*
+ * NotionチケットのURLは、公開の直前に作られる対応表から入る。
+ * frontmatterには載らないので、カタログから引く。
+ */
+const notionUrl = computed(
+  () =>
+    catalog.find((entry) => entry.taskId === frontmatter.value.taskId)
+      ?.notionUrl ?? ''
 )
 </script>
 
@@ -17,9 +28,9 @@ const isManagedPage = computed(() =>
       {{ frontmatter.category }}
     </span>
     <a
-      v-if="frontmatter.notionUrl"
+      v-if="notionUrl"
       class="page-meta-notion"
-      :href="frontmatter.notionUrl"
+      :href="notionUrl"
       target="_blank"
       rel="noopener noreferrer"
     >

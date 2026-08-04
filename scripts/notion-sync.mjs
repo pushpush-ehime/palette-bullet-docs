@@ -12,18 +12,24 @@
  *   設計書サイト … 作業内容・完了条件の正。タスク名と設計書URLはこちらが上書きする。
  *   Notion       … 進行管理の正。状態・担当・期限・優先度は起票時だけ書き込み、
  *                  以降は触らない（人がNotion上で動かすため）。
+ *
+ * チケットのURLはMarkdownへ書き戻さず、対応表（notion-links.json）に出す。
+ * mainはPull Request必須で保護しているため、自動でコミットしない。
+ * このスクリプトは公開の直前に実行し、続くビルドが対応表を読んでリンクを埋める。
  */
 
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
-  getSectionContent,
   loadCatalog,
+  getSectionContent,
   validateCatalog
 } from '../docs/.vitepress/content/catalog.mjs'
 import {
   CATEGORY_ICONS,
   DEFAULT_CATEGORY_ICON,
   DEFAULT_TASK_FIELDS,
+  NOTION_LINKS_FILE,
   SITE_BASE_URL
 } from '../docs/.vitepress/content/notion-fields.mjs'
 
@@ -94,8 +100,8 @@ async function main() {
 
   const created = []
   const updated = []
-  const linked = []
   const unchanged = []
+  const links = {}
 
   for (const task of tasks) {
     const siteUrl = `${SITE_BASE_URL}${task.url}`
@@ -133,17 +139,28 @@ async function main() {
       }
     }
 
-    if (!notionUrl) continue
-
-    const rewritten = writeBackNotionUrl(task, notionUrl, databaseTitle)
-
-    if (rewritten) {
-      linked.push(task.taskId)
-      console.log(`[書き戻し] ${task.relativePath}`)
-    }
+    if (notionUrl) links[task.taskId] = notionUrl
   }
 
-  report({ created, updated, linked, unchanged, tasks, databaseTitle })
+  writeLinks(links)
+  report({ created, updated, links, unchanged, tasks, databaseTitle })
+}
+
+/*
+ * ビルドが読む対応表を書き出す。
+ * Markdownには触らないので、mainへコミットする必要がない。
+ */
+function writeLinks(links) {
+  if (dryRun) return
+
+  const sorted = Object.fromEntries(
+    Object.entries(links).sort(([left], [right]) => left.localeCompare(right))
+  )
+
+  writeFileSync(
+    resolve(process.cwd(), NOTION_LINKS_FILE),
+    `${JSON.stringify(sorted, null, 2)}\n`
+  )
 }
 
 /*
@@ -478,67 +495,17 @@ function categoryIcon(task) {
 }
 
 /*
- * 設計書サイト側への書き戻し
- */
-
-function writeBackNotionUrl(task, notionUrl, databaseTitle) {
-  const source = readFileSync(task.filePath, 'utf8')
-  const usesCrlf = source.includes('\r\n')
-  const normalized = source.replaceAll('\r\n', '\n')
-
-  const frontmatterEnd = normalized.indexOf('\n---\n', 4)
-  if (frontmatterEnd === -1) return false
-
-  const frontmatter = normalized.slice(4, frontmatterEnd).split('\n')
-  const body = normalized.slice(frontmatterEnd + 5)
-
-  const notionUrlIndex = frontmatter.findIndex((line) =>
-    line.startsWith('notionUrl:')
-  )
-
-  if (notionUrlIndex === -1) {
-    const taskIdIndex = frontmatter.findIndex((line) =>
-      line.startsWith('taskId:')
-    )
-    frontmatter.splice(taskIdIndex + 1, 0, `notionUrl: ${notionUrl}`)
-  } else {
-    frontmatter[notionUrlIndex] = `notionUrl: ${notionUrl}`
-  }
-
-  const label = `[${task.taskId}（${databaseTitle.replaceAll(/[[\]]/g, '')}）](${notionUrl})`
-  const updatedBody = body.replace(
-    /^- Notionタスク：.*$/m,
-    `- Notionタスク：${label}`
-  )
-
-  if (!/^- Notionタスク：/m.test(body)) {
-    console.warn(
-      `注意：${task.relativePath}に「- Notionタスク：」の行がないため、本文は書き換えていません。`
-    )
-  }
-
-  const rebuilt = `---\n${frontmatter.join('\n')}\n---\n${updatedBody}`
-  const output = usesCrlf ? rebuilt.replaceAll('\n', '\r\n') : rebuilt
-
-  if (output === source) return false
-  if (dryRun) return true
-
-  writeFileSync(task.filePath, output)
-  return true
-}
-
-/*
  * 実行結果の表示
  */
 
-function report({ created, updated, linked, unchanged, tasks, databaseTitle }) {
+function report({ created, updated, links, unchanged, tasks, databaseTitle }) {
   const prefix = dryRun ? '（--dry-run）' : ''
   const lines = [
     `${prefix}タスクページ${tasks.length}件をNotion「${databaseTitle}」と同期しました。`,
     `- 新しく起票：${created.length}件${listOf(created)}`,
     `- 内容を更新：${updated.length}件${listOf(updated)}`,
-    `- 設計書側へURLを書き戻し：${linked.length}件${listOf(linked)}`,
-    `- 変更なし：${unchanged.length}件`
+    `- 変更なし：${unchanged.length}件`,
+    `- サイトへ載せるリンク：${Object.keys(links).length}件`
   ]
 
   console.log(`\n${lines.join('\n')}`)
