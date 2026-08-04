@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useData } from 'vitepress'
+import NewTaskButton from './NewTaskButton.vue'
 import StatusBadge from './StatusBadge.vue'
 
 const { frontmatter } = useData()
@@ -16,5 +17,6 @@ const isManagedPage = computed(() =>
     <span v-if="frontmatter.category" class="page-meta-category">
       {{ frontmatter.category }}
     </span>
+    <NewTaskButton v-if="frontmatter.pageType === 'spec'" />
   </div>
 </template>

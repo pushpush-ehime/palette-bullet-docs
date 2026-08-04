@@ -13,6 +13,8 @@ export interface CatalogEntry {
   categoryOrder: number
   relatedSpecs: string[]
   openQuestions: string[]
+  purpose: string
+  constraints: string
   updatedAt: string
 }
 
@@ -33,6 +35,8 @@ export default createContentLoader('**/*.md', {
       categoryOrder: entry.categoryOrder,
       relatedSpecs: entry.relatedSpecs,
       openQuestions: entry.openQuestions,
+      purpose: entry.purpose,
+      constraints: entry.constraints,
       updatedAt: entry.updatedAt
     }))
   }
