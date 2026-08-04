@@ -1,5 +1,6 @@
 import { h } from 'vue'
 import DefaultTheme from 'vitepress/theme'
+import NotionTaskLink from './components/NotionTaskLink.vue'
 import OpenQuestions from './components/OpenQuestions.vue'
 import PageMeta from './components/PageMeta.vue'
 import PageRelations from './components/PageRelations.vue'
@@ -20,6 +21,7 @@ export default {
       'doc-before': () => h(PageMeta)
     }),
   enhanceApp({ app }) {
+    app.component('NotionTaskLink', NotionTaskLink)
     app.component('OpenQuestions', OpenQuestions)
     app.component('PageRelations', PageRelations)
     app.component('RecentPages', RecentPages)

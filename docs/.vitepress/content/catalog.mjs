@@ -1,6 +1,12 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, relative, resolve } from 'node:path'
+import {
+  DUE_PATTERN,
+  NOTION_LINKS_FILE,
+  NOTION_TASK_FIELDS,
+  TASK_ONLY_KEYS
+} from './notion-fields.mjs'
 /**
  * @typedef {import('vitepress').DefaultTheme.SidebarItem} SidebarItem
  * @typedef {import('vitepress').DefaultTheme.SidebarMulti} SidebarMulti
@@ -10,6 +16,16 @@ export const VALID_STATUSES = ['確定', '仮仕様', '未決', '対象外', '�
 
 function toPosix(value) {
   return value.replaceAll('\\', '/')
+}
+
+/*
+ * frontmatterの値を文字列にそろえる。
+ * 数値として読み取られた値（例：order）もそのまま扱えるようにする。
+ */
+function toText(value) {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'string') return value.trim()
+  return String(value)
 }
 
 function parseScalar(rawValue) {
@@ -124,7 +140,7 @@ function getDocumentStructure(source) {
   }
 }
 
-function getSectionContent(structure, headingText) {
+export function getSectionContent(structure, headingText) {
   const headingIndex = structure.headings.findIndex(
     (heading) => heading.level === 2 && heading.text === headingText
   )
@@ -152,6 +168,15 @@ function extractOpenQuestions(structure) {
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
         .replaceAll('`', '')
     )
+}
+
+function extractSpecSections(structure, pageType) {
+  if (pageType !== 'spec') return { purpose: '', constraints: '' }
+
+  return {
+    purpose: getSectionContent(structure, '目的'),
+    constraints: getSectionContent(structure, '例外・禁止事項')
+  }
 }
 
 function markdownFiles(directory) {
@@ -219,8 +244,29 @@ function updatedAt(filePath, repositoryRoot) {
   return statSync(filePath).mtime.toISOString()
 }
 
+/*
+ * タスクID→NotionチケットURLの対応表を読む。
+ *
+ * 公開の直前に同期スクリプトが作るファイルで、Gitには入っていない。
+ * 手元でのビルドやPull Requestの検査では存在しないため、
+ * 見つからなければ空として扱う。
+ */
+function loadNotionLinks(repositoryRoot) {
+  const linksPath = resolve(repositoryRoot, NOTION_LINKS_FILE)
+  if (!existsSync(linksPath)) return {}
+
+  try {
+    const links = JSON.parse(readFileSync(linksPath, 'utf8'))
+    return typeof links === 'object' && links !== null ? links : {}
+  } catch {
+    console.warn(`${NOTION_LINKS_FILE}を読めませんでした。Notionリンクなしで続けます。`)
+    return {}
+  }
+}
+
 export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), includeUpdated = true } = {}) {
   const repositoryRoot = resolve(docsRoot, '..')
+  const notionLinks = loadNotionLinks(repositoryRoot)
 
   const entries = markdownFiles(docsRoot)
     .map((filePath) => {
@@ -228,6 +274,7 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
       const relativePath = toPosix(relative(docsRoot, filePath))
       const { data: frontmatter, hasFrontmatter } = parseFrontmatter(source)
       const structure = getDocumentStructure(source)
+      const specSections = extractSpecSections(structure, frontmatter.pageType ?? '')
 
       return {
         filePath,
@@ -250,7 +297,27 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
         relatedSpecs: Array.isArray(frontmatter.relatedSpecs)
           ? frontmatter.relatedSpecs.map(normalizePageUrl)
           : [],
+        /*
+         * Notionへ転記する進行管理の項目。
+         * すべて任意で、書かれていなければ空にする。
+         */
+        team: toText(frontmatter.team),
+        priority: toText(frontmatter.priority),
+        milestone: toText(frontmatter.milestone),
+        assignees: Array.isArray(frontmatter.assignees)
+          ? frontmatter.assignees.map(toText)
+          : [],
+        due: toText(frontmatter.due),
+        /*
+         * NotionのURLは対応表から入れる。
+         * frontmatterに手で書いた場合は、そちらを優先する。
+         */
+        notionUrl:
+          toText(frontmatter.notionUrl) ||
+          toText(notionLinks[toText(frontmatter.taskId)]),
         openQuestions: extractOpenQuestions(structure),
+        purpose: specSections.purpose,
+        constraints: specSections.constraints,
         updatedAt: includeUpdated ? updatedAt(filePath, repositoryRoot) : ''
       }
     })
@@ -666,6 +733,20 @@ export function validateCatalog(catalog) {
     }
 
     /*
+     * Notion連携の項目はタスクページ専用。
+     */
+
+    if (entry.pageType !== 'task') {
+      for (const key of TASK_ONLY_KEYS) {
+        if (entry.frontmatter[key] !== undefined) {
+          errors.push(
+            `${entry.relativePath}: ${key}はタスクページだけで使用してください。`
+          )
+        }
+      }
+    }
+
+    /*
      * 仕様ページ
      */
 
@@ -819,6 +900,75 @@ export function validateCatalog(catalog) {
             }
           }
         }
+      }
+
+      /*
+       * Notionへ転記する項目の検査。
+       *
+       * すべて任意。書かれている場合だけ、NotionタスクDBの
+       * 選択肢に存在する値かどうかを確認する。
+       * ここで弾いておかないと、Notion側に選択肢が増えてしまう。
+       */
+      for (const field of NOTION_TASK_FIELDS) {
+        const value = entry.frontmatter[field.key]
+        if (value === undefined) continue
+
+        if (field.type === 'multi_select') {
+          if (!Array.isArray(value)) {
+            errors.push(
+              `${entry.relativePath}: ${field.key}は配列で指定してください（例：[高平, 下條]）。`
+            )
+            continue
+          }
+
+          const names = value.map(toText)
+
+          if (new Set(names).size !== names.length) {
+            errors.push(
+              `${entry.relativePath}: ${field.key}に同じ名前が重複しています。`
+            )
+          }
+
+          for (const name of names) {
+            if (!field.options.includes(name)) {
+              errors.push(
+                `${entry.relativePath}: ${field.key}の「${name}」はNotionの「${field.property}」にありません。`
+              )
+            }
+          }
+
+          continue
+        }
+
+        const text = toText(value)
+
+        if (field.type === 'date') {
+          if (!DUE_PATTERN.test(text)) {
+            errors.push(
+              `${entry.relativePath}: ${field.key}は2026-08-10の形式で指定してください。`
+            )
+          }
+          continue
+        }
+
+        if (!field.options.includes(text)) {
+          errors.push(
+            `${entry.relativePath}: ${field.key}は${field.options.join('／')}のいずれかにしてください。`
+          )
+        }
+      }
+
+      /*
+       * notionUrlは通常、同期スクリプトが作る対応表から入る。
+       * frontmatterへ手で書くこともできるので、その場合だけ形式を確認する。
+       */
+      if (
+        entry.frontmatter.notionUrl !== undefined &&
+        !/^https:\/\/\S+$/.test(toText(entry.frontmatter.notionUrl))
+      ) {
+        errors.push(
+          `${entry.relativePath}: notionUrlはhttpsで始まるNotionページのURLにしてください。`
+        )
       }
     }
   }
