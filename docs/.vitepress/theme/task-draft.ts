@@ -162,7 +162,8 @@ export function buildTaskDraft(
   draft = setField(draft, 'taskId', taskId)
   draft = setField(draft, 'category', yamlValue(category))
   draft = setRelatedSpecs(draft, [spec.url])
-  draft = draft.replace(/^# .*$/m, () => `# ${taskId}｜${title}`)
+  // frontmatterのコメント行に当たらないよう、H1の書式で絞り込む。
+  draft = draft.replace(/^# PB-TASK-.*$/m, () => `# ${taskId}｜${title}`)
 
   const purpose = copySpecContent ? meaningful(spec.purpose) : ''
   if (purpose) {

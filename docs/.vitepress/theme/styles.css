@@ -8,6 +8,7 @@
 
 .page-meta-id,
 .page-meta-category,
+.page-meta-notion,
 .status-badge,
 .open-question-category {
   display: inline-flex;
@@ -52,6 +53,16 @@
 .page-meta-category,
 .open-question-category {
   color: var(--vp-c-text-2);
+}
+
+.page-meta-notion {
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.page-meta-notion:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
 }
 
 .status-確定 {
@@ -133,6 +144,10 @@
 .catalog-table-wrap table {
   width: 100%;
   margin: 0;
+}
+
+.catalog-empty-cell {
+  color: var(--vp-c-text-3);
 }
 
 .catalog-empty {
