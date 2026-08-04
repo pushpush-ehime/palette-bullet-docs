@@ -154,6 +154,15 @@ function extractOpenQuestions(structure) {
     )
 }
 
+function extractSpecSections(structure, pageType) {
+  if (pageType !== 'spec') return { purpose: '', constraints: '' }
+
+  return {
+    purpose: getSectionContent(structure, '目的'),
+    constraints: getSectionContent(structure, '例外・禁止事項')
+  }
+}
+
 function markdownFiles(directory) {
   const files = []
 
@@ -228,6 +237,7 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
       const relativePath = toPosix(relative(docsRoot, filePath))
       const { data: frontmatter, hasFrontmatter } = parseFrontmatter(source)
       const structure = getDocumentStructure(source)
+      const specSections = extractSpecSections(structure, frontmatter.pageType ?? '')
 
       return {
         filePath,
@@ -251,6 +261,8 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
           ? frontmatter.relatedSpecs.map(normalizePageUrl)
           : [],
         openQuestions: extractOpenQuestions(structure),
+        purpose: specSections.purpose,
+        constraints: specSections.constraints,
         updatedAt: includeUpdated ? updatedAt(filePath, repositoryRoot) : ''
       }
     })
