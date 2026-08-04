@@ -14,6 +14,8 @@ export interface CatalogEntry {
   relatedSpecs: string[]
   notionUrl: string
   openQuestions: string[]
+  purpose: string
+  constraints: string
   updatedAt: string
 }
 
@@ -35,6 +37,8 @@ export default createContentLoader('**/*.md', {
       relatedSpecs: entry.relatedSpecs,
       notionUrl: entry.notionUrl,
       openQuestions: entry.openQuestions,
+      purpose: entry.purpose,
+      constraints: entry.constraints,
       updatedAt: entry.updatedAt
     }))
   }

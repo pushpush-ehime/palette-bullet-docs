@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useData } from 'vitepress'
 import { data as catalog } from '../../content/catalog.data.js'
+import NewTaskButton from './NewTaskButton.vue'
 import StatusBadge from './StatusBadge.vue'
 
 const { frontmatter } = useData()
@@ -36,5 +37,6 @@ const notionUrl = computed(
     >
       Notionタスク
     </a>
+    <NewTaskButton v-if="frontmatter.pageType === 'spec'" />
   </div>
 </template>

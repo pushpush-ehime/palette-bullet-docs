@@ -26,6 +26,30 @@
   color: var(--vp-c-brand-1);
 }
 
+.new-task-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  margin-left: auto;
+  padding: 2px 12px;
+  border: 1px solid var(--vp-c-brand-1);
+  border-radius: 999px;
+  color: var(--vp-c-brand-1);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.new-task-button:hover {
+  background: var(--vp-c-brand-1);
+  color: var(--vp-c-bg);
+}
+
 .page-meta-category,
 .open-question-category {
   color: var(--vp-c-text-2);
