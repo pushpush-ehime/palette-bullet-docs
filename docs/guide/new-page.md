@@ -15,20 +15,20 @@ description: 新しいカテゴリ・仕様・タスクの追加方法
 4. テンプレートを貼り付けて内容を書き、コミットします。
 
 ::: details テンプレート
-<<< ../../.github/page-templates/spec.md
+<<< ../../.github/page-templates/spec-category.md
 :::
 
-[仕様カテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/spec)
+[仕様カテゴリを作成](/guide/create-category?type=spec)
 
 ---
 
 ### タスクカテゴリ
 
 ::: details テンプレート
-<<< ../../.github/page-templates/task.md
+<<< ../../.github/page-templates/task-category.md
 :::
 
-[タスクカテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/tasks)
+[タスクカテゴリを作成](/guide/create-category?type=task)
 
 ---
 
@@ -44,13 +44,43 @@ description: 新しいカテゴリ・仕様・タスクの追加方法
 
 ---
 
+## 仕様からタスクを作る
+
+タスクページは、もとになる仕様ページから作れます。
+
+1. タスクにしたい仕様ページを開きます。
+2. ページ上部のステータス表示の右にある`＋ タスクを生成`を押します。
+3. GitHubの新規ファイル作成画面が開きます。ファイル名、タスクID、カテゴリ、`relatedSpecs`、仕様から転記した目的と注意点が入力済みです。
+4. 空欄（実施内容、完了条件など）を書き足します。
+5. `Commit changes`を押し、`Create a new branch for this commit and start a pull request`を選びます。
+
+::: warning
+`Commit directly to the main branch`は選ばないでください。mainへ直接コミットすると、記入漏れがあったときに公開が失敗します。
+:::
+
+タスクIDは、ボタンを押した時点で使われている最大の番号＋1です。2人が続けて生成すると同じ番号になることがあります。Pull Requestの検査がタスクIDの重複で失敗したら、ファイル名と`taskId`を空いている番号へ書き換えてください。
+
+タスクの保存先は、仕様と同じ名前のタスクカテゴリです。同じ名前のタスクカテゴリがない場合は`other`へ保存します。別のカテゴリへ入れたいときは、GitHubの画面でファイル名の先頭にあるフォルダ名と、`category`をそのカテゴリの`index.md`に合わせて書き換えてください。
+
+---
+
+## タスクページを追加したあと
+
+タスクページが`main`へマージされると、NotionのタスクDBへチケットが自動で作られ、
+サイトにチケットへのリンクが出ます。担当や期限を先に決めておきたいときは、
+frontmatterへ書いてからマージします（→[Notionタスクとの連携](/guide/notion-link)）。
+
+---
+
 ## コミットから公開までの流れ
 
-`main`ブランチは保護されているため、直接コミットはできません。コミットすると自動でプルリクエスト（PR）を作る流れになります。
+`main`ブランチは保護されているため、直接コミットはできません。変更は新しいブランチとPull Requestを経由して反映します。
 
-1. 「Commit changes...」を押すと、自動で新しいブランチ名が入った状態になります。そのまま「Propose changes」を押します。
-2. 続けて表示される画面で「Create pull request」を押します。
-3. 数分でCI（自動チェック `docs-check`）が完了します。
-   - **緑（成功）**: 「Merge pull request」を押して反映します。マージは自分で行って構いません。
-   - **赤（失敗）**: エラーメッセージ（日本語で出ます）に従って、PRの画面からファイルを修正してください。
-4. マージ後、数分でサイトに反映されます。
+1. GitHubの編集画面で「Commit changes...」を押します。
+2. 「Create a new branch for this commit and start a pull request」を選びます。
+3. 「Propose changes」を押します。
+4. 続けて表示される画面で「Create pull request」を押します。
+5. CI（自動チェック `docs-check`）の完了を待ちます。
+   - **緑（成功）**：内容を確認して「Merge pull request」を押します。
+   - **赤（失敗）**：エラー内容を確認し、Pull Requestのブランチを修正します。
+6. マージ後、サイトの自動公開が完了すると変更が反映されます。

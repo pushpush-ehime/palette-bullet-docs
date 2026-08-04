@@ -1,9 +1,9 @@
 ---
-title: タスク名
-description: このタスクで実施する内容
+title: 敵の実装
+description: 「敵」の仕様を実装する
 pageType: task
-taskId: PB-TASK-0000
-category: Player
+taskId: PB-TASK-0002
+category: その他
 order: 90
 # ここから下は任意。Notionチケットを作るときの初期値になる。
 # team: プログラム
@@ -12,14 +12,16 @@ order: 90
 # assignees: [高平]
 # due: 2026-08-10
 relatedSpecs:
-  - /spec/player/spec-page
+  - /spec/enemy/
 ---
 
-# PB-TASK-0000｜タスク名
+# PB-TASK-0002｜敵の実装
 
 ## タスクの目的
 
-未決
+仕様「敵」の目的から転記しています。タスクとして達成することに書き換えてください。
+
+敵に関するゲーム上の挙動を定義します。
 
 ## 完成時にできるようになること
 
@@ -65,5 +67,6 @@ relatedSpecs:
 
 ## 関連リンク
 
+- 仕様ページ：[敵](/spec/enemy/)
 - Notionタスク：<NotionTaskLink />
 - GitHub Pull Request：未登録

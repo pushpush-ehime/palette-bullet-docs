@@ -1,0 +1,40 @@
+name: Create Notion task DB
+
+# 連携先のタスクDBを作る。設定のとき1回だけ実行する。
+# Actionsの画面から実行できるので、手元にNode.jsがなくても使える。
+on:
+  workflow_dispatch:
+    inputs:
+      parent:
+        description: 'DBを置くNotionページのURL'
+        required: true
+        type: string
+      title:
+        description: 'DBの名前'
+        required: false
+        default: '🎯 パレットブレット タスクDB'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Create task database
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          PARENT: ${{ inputs.parent }}
+          TITLE: ${{ inputs.title }}
+        run: node scripts/notion-create-task-db.mjs --parent "$PARENT" --title "$TITLE"

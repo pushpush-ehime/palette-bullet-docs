@@ -18,6 +18,7 @@ const generatedSidebars = buildSidebars(catalog, {
         { text: 'ゲーム概要', link: '/game-overview' },
         { text: '仕様・タスク対応', link: '/relations' },
         { text: '新しいページを作る', link: '/guide/new-page' },
+        { text: 'Notionタスクとの連携', link: '/guide/notion-link' },
         { text: '用語集', link: '/glossary' }
       ]
     }
@@ -37,7 +38,8 @@ export default defineConfig({
       {
         text: 'はじめに',
         items: [
-          { text: 'このサイトの使い方', link: '/guide/how-to-use' }
+          { text: 'このサイトの使い方', link: '/guide/how-to-use' },
+          { text: 'Notionタスクとの連携', link: '/guide/notion-link' }
         ]
       },
       { text: '仕様・設計', link: '/spec/' },

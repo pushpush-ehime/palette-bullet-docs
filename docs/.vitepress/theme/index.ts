@@ -1,5 +1,6 @@
 import { h } from 'vue'
 import DefaultTheme from 'vitepress/theme'
+import NotionTaskLink from './components/NotionTaskLink.vue'
 import OpenQuestions from './components/OpenQuestions.vue'
 import PageMeta from './components/PageMeta.vue'
 import PageRelations from './components/PageRelations.vue'
@@ -8,6 +9,9 @@ import RelationMap from './components/RelationMap.vue'
 import SpecList from './components/SpecList.vue'
 import StatusBadge from './components/StatusBadge.vue'
 import TaskList from './components/TaskList.vue'
+import CategoryCreateButton from './components/CategoryCreateButton.vue'
+import CreateCategoryForm from './components/CreateCategoryForm.vue'
+import CreatePageForm from './components/CreatePageForm.vue'
 import './styles.css'
 
 export default {
@@ -17,6 +21,7 @@ export default {
       'doc-before': () => h(PageMeta)
     }),
   enhanceApp({ app }) {
+    app.component('NotionTaskLink', NotionTaskLink)
     app.component('OpenQuestions', OpenQuestions)
     app.component('PageRelations', PageRelations)
     app.component('RecentPages', RecentPages)
@@ -24,5 +29,8 @@ export default {
     app.component('SpecList', SpecList)
     app.component('StatusBadge', StatusBadge)
     app.component('TaskList', TaskList)
+    app.component('CategoryCreateButton', CategoryCreateButton)
+    app.component('CreateCategoryForm', CreateCategoryForm)
+    app.component('CreatePageForm', CreatePageForm)
   }
 }
