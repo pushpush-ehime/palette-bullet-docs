@@ -12,13 +12,15 @@
     "docs:check": "npm run docs:validate && npm run docs:build",
     "notion:init-db": "node scripts/notion-create-task-db.mjs",
     "notion:sync": "node scripts/notion-sync.mjs",
-    "notion:sync:dry": "node scripts/notion-sync.mjs --dry-run"
+    "notion:sync:dry": "node scripts/notion-sync.mjs --dry-run",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "devDependencies": {
+    "husky": "^9.1.7",
     "vitepress": "^1.6.4"
   }
 }
