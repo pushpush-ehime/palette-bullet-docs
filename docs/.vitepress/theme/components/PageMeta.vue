@@ -16,5 +16,14 @@ const isManagedPage = computed(() =>
     <span v-if="frontmatter.category" class="page-meta-category">
       {{ frontmatter.category }}
     </span>
+    <a
+      v-if="frontmatter.notionUrl"
+      class="page-meta-notion"
+      :href="frontmatter.notionUrl"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      Notionタスク
+    </a>
   </div>
 </template>

@@ -1,0 +1,81 @@
+name: Sync tasks to Notion
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/tasks/**'
+      - 'docs/.vitepress/content/notion-fields.mjs'
+      - 'scripts/notion-sync.mjs'
+      - '.github/workflows/notion-sync.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: notion-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      NOTION_TASK_DB_ID: ${{ secrets.NOTION_TASK_DB_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # 設定前でもワークフローが赤くならないようにする。
+      - name: Check settings
+        id: settings
+        run: |
+          if [ -z "$NOTION_TOKEN" ] || [ -z "$NOTION_TASK_DB_ID" ]; then
+            echo "::notice::NOTION_TOKENまたはNOTION_TASK_DB_IDが未設定のため、同期を飛ばしました。"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sync tasks to Notion
+        if: steps.settings.outputs.ready == 'true'
+        run: node scripts/notion-sync.mjs
+
+      # NotionページのURLをタスクページへ書き戻す。
+      - name: Commit Notion links
+        id: commit
+        if: steps.settings.outputs.ready == 'true'
+        run: |
+          if [ -z "$(git status --porcelain docs/tasks)" ]; then
+            echo "変更はありませんでした。"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/tasks
+          git commit -m "NotionタスクのURLを反映"
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      # GITHUB_TOKENでのpushは公開ワークフローを起動しないため、明示的に実行する。
+      - name: Trigger deployment
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref main

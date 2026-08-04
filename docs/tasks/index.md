@@ -8,6 +8,7 @@ sidebarTitle: タスク一覧
 # タスク一覧
 
 担当者・状態・優先度・期限はNotionで管理します。
+タスクページを`main`へマージすると、Notionのチケットが自動で作られます（→[Notionタスクとの連携](/guide/notion-link)）。
 
 ## タスク
 

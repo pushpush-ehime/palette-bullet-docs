@@ -5,6 +5,12 @@ pageType: task
 taskId: PB-TASK-0000
 category: Player
 order: 90
+# ここから下は任意。Notionチケットを作るときの初期値になる。
+# team: プログラム
+# priority: B
+# milestone: プロトタイプ
+# assignees: [高平]
+# due: 2026-08-10
 relatedSpecs:
   - /spec/player/spec-page
 ---
@@ -59,5 +65,5 @@ relatedSpecs:
 
 ## 関連リンク
 
-- Notionタスク：未登録
+- Notionタスク：未登録（`main`へマージすると自動で入ります）
 - GitHub Pull Request：未登録

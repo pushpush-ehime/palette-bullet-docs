@@ -12,6 +12,7 @@ export interface CatalogEntry {
   order: number
   categoryOrder: number
   relatedSpecs: string[]
+  notionUrl: string
   openQuestions: string[]
   updatedAt: string
 }
@@ -32,6 +33,7 @@ export default createContentLoader('**/*.md', {
       order: entry.order,
       categoryOrder: entry.categoryOrder,
       relatedSpecs: entry.relatedSpecs,
+      notionUrl: entry.notionUrl,
       openQuestions: entry.openQuestions,
       updatedAt: entry.updatedAt
     }))

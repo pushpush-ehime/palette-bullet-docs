@@ -75,6 +75,7 @@ function specTitle(url: string) {
             <th>タスク名</th>
             <th v-if="!props.category">分類</th>
             <th>関連仕様</th>
+            <th>Notion</th>
           </tr>
         </thead>
         <tbody>
@@ -89,6 +90,17 @@ function specTitle(url: string) {
                 <span v-if="index">、</span>
                 <a :href="pageHref(spec)">{{ specTitle(spec) }}</a>
               </template>
+            </td>
+            <td>
+              <a
+                v-if="task.notionUrl"
+                :href="task.notionUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                チケット
+              </a>
+              <span v-else class="catalog-empty-cell">未連携</span>
             </td>
           </tr>
         </tbody>
