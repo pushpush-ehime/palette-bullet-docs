@@ -91,7 +91,7 @@ relatedSpecs:
 連携はサイトの公開（`Deploy VitePress site to Pages`）の中で実行され、
 リポジトリへは何もコミットしません。`main`の保護設定を変える必要はありません。
 
-1. [Notionのインテグレーション設定](https://www.notion.so/profile/integrations)で内部インテグレーションを作り、トークンを控えます。**内部インテグレーションは、そのワークスペースのオーナーだけが作れます。**
+1. [Notionのインテグレーション設定](https://www.notion.so/my-integrations)で内部インテグレーションを作り、トークンを控えます。**「新しいインテグレーション」は、そのワークスペースのオーナーにしか表示されません。**
 2. NotionのタスクDBのページで「…」→「接続」から、作ったインテグレーションを追加します。
 3. GitHubの`Settings` → `Secrets and variables` → `Actions`で、上の2つを登録します。
 
