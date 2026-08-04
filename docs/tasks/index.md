@@ -12,6 +12,7 @@ sidebarTitle: タスク一覧
 ## タスク
 
 <TaskList />
+<CategoryCreateButton type="task" />
 
 一覧の検索欄から、タスクIDまたはタスク名で検索できます。
 

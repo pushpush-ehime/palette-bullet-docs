@@ -8,6 +8,7 @@ import RelationMap from './components/RelationMap.vue'
 import SpecList from './components/SpecList.vue'
 import StatusBadge from './components/StatusBadge.vue'
 import TaskList from './components/TaskList.vue'
+import CategoryCreateButton from './components/CategoryCreateButton.vue'
 import './styles.css'
 
 export default {
@@ -24,5 +25,6 @@ export default {
     app.component('SpecList', SpecList)
     app.component('StatusBadge', StatusBadge)
     app.component('TaskList', TaskList)
+    app.component('CategoryCreateButton', CategoryCreateButton)
   }
 }

@@ -15,7 +15,7 @@ description: 新しいカテゴリ・仕様・タスクの追加方法
 4. `index.md`を作成します。
 
 ::: details テンプレート
-<<< ../../.github/page-templates/spec.md
+<<< ../../.github/page-templates/spec-category.md
 :::
 
 [仕様カテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/spec?filename=new-category/index.md)
@@ -25,7 +25,7 @@ description: 新しいカテゴリ・仕様・タスクの追加方法
 ### タスクカテゴリ
 
 ::: details テンプレート
-<<< ../../.github/page-templates/task.md
+<<< ../../.github/page-templates/task-category.md
 :::
 
 [タスクカテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/tasks?filename=new-category/index.md)

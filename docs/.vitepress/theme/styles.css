@@ -479,3 +479,24 @@
   outline: 2px solid var(--vp-c-brand-2);
   outline-offset: 2px;
 }
+.category-create-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+  padding: 10px 16px;
+  border: 1px solid var(--vp-c-brand-1);
+  border-radius: 8px;
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+  line-height: 1.4;
+  text-decoration: none;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.category-create-button:hover {
+  color: var(--vp-c-white);
+  background-color: var(--vp-c-brand-1);
+}
