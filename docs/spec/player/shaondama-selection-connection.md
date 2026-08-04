@@ -1,6 +1,6 @@
 ---
-title: シャオンダマ選択との接続
-description: Playerとシャオンダマ選択の接続仕様
+title: シャオンダマ選択
+description: Playerとシャオンダマ選択
 pageType: spec
 category: Player
 order: 50
