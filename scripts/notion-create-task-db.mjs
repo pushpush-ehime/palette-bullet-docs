@@ -10,6 +10,7 @@
  * インテグレーションを追加しておくこと。
  */
 
+import { appendFileSync } from 'node:fs'
 import {
   MEMBERS,
   MILESTONES,
@@ -72,12 +73,30 @@ async function main() {
 
   const database = await response.json()
 
+  const id = database.id.replaceAll('-', '')
+
   console.log(`タスクDB「${title}」を作りました。`)
   console.log(`URL: ${database.url}`)
-  console.log(`ID : ${database.id}`)
+  console.log(`ID : ${id}`)
   console.log(
     '\nGitHubのSecretsへ、このIDをNOTION_TASK_DB_IDとして登録してください。'
   )
+
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(
+      process.env.GITHUB_STEP_SUMMARY,
+      [
+        '## タスクDBを作りました',
+        '',
+        `- 名前：${title}`,
+        `- URL：${database.url}`,
+        `- ID：\`${id}\``,
+        '',
+        'このIDを、Secretsの`NOTION_TASK_DB_ID`へ登録してください。',
+        ''
+      ].join('\n')
+    )
+  }
 }
 
 function buildProperties() {
