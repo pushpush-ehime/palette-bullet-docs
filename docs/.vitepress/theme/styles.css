@@ -849,3 +849,38 @@
     width: 100%;
   }
 }
+
+/* 仕様・タスクページの削除PRボタン */
+.delete-page-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  margin-left: auto;
+  padding: 2px 12px;
+  color: var(--vp-c-red-1);
+  background: transparent;
+  border: 1px solid var(--vp-c-red-1);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.new-task-button + .delete-page-button {
+  margin-left: 0;
+}
+
+.delete-page-button:hover {
+  color: var(--vp-c-white);
+  background: var(--vp-c-red-1);
+}
+
+.delete-page-button:focus-visible {
+  outline: 2px solid var(--vp-c-red-1);
+  outline-offset: 2px;
+}
