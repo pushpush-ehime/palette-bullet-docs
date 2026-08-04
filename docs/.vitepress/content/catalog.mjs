@@ -422,19 +422,33 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
     return { categoryIndex, directory, tasks }
   })
 
-  function createAddPageItem(rootName, directory) {
-    // ファイル名を?filename=で固定プレフィルすると、同名ファイルが
-    // 作られた後は全員コミットに失敗する。カテゴリのディレクトリだけ
-    // 指定して開き、ファイル名は作成者に入力してもらう。
-    const encodedDirectory = encodeURIComponent(directory)
+  const nextTaskNumber =
+    catalog
+      .map((entry) => entry.taskId?.match(/^PB-TASK-(\d{4})$/)?.[1])
+      .filter(Boolean)
+      .reduce(
+        (maximum, value) => Math.max(maximum, Number(value)),
+        0
+      ) + 1
+
+  const nextTaskId =
+    `PB-TASK-${String(nextTaskNumber).padStart(4, '0')}`
+
+  function createAddPageItem(rootName, directory, category) {
+    const type = rootName === 'spec' ? 'spec' : 'task'
+    const query = new URLSearchParams({
+      type,
+      directory,
+      category
+    })
+
+    if (type === 'task') {
+      query.set('taskId', nextTaskId)
+    }
 
     return {
       text: '＋ このカテゴリにページを追加',
-      link:
-        `https://github.com/pushpush-ehime/palette-bullet-docs/` +
-        `new/main/docs/${rootName}/${encodedDirectory}`,
-      target: '_blank',
-      rel: 'noopener noreferrer'
+      link: `/guide/create-page?${query.toString()}`
     }
   }
 
@@ -450,15 +464,16 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
       }
     ]
 
-    if (specCategories.length > 0) {
-      specItems.push({
-        text: '仕様一覧',
-        collapsed: false,
-        items: specCategories.map(({ categoryIndex, directory, pages }) => {
+    specItems.push({
+      text: '仕様一覧',
+      collapsed: false,
+      items: [
+        ...specCategories.map(({ categoryIndex, directory, pages }) => {
           const items = [
             {
               text:
-                categoryIndex.frontmatter.sidebarTitle ?? categoryIndex.title,
+                categoryIndex.frontmatter.sidebarTitle ??
+                categoryIndex.title,
               link: categoryIndex.url
             },
             ...pages
@@ -470,7 +485,7 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
           ]
 
           if (directory === activeDirectory) {
-            items.push(createAddPageItem('spec', directory))
+            items.push(createAddPageItem('spec', directory, categoryIndex.category))
           }
 
           return {
@@ -481,9 +496,11 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
                 : (categoryIndex.frontmatter.collapsed ?? true),
             items
           }
-        })
-      })
-    }
+        }),
+        createAddCategoryItem('spec')
+      ]
+    })
+    
 
     return [
       {
@@ -492,7 +509,17 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
       }
     ]
   }
+  function createAddCategoryItem(rootName) {
+  const type = rootName === 'spec' ? 'spec' : 'task'
 
+    return {
+      text:
+        type === 'spec'
+          ? '＋ 仕様カテゴリを追加'
+          : '＋ タスクカテゴリを追加',
+      link: `/guide/create-category?type=${type}`
+    }
+  }
   function createTaskSidebar(activeDirectory = '') {
     const taskItems = [
       {
@@ -509,34 +536,38 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
       taskItems.push({
         text: 'タスク一覧',
         collapsed: false,
-        items: taskCategories.map(({ categoryIndex, directory, tasks }) => {
-          const items = [
-            {
-              text:
-                categoryIndex.frontmatter.sidebarTitle ?? categoryIndex.title,
-              link: categoryIndex.url
-            },
-            ...tasks
-              .filter((task) => task.url !== categoryIndex.url)
-              .map((task) => ({
-                text: `${task.taskId} ${task.title}`,
-                link: task.url
-              }))
-          ]
+        items: [
+          ...taskCategories.map(({ categoryIndex, directory, tasks }) => {
+            const items = [
+              {
+                text:
+                  categoryIndex.frontmatter.sidebarTitle ??
+                  categoryIndex.title,
+                link: categoryIndex.url
+              },
+              ...tasks
+                .filter((task) => task.url !== categoryIndex.url)
+                .map((task) => ({
+                  text: `${task.taskId} ${task.title}`,
+                  link: task.url
+                }))
+            ]
 
-          if (directory === activeDirectory) {
-            items.push(createAddPageItem('tasks', directory))
-          }
+            if (directory === activeDirectory) {
+              items.push(createAddPageItem('tasks', directory, categoryIndex.category))
+            }
 
-          return {
-            text: categoryIndex.category,
-            collapsed:
-              directory === activeDirectory
-                ? false
-                : (categoryIndex.frontmatter.collapsed ?? true),
-            items
-          }
-        })
+            return {
+              text: categoryIndex.category,
+              collapsed:
+                directory === activeDirectory
+                  ? false
+                  : (categoryIndex.frontmatter.collapsed ?? true),
+              items
+            }
+          }),
+          createAddCategoryItem('tasks')
+        ]
       })
     }
 

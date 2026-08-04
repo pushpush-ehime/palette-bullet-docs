@@ -15,20 +15,20 @@ description: 新しいカテゴリ・仕様・タスクの追加方法
 4. テンプレートを貼り付けて内容を書き、コミットします。
 
 ::: details テンプレート
-<<< ../../.github/page-templates/spec.md
+<<< ../../.github/page-templates/spec-category.md
 :::
 
-[仕様カテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/spec)
+[仕様カテゴリを作成](/guide/create-category?type=spec)
 
 ---
 
 ### タスクカテゴリ
 
 ::: details テンプレート
-<<< ../../.github/page-templates/task.md
+<<< ../../.github/page-templates/task-category.md
 :::
 
-[タスクカテゴリを作成](https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/tasks)
+[タスクカテゴリを作成](/guide/create-category?type=task)
 
 ---
 
