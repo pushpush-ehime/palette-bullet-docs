@@ -564,9 +564,17 @@ function plainText(value) {
   return value.map((item) => item.plain_text ?? '').join('')
 }
 
+/*
+ * IDでもURLでも受け取れるようにする。
+ * データベースのURLは「.../p/<DBのID>?v=<ビューのID>」の形なので、
+ * 先に出てくる32桁を使う。
+ */
 function normalizeId(value) {
-  const id = value.trim().replaceAll('-', '')
-  return /^[0-9a-f]{32}$/i.test(id) ? id : ''
+  const match = value
+    .trim()
+    .match(/[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}/i)
+
+  return match ? match[0].replaceAll('-', '') : ''
 }
 
 function sleep(milliseconds) {

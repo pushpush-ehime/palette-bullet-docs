@@ -79,11 +79,14 @@ relatedSpecs:
 | 名前 | 内容 |
 |---|---|
 | `NOTION_TOKEN` | Notionインテグレーションのトークン |
-| `NOTION_TASK_DB_ID` | タスクDBのID |
+| `NOTION_TASK_DB_ID` | タスクDBのID（DBのURLをそのまま貼っても動きます） |
 
-1. [Notionのインテグレーション設定](https://www.notion.so/profile/integrations)で内部インテグレーションを作り、トークンを控えます。
+1. [Notionのインテグレーション設定](https://www.notion.so/profile/integrations)で内部インテグレーションを作り、トークンを控えます。**内部インテグレーションは、そのワークスペースのオーナーだけが作れます。**
 2. NotionのタスクDBのページで「…」→「接続」から、作ったインテグレーションを追加します。
 3. GitHubの`Settings` → `Secrets and variables` → `Actions`で、上の2つを登録します。
+
+トークンはワークスペースごとに発行されます。別のワークスペースにあるDBへは書き込めないため、
+連携先を移すときはトークンも取り直してください。
 
 手元で試すこともできます。
 
