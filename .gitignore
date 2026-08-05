@@ -7,3 +7,5 @@ docs/.vitepress/dist/
 Thumbs.db
 docs/.vitepress/content/notion-links.json
 fake-requests*.json
+.codex
+.agents
