@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import MarkdownIt from 'markdown-it'
+import { computed, onMounted, ref, watch } from 'vue'
 
 type PageType = 'spec' | 'task'
 
@@ -10,12 +11,19 @@ const title = ref('')
 const fileName = ref('')
 const status = ref('未決')
 const taskId = ref('PB-TASK-0000')
+const markdownSource = ref('')
+const lastTemplateMarkdown = ref('')
 
 const markdownCopied = ref(false)
 const commitMessageCopied = ref(false)
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const taskIdPattern = /^PB-TASK-\d{4}$/
+const markdown = new MarkdownIt({
+  html: false,
+  linkify: true,
+  typographer: true
+})
 
 onMounted(() => {
   const query = new URLSearchParams(window.location.search)
@@ -78,7 +86,15 @@ const formError = computed(() => {
   return ''
 })
 
-const generatedMarkdown = computed(() => {
+const defaultBody = computed(() => {
+  if (pageType.value === 'spec') {
+    return 'ここに仕様を記載します。'
+  }
+
+  return 'ここにタスクの内容を記載します。'
+})
+
+const templateMarkdown = computed(() => {
   const pageTitle = title.value.trim()
   const pageCategory = category.value.trim()
 
@@ -92,7 +108,7 @@ status: ${status.value}
 
 # ${pageTitle}
 
-ここに仕様を記載します。
+${defaultBody.value}
 `
   }
 
@@ -107,9 +123,56 @@ category: ${yamlString(pageCategory)}
 
 # ${id}｜${pageTitle}
 
-ここにタスクの内容を記載します。
+${defaultBody.value}
 `
 })
+
+const generatedMarkdown = computed(() => {
+  return markdownSource.value
+})
+
+const renderedPreview = computed(() => {
+  return markdown.render(markdownForPreview(markdownSource.value))
+})
+
+watch(templateMarkdown, (nextTemplate) => {
+  if (
+    !markdownSource.value ||
+    markdownSource.value === lastTemplateMarkdown.value
+  ) {
+    markdownSource.value = nextTemplate
+  }
+
+  lastTemplateMarkdown.value = nextTemplate
+}, { immediate: true })
+
+function markdownForPreview(source: string) {
+  const frontmatterMatch = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
+
+  if (!frontmatterMatch) {
+    return source
+  }
+
+  const frontmatterTable = frontmatterMatch[1]
+    .split(/\r?\n/)
+    .filter((line) => line.includes(':'))
+    .map((line) => {
+      const separatorIndex = line.indexOf(':')
+      const key = line.slice(0, separatorIndex).trim()
+      const value = line.slice(separatorIndex + 1).trim()
+
+      return `| ${key} | ${value || '-'} |`
+    })
+    .join('\n')
+
+  const body = source.slice(frontmatterMatch[0].length)
+
+  return `| 項目 | 内容 |
+| --- | --- |
+${frontmatterTable}
+
+${body}`
+}
 
 const destinationPath = computed(() => {
   const root = pageType.value === 'spec' ? 'spec' : 'tasks'
@@ -222,7 +285,7 @@ async function openGitHub() {
       </label>
 
       <label v-if="pageType === 'spec'">
-        <span>仕様の状態</span>
+        <span>ステータス</span>
         <select v-model="status">
           <option value="確定">確定</option>
           <option value="仮仕様">仮仕様</option>
@@ -258,14 +321,27 @@ async function openGitHub() {
       <code>{{ destinationPath }}</code>
     </div>
 
-    <label class="page-create-preview">
-      <span>生成される内容</span>
-      <textarea
-        :value="generatedMarkdown"
-        rows="14"
-        readonly
-      />
-    </label>
+    <div class="page-create-editor">
+      <label class="page-create-markdown">
+        <span>Markdown</span>
+        <textarea
+          v-model="markdownSource"
+          rows="14"
+          spellcheck="false"
+        />
+      </label>
+
+      <section
+        class="page-create-rendered"
+        aria-label="リアルタイム表示"
+      >
+        <span>リアルタイム表示</span>
+        <div
+          class="page-create-rendered-body"
+          v-html="renderedPreview"
+        />
+      </section>
+    </div>
 
     <div class="page-create-commit">
       <strong>推奨コミットメッセージ</strong>
@@ -303,7 +379,7 @@ async function openGitHub() {
         :disabled="Boolean(formError)"
         @click="openGitHub"
       >
-        本文をコピーしてGitHubを開く
+        GitHubで作成
       </button>
     </div>
   </div>

@@ -540,6 +540,54 @@
   background-color: var(--vp-c-brand-1);
 }
 /* カテゴリ作成フォーム */
+.VPDoc:has(.category-create-form) .main,
+.VPDoc:has(.page-create-form) .main {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.VPDoc:has(.category-create-form) .container,
+.VPDoc:has(.page-create-form) .container {
+  width: min(100%, 1440px);
+  max-width: none;
+  margin-right: 0;
+  margin-left: 0;
+}
+
+.VPDoc:has(.category-create-form) .content,
+.VPDoc:has(.page-create-form) .content,
+.VPDoc:has(.category-create-form) .content-container,
+.VPDoc:has(.page-create-form) .content-container {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin-right: 0;
+  margin-left: 0;
+}
+
+.content-container:has(.category-create-form),
+.content-container:has(.page-create-form) {
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: none !important;
+  margin-right: 0 !important;
+  margin-left: 0 !important;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.VPDoc:has(.category-create-form) .content,
+.VPDoc:has(.page-create-form) .content {
+  padding-right: 0;
+}
+
+.VPDoc:has(.category-create-form) .aside,
+.VPDoc:has(.page-create-form) .aside {
+  display: none;
+}
+
 .category-create-form {
   display: grid;
   gap: 20px;
@@ -562,7 +610,8 @@
 }
 
 .category-create-fields input[type='text'],
-.category-create-fields input[type='number'] {
+.category-create-fields input[type='number'],
+.category-create-markdown textarea {
   width: 100%;
   min-height: 42px;
   padding: 8px 11px;
@@ -573,7 +622,8 @@
   font: inherit;
 }
 
-.category-create-fields input:focus {
+.category-create-fields input:focus,
+.category-create-markdown textarea:focus {
   outline: 2px solid var(--vp-c-brand-2);
   outline-offset: 1px;
 }
@@ -624,23 +674,90 @@
   overflow-wrap: anywhere;
 }
 
-.category-create-preview {
+.category-create-editor {
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+}
+
+.category-create-markdown,
+.category-create-rendered {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  margin: 0;
   font-weight: 700;
 }
 
-.category-create-preview textarea {
-  width: 100%;
-  padding: 14px;
-  color: var(--vp-c-text-1);
+.category-create-markdown > span,
+.category-create-rendered > span {
+  padding: 10px 12px;
+  color: var(--vp-c-text-2);
   background: var(--vp-c-bg-soft);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 10px;
-  font-family: var(--vp-font-family-mono);
+  border-bottom: 1px solid var(--vp-c-divider);
   font-size: 13px;
-  line-height: 1.6;
+}
+
+.category-create-markdown {
+  border-right: 1px solid var(--vp-c-divider);
+}
+
+.category-create-markdown textarea {
+  min-height: 360px;
+  padding: 14px;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--vp-font-family-mono);
+  font-size: 14px;
+  line-height: 1.7;
   resize: vertical;
+}
+
+.category-create-rendered-body {
+  min-height: 360px;
+  padding: 14px 18px;
+  overflow: auto;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg);
+  font-weight: 400;
+}
+
+.category-create-rendered-body > :first-child {
+  margin-top: 0;
+}
+
+.category-create-rendered-body > :last-child {
+  margin-bottom: 0;
+}
+
+.category-create-rendered-body table,
+.page-create-rendered-body table {
+  display: block;
+  width: 100%;
+  margin: 16px 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.category-create-rendered-body th,
+.category-create-rendered-body td,
+.page-create-rendered-body th,
+.page-create-rendered-body td {
+  padding: 8px 12px;
+  border: 1px solid var(--vp-c-divider);
+}
+
+.category-create-rendered-body th,
+.page-create-rendered-body th {
+  font-weight: 700;
+  background: var(--vp-c-bg-soft);
+}
+
+.category-create-rendered-body tr:nth-child(2n),
+.page-create-rendered-body tr:nth-child(2n) {
+  background: var(--vp-c-bg-soft);
 }
 
 .category-create-actions {
@@ -680,6 +797,15 @@
 }
 
 @media (max-width: 640px) {
+  .category-create-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .category-create-markdown {
+    border-right: 0;
+    border-bottom: 1px solid var(--vp-c-divider);
+  }
+
   .category-create-actions {
     display: grid;
   }
@@ -731,7 +857,8 @@
 }
 
 .page-create-fields input,
-.page-create-fields select {
+.page-create-fields select,
+.page-create-markdown textarea {
   width: 100%;
   min-height: 42px;
   padding: 8px 11px;
@@ -743,7 +870,8 @@
 }
 
 .page-create-fields input:focus,
-.page-create-fields select:focus {
+.page-create-fields select:focus,
+.page-create-markdown textarea:focus {
   outline: 2px solid var(--vp-c-brand-2);
   outline-offset: 1px;
 }
@@ -773,23 +901,62 @@
   overflow-wrap: anywhere;
 }
 
-.page-create-preview {
+.page-create-editor {
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+}
+
+.page-create-markdown,
+.page-create-rendered {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  margin: 0;
   font-weight: 700;
 }
 
-.page-create-preview textarea {
-  width: 100%;
-  padding: 14px;
-  color: var(--vp-c-text-1);
+.page-create-markdown > span,
+.page-create-rendered > span {
+  padding: 10px 12px;
+  color: var(--vp-c-text-2);
   background: var(--vp-c-bg-soft);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 10px;
-  font-family: var(--vp-font-family-mono);
+  border-bottom: 1px solid var(--vp-c-divider);
   font-size: 13px;
-  line-height: 1.6;
+}
+
+.page-create-markdown {
+  border-right: 1px solid var(--vp-c-divider);
+}
+
+.page-create-markdown textarea {
+  min-height: 360px;
+  padding: 14px;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--vp-font-family-mono);
+  font-size: 14px;
+  line-height: 1.7;
   resize: vertical;
+}
+
+.page-create-rendered-body {
+  min-height: 360px;
+  padding: 14px 18px;
+  overflow: auto;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg);
+  font-weight: 400;
+}
+
+.page-create-rendered-body > :first-child {
+  margin-top: 0;
+}
+
+.page-create-rendered-body > :last-child {
+  margin-bottom: 0;
 }
 
 .page-create-commit {
@@ -840,6 +1007,15 @@
 }
 
 @media (max-width: 640px) {
+  .page-create-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .page-create-markdown {
+    border-right: 0;
+    border-bottom: 1px solid var(--vp-c-divider);
+  }
+
   .page-create-actions {
     display: grid;
   }

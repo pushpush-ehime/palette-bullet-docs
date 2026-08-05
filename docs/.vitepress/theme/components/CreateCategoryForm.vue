@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import MarkdownIt from 'markdown-it'
+import { computed, onMounted, ref, watch } from 'vue'
 
 type CategoryType = 'spec' | 'task'
 
@@ -8,9 +9,16 @@ const categoryName = ref('')
 const directory = ref('')
 const categoryOrder = ref(90)
 const initiallyOpen = ref(true)
+const markdownSource = ref('')
+const lastTemplateMarkdown = ref('')
 const copied = ref(false)
 
 const directoryPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const markdown = new MarkdownIt({
+  html: false,
+  linkify: true,
+  typographer: true
+})
 
 onMounted(() => {
   const type = new URLSearchParams(window.location.search).get('type')
@@ -59,7 +67,15 @@ function yamlString(value: string) {
   return JSON.stringify(value.trim())
 }
 
-const generatedMarkdown = computed(() => {
+const defaultBody = computed(() => {
+  if (categoryType.value === 'spec') {
+    return 'このカテゴリで扱う仕様の概要を記載します。'
+  }
+
+  return 'このカテゴリで扱うタスクの概要を記載します。'
+})
+
+const templateMarkdown = computed(() => {
   const name = categoryName.value.trim()
   const collapsed = !initiallyOpen.value
 
@@ -77,7 +93,7 @@ collapsed: ${collapsed}
 
 # ${name}
 
-このカテゴリで扱う仕様の概要を記載します。
+${defaultBody.value}
 `
   }
 
@@ -92,9 +108,56 @@ collapsed: ${collapsed}
 
 # ${name}
 
-このカテゴリで扱うタスクの概要を記載します。
+${defaultBody.value}
 `
 })
+
+const generatedMarkdown = computed(() => {
+  return markdownSource.value
+})
+
+const renderedPreview = computed(() => {
+  return markdown.render(markdownForPreview(markdownSource.value))
+})
+
+watch(templateMarkdown, (nextTemplate) => {
+  if (
+    !markdownSource.value ||
+    markdownSource.value === lastTemplateMarkdown.value
+  ) {
+    markdownSource.value = nextTemplate
+  }
+
+  lastTemplateMarkdown.value = nextTemplate
+}, { immediate: true })
+
+function markdownForPreview(source: string) {
+  const frontmatterMatch = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
+
+  if (!frontmatterMatch) {
+    return source
+  }
+
+  const frontmatterTable = frontmatterMatch[1]
+    .split(/\r?\n/)
+    .filter((line) => line.includes(':'))
+    .map((line) => {
+      const separatorIndex = line.indexOf(':')
+      const key = line.slice(0, separatorIndex).trim()
+      const value = line.slice(separatorIndex + 1).trim()
+
+      return `| ${key} | ${value || '-'} |`
+    })
+    .join('\n')
+
+  const body = source.slice(frontmatterMatch[0].length)
+
+  return `| 項目 | 内容 |
+| --- | --- |
+${frontmatterTable}
+
+${body}`
+}
 
 const destinationPath = computed(() => {
   const root = categoryType.value === 'spec' ? 'spec' : 'tasks'
@@ -212,14 +275,27 @@ async function openGitHub() {
       <code>{{ destinationPath }}</code>
     </div>
 
-    <label class="category-create-preview">
-      <span>生成される内容</span>
-      <textarea
-        :value="generatedMarkdown"
-        rows="18"
-        readonly
-      />
-    </label>
+    <div class="category-create-editor">
+      <label class="category-create-markdown">
+        <span>Markdown</span>
+        <textarea
+          v-model="markdownSource"
+          rows="14"
+          spellcheck="false"
+        />
+      </label>
+
+      <section
+        class="category-create-rendered"
+        aria-label="リアルタイム表示"
+      >
+        <span>リアルタイム表示</span>
+        <div
+          class="category-create-rendered-body"
+          v-html="renderedPreview"
+        />
+      </section>
+    </div>
 
     <div class="category-create-actions">
       <button
