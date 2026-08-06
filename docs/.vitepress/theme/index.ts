@@ -12,6 +12,8 @@ import TaskList from './components/TaskList.vue'
 import CategoryCreateButton from './components/CategoryCreateButton.vue'
 import CreateCategoryForm from './components/CreateCategoryForm.vue'
 import CreatePageForm from './components/CreatePageForm.vue'
+import EditPageForm from './components/EditPageForm.vue'
+import MarkdownPreviewHost from './components/MarkdownPreviewHost.vue'
 import './styles.css'
 
 export default {
@@ -32,5 +34,7 @@ export default {
     app.component('CategoryCreateButton', CategoryCreateButton)
     app.component('CreateCategoryForm', CreateCategoryForm)
     app.component('CreatePageForm', CreatePageForm)
+    app.component('EditPageForm', EditPageForm)
+    app.component('MarkdownPreviewHost', MarkdownPreviewHost)
   }
 }
