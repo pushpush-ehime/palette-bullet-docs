@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import MarkdownIt from 'markdown-it'
 import { computed, onMounted, ref, watch } from 'vue'
+import MarkdownEditor from './MarkdownEditor.vue'
 
 type CategoryType = 'spec' | 'task'
 
@@ -14,11 +14,6 @@ const lastTemplateMarkdown = ref('')
 const copied = ref(false)
 
 const directoryPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-const markdown = new MarkdownIt({
-  html: false,
-  linkify: true,
-  typographer: true
-})
 
 onMounted(() => {
   const type = new URLSearchParams(window.location.search).get('type')
@@ -112,13 +107,7 @@ ${defaultBody.value}
 `
 })
 
-const generatedMarkdown = computed(() => {
-  return markdownSource.value
-})
-
-const renderedPreview = computed(() => {
-  return markdown.render(markdownForPreview(markdownSource.value))
-})
+const generatedMarkdown = computed(() => markdownSource.value)
 
 watch(templateMarkdown, (nextTemplate) => {
   if (
@@ -130,34 +119,6 @@ watch(templateMarkdown, (nextTemplate) => {
 
   lastTemplateMarkdown.value = nextTemplate
 }, { immediate: true })
-
-function markdownForPreview(source: string) {
-  const frontmatterMatch = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
-
-  if (!frontmatterMatch) {
-    return source
-  }
-
-  const frontmatterTable = frontmatterMatch[1]
-    .split(/\r?\n/)
-    .filter((line) => line.includes(':'))
-    .map((line) => {
-      const separatorIndex = line.indexOf(':')
-      const key = line.slice(0, separatorIndex).trim()
-      const value = line.slice(separatorIndex + 1).trim()
-
-      return `| ${key} | ${value || '-'} |`
-    })
-    .join('\n')
-
-  const body = source.slice(frontmatterMatch[0].length)
-
-  return `| 項目 | 内容 |
-| --- | --- |
-${frontmatterTable}
-
-${body}`
-}
 
 const destinationPath = computed(() => {
   const root = categoryType.value === 'spec' ? 'spec' : 'tasks'
@@ -275,27 +236,10 @@ async function openGitHub() {
       <code>{{ destinationPath }}</code>
     </div>
 
-    <div class="category-create-editor">
-      <label class="category-create-markdown">
-        <span>Markdown</span>
-        <textarea
-          v-model="markdownSource"
-          rows="14"
-          spellcheck="false"
-        />
-      </label>
-
-      <section
-        class="category-create-rendered"
-        aria-label="リアルタイム表示"
-      >
-        <span>リアルタイム表示</span>
-        <div
-          class="category-create-rendered-body"
-          v-html="renderedPreview"
-        />
-      </section>
-    </div>
+    <MarkdownEditor
+      v-model="markdownSource"
+      variant="category"
+    />
 
     <div class="category-create-actions">
       <button

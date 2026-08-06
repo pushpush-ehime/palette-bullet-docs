@@ -5,6 +5,7 @@ import {
   loadCatalog
 } from './content/catalog.mjs'
 
+const siteBase = '/palette-bullet-docs/'
 const catalog = loadCatalog()
 // assertValidCatalog(catalog)
 
@@ -29,7 +30,7 @@ export default defineConfig({
   lang: 'ja-JP',
   title: 'Palette Bullet Design',
   description: 'Palette Bullet 仕様書・タスク説明書',
-  base: '/palette-bullet-docs/',
+  base: siteBase,
   lastUpdated: true,
 
   themeConfig: {
@@ -49,8 +50,8 @@ export default defineConfig({
     ],
 
     editLink: {
-      pattern:
-        'https://github.com/pushpush-ehime/palette-bullet-docs/edit/main/docs/:path',
+      pattern: ({ filePath }) =>
+        `/guide/edit-page.html?path=${encodeURIComponent(filePath)}`,
       text: 'このページを編集'
     },
 
