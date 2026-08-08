@@ -3,6 +3,11 @@ title: "BGM MIDIファイルの設定"
 pageType: spec
 category: "BGM"
 status: 仮仕様
+relatedTasks:
+  - /tasks/music-chart-scriptableobject/pb-task-0011
+  - /tasks/music-chart-scriptableobject/pb-task-0012
+  - /tasks/music-chart-scriptableobject/pb-task-0013
+  - /tasks/music-chart-scriptableobject/pb-task-0014
 ---
 
 # BGM MIDI仕様
