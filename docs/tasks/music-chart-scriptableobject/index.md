@@ -3,6 +3,7 @@ title: "00. BGM下準備"
 description: このカテゴリで扱うタスク
 pageType: task-category
 category: "BGM"
+taskId: PB-TASK-0011
 categoryOrder: 90
 collapsed: true
 ---
