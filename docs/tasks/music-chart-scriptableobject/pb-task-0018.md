@@ -4,6 +4,8 @@ pageType: task
 taskId: PB-TASK-0018
 category: "BGM"
 team: プログラム
+relatedSpecs:
+  - /spec/bgm/bgm-make-syaonndama
 ---
 
 # PB-TASK-0018｜09. BGMシャオンダマ生成
