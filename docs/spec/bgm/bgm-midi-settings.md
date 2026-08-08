@@ -9,133 +9,117 @@ status: 仮仕様
 
 ## MIDIの役割
 
-MIDIには、BGMからゲームで使用する以下の情報を記録する。
+MIDIは、BGMの音楽情報をUnityへ渡すために使用する。
 
-* 音程・・・シャオンダマの発生に使用
-* 固定攻撃イベント・・・変化しない攻撃ポイント
-* ランダム攻撃候補・・・毎回変化する攻撃候補
-* ランダム区間・・・この中のコードやアルペジオ候補から攻撃が決まる
+ゲーム内で実際に再生する音にはFLACを使用し、MIDI自体は再生しない。
 
-音楽として実際に再生するのはFLACを使用し、MIDIはゲーム用の情報取得に使用する。
+```text
+FLAC
+└─ プレイヤーが実際に聞くBGM
 
-## ゲーム用Track
+MIDI
+└─ Unityが音程・楽器・演奏位置などを取得するためのデータ
+```
 
-通常の楽器Trackとは別に、ゲーム用Trackを用意する。
+MIDIから取得した情報は、Unity Editorで`MusicChart.asset`へ変換して使用する。
+
+```text
+MIDI
+ ↓
+DryWetMIDI
+ ↓
+MusicChart
+ ↓
+ゲームで使用
+```
+
+## MIDIに必要な情報
+
+MIDIには、ゲームで使用する楽器のNote情報を残す。
+
+各Noteから、主に以下の情報を取得する。
+
+```text
+Note
+├─ 音程・・・シャオンダマが持つ音を決めるため
+├─ オクターブ
+├─ Velocity
+├─ Track・・・そのNoteが、どの楽器から鳴っているかを取得するため
+├─ 演奏位置・・・そのNoteが曲のどこで鳴るかを取得するため（TempoMapを使って秒数へ変換）
+└─ Noteの長さ
+```
+## Trackについて
+
+作曲時の楽器Trackは、MIDI書き出し時にも判別できる状態にする。
+
+例：
 
 ```text
 Piano
 Guitar
 Bass
-Synth
-
-PB_ATTACK
-PB_RANDOM
+LeadSynth
+Pad
+Drums
 ```
 
-`PB_`から始まるTrackはゲーム用データとして扱い、BGMとしては再生しない。
+ゲーム内ですべてのTrackをシャオンダマ生成に使用するとは限らない。
 
-以下、PBのTrackの説明をします。
-このページの作者はMIDIがどんなタグを打てるのかわかっていないので、おしえてください。
-
-## 固定攻撃
-
-### コード
-攻撃に使用したいコードの構成音（もしくはコード）を明記する。
+どのTrackを使用するかは、Unityの`MusicChart`で設定する。
 
 ```text
-PB_ATTACK
+MusicChart
 
-       C
-       E
-       G
-       │
-       ▼
-   Attack Event
+Shaondama Settings
+
+Piano      ON
+Guitar     ON
+Bass       OFF
+Pad        OFF
+Drums      OFF
 ```
 
-例：
+## 攻撃イベントについて
+
+攻撃イベントはMIDIには記録しない。
+
+以下の情報はUnityの`MusicChart`で設定する。
 
 ```text
-C4
-E4
-G4
+Attack Events
+├─ 発生位置
+├─ 必要音
+├─ Chord / Arpeggio
+├─ アルペジオ順序
+├─ 予告時間
+└─ Harmony
+
+Random Sections
+├─ 開始位置
+├─ 終了位置
+└─ AttackEvent候補
 ```
 
-↓
+そのため、作曲者がMIDIへ`PB_ATTACK`や`PB_RANDOM`などのゲーム専用Trackを作成する必要はない。
 
-```text
-必要音
+## MIDI書き出しルール
 
-C
-E
-G
-```
+FLACとMIDIは、同じDAWプロジェクトから書き出す。
 
-オクターブは攻撃条件では区別しない。
+以下を必ず揃える。
 
----
+* 曲の開始位置
+* テンポ
+* テンポ変更
+* 拍子
+* 演奏位置
 
-### アルペジオ
+FLACだけ冒頭の無音を削除するなど、FLACとMIDIの開始位置が変わる編集は行わない。
 
-アルペジオの場合は、実際に演奏される順番でNoteを配置する。
+また、ゲームで使用する楽器のNote情報をMIDIに残す。
 
-```text
-PB_ATTACK
+## 将来の拡張
 
-C → E → G → C
-```
+将来、作曲者がDAW上からAttackEventやRandom Sectionを指定する必要が出た場合は、ゲーム専用TrackやMarker / Cueの利用を検討する。
 
-Unityでは、
-
-```text
-Type
-Arpeggio
-
-Sequence
-C → E → G → C
-
-Required
-C / E / G
-```
-
-として扱う。
-
-演奏順は保持するが、プレイヤーが集める必要音では重複を除外する。
-
-
-## ランダム区間
-
-作曲者は、Unityが攻撃イベントをランダムに選択してよい区間を指定できる。
-
-```text
-RANDOM START
-│
-│  Candidate A : C E G
-│
-│  Candidate B : A C E
-│
-│  Candidate C : C → E → G
-│
-RANDOM END
-```
-
-Unityは、この区間に登録された候補から攻撃イベントを選択する。
-
-### 作曲者
-* 攻撃コード,アルペジオを指定する
-* ランダム区間を指定する
-* 区間内で使用可能な攻撃候補を指定する
-
-### Unity
-
-* 使用する候補をランダムに選択する
-* 使用する個数を決定する
-* UI予告を行う
-* 攻撃判定を行う
-
-## Marker / Cueについて
-
-`ATTACK`、`RANDOM_START`、`RANDOM_END`などの位置情報（どのタイミングで来るか）は、MIDIのMarker / Cue、または専用Trackで記録する。
-
-使用するDAWからMIDIへ正しく書き出せる方法を確認した後、記録方式を決定する。
-
+現段階では使用しない。
