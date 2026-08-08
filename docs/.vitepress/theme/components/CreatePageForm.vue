@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import {
+  formatRelatedPages,
+  relationFieldForPageType,
+  setRelatedPages
+} from '../../content/related-specs.js'
 import { isTaskTeam, setTaskTeam } from '../../content/task-team.js'
 import MarkdownEditor from './MarkdownEditor.vue'
+import RelatedPagePicker from './RelatedPagePicker.vue'
 import TaskTeamField from './TaskTeamField.vue'
 
 type PageType = 'spec' | 'task'
@@ -14,11 +20,14 @@ const fileName = ref('')
 const status = ref('未決')
 const taskId = ref('PB-TASK-0000')
 const team = ref('')
+const relatedPageUrls = ref<string[]>([])
 const markdownSource = ref('')
 const lastTemplateMarkdown = ref('')
 
 const markdownCopied = ref(false)
 const commitMessageCopied = ref(false)
+const copyError = ref('')
+const manualCopyText = ref('')
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const taskIdPattern = /^PB-TASK-\d{4}$/
@@ -76,6 +85,28 @@ const taskMarkdownError = computed(() => {
   }
 })
 
+const relationField = computed(() => relationFieldForPageType(pageType.value))
+const relatedCandidateTypes = computed<PageType[]>(() =>
+  pageType.value === 'spec' ? ['task'] : ['spec']
+)
+
+const relationMarkdownError = computed(() => {
+  if (!markdownSource.value) return ''
+
+  try {
+    setRelatedPages(
+      markdownSource.value,
+      relationField.value,
+      relatedPageUrls.value
+    )
+    return ''
+  } catch (error) {
+    return error instanceof Error
+      ? error.message
+      : '関連情報のfrontmatterを更新できませんでした。'
+  }
+})
+
 const formError = computed(() => {
   if (!directory.value) {
     return '追加先のフォルダを取得できませんでした。'
@@ -114,6 +145,10 @@ const formError = computed(() => {
     return taskMarkdownError.value
   }
 
+  if (relationMarkdownError.value) {
+    return relationMarkdownError.value
+  }
+
   return ''
 })
 
@@ -130,11 +165,13 @@ const templateMarkdown = computed(() => {
   const pageCategory = category.value.trim()
 
   if (pageType.value === 'spec') {
+    const relatedPages = formatRelatedPages('relatedTasks', relatedPageUrls.value)
     return `---
 title: ${yamlString(pageTitle)}
 pageType: spec
 category: ${yamlString(pageCategory)}
 status: ${status.value}
+${relatedPages}
 ---
 
 # ${pageTitle}
@@ -144,6 +181,7 @@ ${defaultBody.value}
   }
 
   const id = taskId.value.trim()
+  const relatedPages = formatRelatedPages('relatedSpecs', relatedPageUrls.value)
 
   return `---
 title: ${yamlString(pageTitle)}
@@ -151,6 +189,7 @@ pageType: task
 taskId: ${id}
 category: ${yamlString(pageCategory)}
 team: ${team.value}
+${relatedPages}
 ---
 
 # ${id}｜${pageTitle}
@@ -160,14 +199,20 @@ ${defaultBody.value}
 })
 
 const generatedMarkdown = computed(() => {
-  if (pageType.value !== 'task' || !isTaskTeam(team.value)) {
-    return markdownSource.value
-  }
+  let generated = markdownSource.value
 
   try {
-    return setTaskTeam(markdownSource.value, team.value)
+    if (pageType.value === 'task' && isTaskTeam(team.value)) {
+      generated = setTaskTeam(generated, team.value)
+    }
+
+    return setRelatedPages(
+      generated,
+      relationField.value,
+      relatedPageUrls.value
+    )
   } catch {
-    return markdownSource.value
+    return generated
   }
 })
 
@@ -198,6 +243,33 @@ watch([team, markdownSource, pageType], ([nextTeam, nextSource, nextType]) => {
     // formErrorでfrontmatterの問題を表示し、コピーとGitHub作成を止める。
   }
 })
+
+watch(
+  [
+    () => relatedPageUrls.value.join('\0'),
+    markdownSource,
+    pageType
+  ],
+  ([, nextSource, nextType]) => {
+    if (
+      !nextSource ||
+      !new RegExp(`^pageType:\\s*${nextType}\\s*$`, 'm').test(nextSource)
+    ) {
+      return
+    }
+
+    try {
+      const updated = setRelatedPages(
+        nextSource,
+        relationFieldForPageType(nextType),
+        relatedPageUrls.value
+      )
+      if (updated !== nextSource) markdownSource.value = updated
+    } catch {
+      // formErrorでfrontmatterの問題を表示し、生成とコピーを止める。
+    }
+  }
+)
 
 const destinationPath = computed(() => {
   const root = pageType.value === 'spec' ? 'spec' : 'tasks'
@@ -230,17 +302,42 @@ const githubUrl = computed(() => {
   )
 })
 
+watch([generatedMarkdown, commitMessage], () => {
+  markdownCopied.value = false
+  commitMessageCopied.value = false
+  copyError.value = ''
+  manualCopyText.value = ''
+})
+
+async function copyText(text: string) {
+  copyError.value = ''
+  manualCopyText.value = ''
+
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    copyError.value = '自動コピーできませんでした。下の欄から手動でコピーしてください。'
+    manualCopyText.value = text
+    return false
+  }
+}
+
 async function copyMarkdown() {
   if (formError.value) {
-    return
+    return false
   }
 
-  await navigator.clipboard.writeText(generatedMarkdown.value)
+  markdownCopied.value = false
+  commitMessageCopied.value = false
+  if (!await copyText(generatedMarkdown.value)) return false
   markdownCopied.value = true
 
   window.setTimeout(() => {
     markdownCopied.value = false
   }, 3000)
+  return true
 }
 
 async function copyCommitMessage() {
@@ -248,7 +345,9 @@ async function copyCommitMessage() {
     return
   }
 
-  await navigator.clipboard.writeText(commitMessage.value)
+  markdownCopied.value = false
+  commitMessageCopied.value = false
+  if (!await copyText(commitMessage.value)) return
   commitMessageCopied.value = true
 
   window.setTimeout(() => {
@@ -261,8 +360,14 @@ async function openGitHub() {
     return
   }
 
+  const copyPromise = copyMarkdown()
   window.open(githubUrl.value, '_blank', 'noopener,noreferrer')
-  await copyMarkdown()
+  await copyPromise
+}
+
+function selectManualText(event: FocusEvent) {
+  const textarea = event.currentTarget as HTMLTextAreaElement
+  textarea.select()
 }
 </script>
 
@@ -338,6 +443,12 @@ async function openGitHub() {
         v-model="team"
         required
       />
+
+      <RelatedPagePicker
+        v-model="relatedPageUrls"
+        :page-types="relatedCandidateTypes"
+        :label="pageType === 'spec' ? '関連タスク' : '関連仕様'"
+      />
     </div>
 
     <p
@@ -395,6 +506,17 @@ async function openGitHub() {
       >
         GitHubで作成
       </button>
+    </div>
+
+    <div v-if="copyError" class="page-create-copy-error page-create-error" role="alert">
+      <p>{{ copyError }}</p>
+      <textarea
+        :value="manualCopyText"
+        readonly
+        rows="12"
+        aria-label="手動コピー用テキスト"
+        @focus="selectManualText"
+      ></textarea>
     </div>
   </div>
 </template>

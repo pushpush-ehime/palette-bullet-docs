@@ -1,78 +1,104 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { data as catalog } from '../../content/catalog.data.js'
 import {
-  getRelatedSpecs,
-  setRelatedSpecs
+  buildRelationEdges,
+  canonicalRelationUrl
+} from '../../content/relation-graph.js'
+import {
+  formatRelatedPages,
+  getRelatedPages,
+  relationFieldForPageType,
+  setRelatedPages,
+  type RelationField
 } from '../../content/related-specs.js'
 import { sortSpecs, sortTasks } from '../relations'
+import RelatedPagePicker from './RelatedPagePicker.vue'
+
+type PageType = 'spec' | 'task'
 
 const repository = 'pushpush-ehime/palette-bullet-docs'
 const branch = 'main'
 const specs = sortSpecs(catalog.filter((page) => page.pageType === 'spec'))
 const tasks = sortTasks(catalog.filter((page) => page.pageType === 'task'))
-const knownSpecUrls = new Set(specs.map((spec) => spec.url))
+const edges = buildRelationEdges(catalog)
 
-const selectedTaskUrl = ref('')
-const specQuery = ref('')
+const targetType = ref<PageType>('task')
+const targetCategory = ref('')
+const targetQuery = ref('')
+const selectedPageUrl = ref('')
 const originalMarkdown = ref('')
-const originalSpecUrls = ref<string[]>([])
-const selectedSpecUrls = ref<string[]>([])
-const unknownSpecUrls = ref<string[]>([])
+const originalEditableUrls = ref<string[]>([])
+const selectedRelatedUrls = ref<string[]>([])
+const lockedUrls = ref<string[]>([])
 const loading = ref(false)
 const loadError = ref('')
 const actionError = ref('')
-const markdownCopied = ref(false)
-const showManualCopy = ref(false)
+const copiedMessage = ref('')
+const manualCopyText = ref('')
 let requestSequence = 0
 
-const selectedTask = computed(() =>
-  tasks.find((task) => task.url === selectedTaskUrl.value)
+const targetPages = computed(() =>
+  targetType.value === 'spec' ? specs : tasks
 )
 
-const filteredSpecs = computed(() => {
-  const search = specQuery.value.trim().toLocaleLowerCase('ja')
+const targetCategories = computed(() => [
+  ...new Set(targetPages.value.map((page) => page.category).filter(Boolean))
+].sort((left, right) => left.localeCompare(right, 'ja')))
 
-  if (!search) return specs
+const hasTargetFilter = computed(() =>
+  Boolean(targetCategory.value || targetQuery.value.trim())
+)
 
-  return specs.filter((spec) =>
-    [spec.title, spec.description, spec.category, spec.url]
-      .join(' ')
-      .toLocaleLowerCase('ja')
-      .includes(search)
-  )
+const matchingTargets = computed(() => {
+  if (!hasTargetFilter.value) return []
+
+  const search = targetQuery.value.trim().toLocaleLowerCase('ja')
+
+  return targetPages.value.filter((page) => {
+    const matchesCategory = !targetCategory.value || page.category === targetCategory.value
+    const matchesSearch =
+      !search ||
+      [page.taskId, page.title, page.description, page.category, page.url]
+        .join(' ')
+        .toLocaleLowerCase('ja')
+        .includes(search)
+    return matchesCategory && matchesSearch
+  }).slice(0, 40)
 })
 
-const orderedSelectedSpecUrls = computed(() => {
-  const selected = new Set(selectedSpecUrls.value)
-  return [
-    ...specs.filter((spec) => selected.has(spec.url)).map((spec) => spec.url),
-    ...unknownSpecUrls.value.filter((url) => selected.has(url))
-  ]
+const targetOptions = computed(() => {
+  const selected = selectedPage.value
+  return selected && !matchingTargets.value.some((page) => page.url === selected.url)
+    ? [selected, ...matchingTargets.value]
+    : matchingTargets.value
 })
+
+const selectedPage = computed(() =>
+  targetPages.value.find((page) => page.url === selectedPageUrl.value)
+)
+
+const relationField = computed<RelationField>(() =>
+  relationFieldForPageType(targetType.value)
+)
+
+const candidateTypes = computed<PageType[]>(() =>
+  targetType.value === 'spec' ? ['task'] : ['spec']
+)
 
 const isDirty = computed(() =>
-  !sameUrlSet(originalSpecUrls.value, selectedSpecUrls.value)
+  !sameUrlSet(originalEditableUrls.value, selectedRelatedUrls.value)
 )
-
-const addedCount = computed(() => {
-  const original = new Set(originalSpecUrls.value)
-  return selectedSpecUrls.value.filter((url) => !original.has(url)).length
-})
-
-const removedCount = computed(() => {
-  const selected = new Set(selectedSpecUrls.value)
-  return originalSpecUrls.value.filter((url) => !selected.has(url)).length
-})
 
 const draft = computed(() => {
   if (!originalMarkdown.value) return { markdown: '', error: '' }
 
   try {
     return {
-      markdown: setRelatedSpecs(
+      markdown: setRelatedPages(
         originalMarkdown.value,
-        orderedSelectedSpecUrls.value
+        relationField.value,
+        selectedRelatedUrls.value
       ),
       error: ''
     }
@@ -82,38 +108,49 @@ const draft = computed(() => {
       error:
         error instanceof Error
           ? error.message
-          : 'relatedSpecsを更新できませんでした。'
+          : '関連情報を更新できませんでした。'
     }
   }
 })
 
+const frontmatterSnippet = computed(() => {
+  try {
+    return formatRelatedPages(relationField.value, selectedRelatedUrls.value)
+  } catch {
+    return ''
+  }
+})
+
 const githubEditUrl = computed(() => {
-  const path = selectedTask.value?.relativePath ?? ''
-  return isSafeTaskPath(path)
+  const path = selectedPage.value?.relativePath ?? ''
+  return isSafePagePath(path, targetType.value)
     ? `https://github.com/${repository}/edit/${branch}/docs/${encodePath(path)}`
     : ''
 })
 
-const canOpenGitHub = computed(
+const canGenerate = computed(
   () =>
-    Boolean(githubEditUrl.value) &&
+    Boolean(selectedPage.value) &&
     Boolean(draft.value.markdown) &&
     !draft.value.error &&
     !loading.value &&
-    !loadError.value &&
-    isDirty.value
+    !loadError.value
 )
 
-function sameUrlSet(left: string[], right: string[]) {
-  return (
-    left.length === right.length &&
-    left.every((url) => right.includes(url))
-  )
+function pageLabel(page: (typeof catalog)[number]) {
+  return page.pageType === 'task' && page.taskId
+    ? `${page.taskId}｜${page.title}`
+    : page.title
 }
 
-function isSafeTaskPath(path: string) {
+function sameUrlSet(left: string[], right: string[]) {
+  return left.length === right.length && left.every((url) => right.includes(url))
+}
+
+function isSafePagePath(path: string, pageType: PageType) {
+  const root = pageType === 'spec' ? 'spec/' : 'tasks/'
   if (
-    !path.startsWith('tasks/') ||
+    !path.startsWith(root) ||
     !path.endsWith('.md') ||
     path.includes('\\') ||
     path.includes('?') ||
@@ -123,79 +160,96 @@ function isSafeTaskPath(path: string) {
     return false
   }
 
-  return path
-    .split('/')
-    .every((segment) => segment && segment !== '.' && segment !== '..')
+  return path.split('/').every((segment) => segment && segment !== '.' && segment !== '..')
 }
 
 function encodePath(path: string) {
-  return path
-    .split('/')
-    .map((segment) => encodeURIComponent(segment))
-    .join('/')
+  return path.split('/').map((segment) => encodeURIComponent(segment)).join('/')
 }
 
 function frontmatterValue(source: string, key: string) {
   const normalized = source.replace(/\r\n?/g, '\n')
   if (!normalized.startsWith('---\n')) return ''
-
   const closingIndex = normalized.indexOf('\n---\n', 4)
   if (closingIndex === -1) return ''
 
   const block = normalized.slice(4, closingIndex)
-  const matches = [...block.matchAll(new RegExp(`^${key}\\s*:\\s*(.+?)\\s*$`, 'gm'))]
+  const matches = [...block.matchAll(new RegExp(`^${key}:\\s*(.+?)\\s*$`, 'gm'))]
   if (matches.length !== 1) return ''
 
   const value = matches[0][1].trim()
-  if (
-    value.length >= 2 &&
+  return value.length >= 2 &&
     ((value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'")))
-  ) {
-    return value.slice(1, -1)
-  }
-
-  return value
+    ? value.slice(1, -1)
+    : value
 }
 
-function changeTask(event: Event) {
+function reciprocalUrls(pageUrl: string, pageType: PageType) {
+  return edges
+    .filter((edge) =>
+      pageType === 'spec'
+        ? edge.specUrl === pageUrl && edge.declaredByTask
+        : edge.taskUrl === pageUrl && edge.declaredBySpec
+    )
+    .map((edge) => (pageType === 'spec' ? edge.taskUrl : edge.specUrl))
+}
+
+function clearActionFeedback() {
+  actionError.value = ''
+  copiedMessage.value = ''
+  manualCopyText.value = ''
+}
+
+watch(() => draft.value.markdown, clearActionFeedback)
+
+function requestTargetType(event: Event) {
+  const select = event.currentTarget as HTMLSelectElement
+  const nextType = select.value as PageType
+  if (isDirty.value && !window.confirm('未コピーの選択を破棄してページ種別を変更しますか？')) {
+    select.value = targetType.value
+    return
+  }
+
+  targetType.value = nextType
+  targetCategory.value = ''
+  targetQuery.value = ''
+  void loadPage('')
+}
+
+function requestTarget(event: Event) {
   const select = event.currentTarget as HTMLSelectElement
   const nextUrl = select.value
-
-  if (
-    isDirty.value &&
-    !window.confirm('まだGitHubへ反映していない選択があります。破棄して別のタスクを開きますか？')
-  ) {
-    select.value = selectedTaskUrl.value
+  if (isDirty.value && !window.confirm('未コピーの選択を破棄して別のページを開きますか？')) {
+    select.value = selectedPageUrl.value
     return
   }
 
-  void loadTask(nextUrl)
+  void loadPage(nextUrl)
 }
 
-async function loadTask(taskUrl = selectedTaskUrl.value) {
+async function loadPage(pageUrl = selectedPageUrl.value) {
   const sequence = ++requestSequence
-  const task = tasks.find((entry) => entry.url === taskUrl)
+  const page = targetPages.value.find((entry) => entry.url === pageUrl)
 
-  selectedTaskUrl.value = taskUrl
-  specQuery.value = ''
+  selectedPageUrl.value = pageUrl
   originalMarkdown.value = ''
-  originalSpecUrls.value = []
-  selectedSpecUrls.value = []
-  unknownSpecUrls.value = []
+  originalEditableUrls.value = []
+  selectedRelatedUrls.value = []
+  lockedUrls.value = []
   loadError.value = ''
   actionError.value = ''
-  markdownCopied.value = false
-  showManualCopy.value = false
+  copiedMessage.value = ''
+  manualCopyText.value = ''
 
-  if (!task) {
+  if (!page) {
     loading.value = false
     return
   }
 
-  if (!isSafeTaskPath(task.relativePath)) {
+  if (!isSafePagePath(page.relativePath, targetType.value)) {
     loading.value = false
-    loadError.value = '編集対象のタスクファイルを安全に特定できませんでした。'
+    loadError.value = '編集対象のMarkdownファイルを安全に特定できませんでした。'
     return
   }
 
@@ -203,10 +257,9 @@ async function loadTask(taskUrl = selectedTaskUrl.value) {
 
   try {
     const response = await fetch(
-      `https://raw.githubusercontent.com/${repository}/${branch}/docs/${encodePath(task.relativePath)}`,
+      `https://raw.githubusercontent.com/${repository}/${branch}/docs/${encodePath(page.relativePath)}`,
       { cache: 'no-store' }
     )
-
     if (!response.ok) {
       throw new Error(`GitHubからの取得に失敗しました（${response.status}）。`)
     }
@@ -215,19 +268,22 @@ async function loadTask(taskUrl = selectedTaskUrl.value) {
     if (sequence !== requestSequence) return
 
     if (
-      frontmatterValue(source, 'pageType') !== 'task' ||
-      frontmatterValue(source, 'taskId') !== task.taskId
+      frontmatterValue(source, 'pageType') !== targetType.value ||
+      (targetType.value === 'task' && frontmatterValue(source, 'taskId') !== page.taskId)
     ) {
-      throw new Error('取得したMarkdownが選択したタスクと一致しません。')
+      throw new Error('取得したMarkdownが選択したページと一致しません。')
     }
 
-    const currentUrls = getRelatedSpecs(source)
-    const unavailableUrls = currentUrls.filter((url) => !knownSpecUrls.has(url))
+    const storedUrls = getRelatedPages(source, relationField.value)
+    const storedSet = new Set(storedUrls.map(canonicalRelationUrl))
+    const reciprocal = reciprocalUrls(page.url, targetType.value)
+      .filter((url) => !storedSet.has(canonicalRelationUrl(url)))
+    const editableUrls = storedUrls
 
     originalMarkdown.value = source
-    originalSpecUrls.value = [...currentUrls]
-    selectedSpecUrls.value = [...currentUrls]
-    unknownSpecUrls.value = unavailableUrls
+    originalEditableUrls.value = editableUrls
+    selectedRelatedUrls.value = [...editableUrls]
+    lockedUrls.value = reciprocal
   } catch (error) {
     if (sequence !== requestSequence) return
     loadError.value =
@@ -240,43 +296,40 @@ async function loadTask(taskUrl = selectedTaskUrl.value) {
 }
 
 function resetSelection() {
-  selectedSpecUrls.value = [...originalSpecUrls.value]
+  selectedRelatedUrls.value = [...originalEditableUrls.value]
   actionError.value = ''
-  markdownCopied.value = false
-  showManualCopy.value = false
+  copiedMessage.value = ''
+  manualCopyText.value = ''
 }
 
-async function copyMarkdown() {
+async function copyText(text: string, successMessage: string) {
   actionError.value = ''
-  markdownCopied.value = false
-  showManualCopy.value = false
+  copiedMessage.value = ''
+  manualCopyText.value = ''
 
   try {
-    if (!navigator.clipboard?.writeText) {
-      throw new Error('このブラウザーではクリップボードを利用できません。')
-    }
-
-    await navigator.clipboard.writeText(draft.value.markdown)
-    markdownCopied.value = true
-    window.setTimeout(() => {
-      markdownCopied.value = false
-    }, 5000)
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
+    await navigator.clipboard.writeText(text)
+    copiedMessage.value = successMessage
   } catch {
-    actionError.value =
-      '本文を自動コピーできませんでした。下の欄から全文を手動でコピーしてください。'
-    showManualCopy.value = true
+    actionError.value = '自動コピーできませんでした。下の欄から手動でコピーしてください。'
+    manualCopyText.value = text
   }
 }
 
-async function openGitHub() {
-  if (!canOpenGitHub.value) return
+async function copyFrontmatter() {
+  if (!canGenerate.value) return
+  await copyText(frontmatterSnippet.value, '関連付け用frontmatterをコピーしました。')
+}
 
-  const copyPromise = copyMarkdown()
+async function openGitHub() {
+  if (!canGenerate.value || !isDirty.value || !githubEditUrl.value) return
+  const copyPromise = copyText(draft.value.markdown, '更新後のMarkdown全文をコピーしました。')
   window.open(githubEditUrl.value, '_blank', 'noopener,noreferrer')
   await copyPromise
 }
 
-function selectManualMarkdown(event: FocusEvent) {
+function selectManualText(event: FocusEvent) {
   const textarea = event.currentTarget as HTMLTextAreaElement
   textarea.select()
 }
@@ -286,25 +339,54 @@ function selectManualMarkdown(event: FocusEvent) {
   <section class="relation-editor" aria-labelledby="relation-editor-title">
     <div class="relation-editor-heading">
       <div>
-        <h2 id="relation-editor-title">仕様との対応を編集</h2>
-        <p>タスクを1件選び、関連する仕様を複数選択できます。</p>
+        <h2 id="relation-editor-title">関連付け内容を生成</h2>
+        <p>対象を1件選び、反対側のページを検索して複数関連付けできます。</p>
       </div>
-      <span class="relation-editor-scope">1タスクずつ更新</span>
+      <span class="relation-editor-scope">1ページずつ更新</span>
+    </div>
+
+    <div class="relation-editor-target-filters">
+      <label>
+        <span>対象の種別</span>
+        <select :value="targetType" @change="requestTargetType">
+          <option value="spec">仕様</option>
+          <option value="task">タスク</option>
+        </select>
+      </label>
+      <label>
+        <span>対象のカテゴリ</span>
+        <select v-model="targetCategory">
+          <option value="">すべて</option>
+          <option v-for="item in targetCategories" :key="item" :value="item">
+            {{ item }}
+          </option>
+        </select>
+      </label>
+      <label>
+        <span>対象を検索</span>
+        <input v-model="targetQuery" type="search" placeholder="タイトル、ID、URL" />
+      </label>
     </div>
 
     <div class="relation-editor-task">
-      <label for="relation-editor-task-select">更新するタスク</label>
+      <label for="relation-editor-target-select">対象ページ</label>
       <select
-        id="relation-editor-task-select"
-        :value="selectedTaskUrl"
-        @change="changeTask"
+        id="relation-editor-target-select"
+        :value="selectedPageUrl"
+        @change="requestTarget"
       >
-        <option value="">タスクを選択してください</option>
-        <option v-for="task in tasks" :key="task.url" :value="task.url">
-          {{ task.taskId }}｜{{ task.title }}（{{ task.category }}）
+        <option value="">ページを選択してください</option>
+        <option v-for="page in targetOptions" :key="page.url" :value="page.url">
+          {{ pageLabel(page) }}（{{ page.category }}）
         </option>
       </select>
-      <small>GitHubのmainブランチから最新のMarkdownを取得して編集します。</small>
+      <small>GitHubのmainブランチから最新のMarkdownを取得します。</small>
+      <small v-if="!hasTargetFilter && !selectedPageUrl">
+        カテゴリを選ぶか検索語を入力すると、対象ページの候補を表示します。
+      </small>
+      <small v-else-if="matchingTargets.length === 40">
+        候補は先頭40件まで表示しています。検索条件を追加すると絞り込めます。
+      </small>
     </div>
 
     <p v-if="loading" class="relation-editor-status" role="status">
@@ -313,61 +395,31 @@ function selectManualMarkdown(event: FocusEvent) {
 
     <div v-else-if="loadError" class="relation-editor-error" role="alert">
       <p>{{ loadError }}</p>
-      <button type="button" @click="loadTask()">もう一度読み込む</button>
+      <button type="button" @click="loadPage()">もう一度読み込む</button>
     </div>
 
-    <template v-else-if="selectedTask && originalMarkdown">
-      <div class="relation-editor-search">
-        <label for="relation-editor-spec-search">仕様を検索</label>
-        <input
-          id="relation-editor-spec-search"
-          v-model="specQuery"
-          type="search"
-          placeholder="仕様名、分類、URL"
-        />
-      </div>
+    <template v-else-if="selectedPage && originalMarkdown">
+      <RelatedPagePicker
+        v-model="selectedRelatedUrls"
+        :page-types="candidateTypes"
+        :locked-urls="lockedUrls"
+        :label="targetType === 'spec' ? '関連タスク' : '関連仕様'"
+      />
 
-      <fieldset class="relation-editor-specs">
-        <legend>関連する仕様（複数選択）</legend>
+      <p v-if="lockedUrls.length" class="relation-editor-warning">
+        「相手側のページで設定済み」の関係は、この1ファイルからは解除できません。
+        解除する場合は、その相手ページを対象として選び直してください。
+      </p>
 
-        <div class="relation-editor-selection-summary" aria-live="polite">
-          <strong>{{ selectedSpecUrls.length }}件を選択中</strong>
-          <span v-if="isDirty">追加 {{ addedCount }}件・解除 {{ removedCount }}件</span>
-          <span v-else>GitHub上の現在の設定と同じです</span>
-        </div>
-
-        <div class="relation-editor-spec-list">
-          <label
-            v-for="spec in filteredSpecs"
-            :key="spec.url"
-            class="relation-editor-spec-option"
-            :class="{ 'is-selected': selectedSpecUrls.includes(spec.url) }"
-          >
-            <input
-              v-model="selectedSpecUrls"
-              type="checkbox"
-              :value="spec.url"
-            />
-            <span>
-              <strong>{{ spec.title }}</strong>
-              <small>{{ spec.category }}・{{ spec.url }}</small>
-            </span>
-          </label>
-
-          <p v-if="!filteredSpecs.length" class="catalog-empty">
-            該当する仕様はありません。検索を変更してください。
-          </p>
-        </div>
-      </fieldset>
-
-      <div
-        v-if="unknownSpecUrls.length"
-        class="relation-editor-warning"
-        role="status"
-      >
-        <strong>現在のサイトに未掲載の関連仕様を保持します</strong>
-        <span v-for="url in unknownSpecUrls" :key="url">{{ url }}</span>
-        <small>mainブランチとの公開時差が考えられるため、この画面では解除しません。</small>
+      <div class="relation-editor-generated">
+        <label for="relation-frontmatter-output">生成されるfrontmatter</label>
+        <textarea
+          id="relation-frontmatter-output"
+          :value="frontmatterSnippet"
+          readonly
+          rows="5"
+          @focus="selectManualText"
+        ></textarea>
       </div>
 
       <p v-if="draft.error" class="relation-editor-error" role="alert">
@@ -378,49 +430,41 @@ function selectManualMarkdown(event: FocusEvent) {
         <button type="button" :disabled="!isDirty" @click="resetSelection">
           現在の設定に戻す
         </button>
+        <button type="button" :disabled="!canGenerate" @click="copyFrontmatter">
+          frontmatterをコピー
+        </button>
         <button
           type="button"
           class="primary"
-          :disabled="!canOpenGitHub"
+          :disabled="!canGenerate || !isDirty"
           @click="openGitHub"
         >
-          本文をコピーしてGitHubで編集
+          Markdown全文をコピーしてGitHubで編集
         </button>
-        <a
-          v-if="githubEditUrl"
-          :href="githubEditUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          GitHub編集画面だけ開く
-        </a>
       </div>
 
-      <p v-if="markdownCopied" class="relation-editor-success" aria-live="polite">
-        更新後のMarkdownをコピーしました。GitHubで全文を貼り替えてください。
+      <p v-if="copiedMessage" class="relation-editor-success" aria-live="polite">
+        {{ copiedMessage }}
       </p>
 
       <div v-if="actionError" class="relation-editor-error" role="alert">
         <p>{{ actionError }}</p>
         <textarea
-          v-if="showManualCopy"
-          :value="draft.markdown"
+          :value="manualCopyText"
           readonly
           rows="12"
-          aria-label="手動コピー用の更新後Markdown"
-          @focus="selectManualMarkdown"
+          aria-label="手動コピー用テキスト"
+          @focus="selectManualText"
         ></textarea>
       </div>
 
       <ol class="relation-editor-steps">
-        <li>上のボタンで、更新後のMarkdownをコピーしてGitHub編集画面を開きます。</li>
-        <li>GitHubの本文を全選択し、コピーしたMarkdownで貼り替えます。</li>
-        <li>変更をコミットするときに新しいブランチを選び、Pull Requestを作成します。</li>
+        <li>候補を選ぶと、保存元ページ用のfrontmatterが生成されます。</li>
+        <li>GitHub編集ではコピーしたMarkdown全文を貼り替えます。</li>
+        <li>新しいブランチへコミットし、Pull Requestを作成します。</li>
       </ol>
     </template>
 
-    <p v-else class="relation-editor-empty">
-      最初に更新するタスクを1件選択してください。
-    </p>
+    <p v-else class="relation-editor-empty">最初に対象ページを選択してください。</p>
   </section>
 </template>

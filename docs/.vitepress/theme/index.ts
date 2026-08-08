@@ -1,6 +1,7 @@
 import { h } from 'vue'
 import DefaultTheme from 'vitepress/theme'
 import NotionTaskLink from './components/NotionTaskLink.vue'
+import AutoPageRelations from './components/AutoPageRelations.vue'
 import OpenQuestions from './components/OpenQuestions.vue'
 import PageMeta from './components/PageMeta.vue'
 import PageRelations from './components/PageRelations.vue'
@@ -20,7 +21,8 @@ export default {
   extends: DefaultTheme,
   Layout: () =>
     h(DefaultTheme.Layout, null, {
-      'doc-before': () => h(PageMeta)
+      'doc-before': () => h(PageMeta),
+      'doc-after': () => h(AutoPageRelations)
     }),
   enhanceApp({ app }) {
     app.component('NotionTaskLink', NotionTaskLink)

@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { data as catalog } from '../../content/catalog.data.js'
 import { pageHref } from '../utils'
 import {
-  indexTasksBySpec,
+  relationIndexes,
   relationState,
   relationStateLabels,
   relationStateOptions,
@@ -14,7 +14,7 @@ import RelationEditor from './RelationEditor.vue'
 import StatusBadge from './StatusBadge.vue'
 
 const specs = sortSpecs(catalog.filter((page) => page.pageType === 'spec'))
-const tasksBySpec = indexTasksBySpec(catalog)
+const { tasksBySpec, specsByTask } = relationIndexes(catalog)
 const categories = [
   ...new Map(specs.map((spec) => [spec.category, spec.categoryOrder])).entries()
 ]
@@ -29,6 +29,10 @@ const mode = ref<'view' | 'edit'>('view')
 
 function relatedTasks(specUrl: string) {
   return tasksBySpec.get(specUrl) ?? []
+}
+
+function relatedSpecs(taskUrl: string) {
+  return specsByTask.get(taskUrl) ?? []
 }
 
 function stateFor(spec: (typeof specs)[number]) {
@@ -77,7 +81,7 @@ const relationCount = computed(() =>
           {{
             mode === 'view'
               ? '仕様から関連タスクを確認できます。'
-              : 'タスクを1件選び、関連仕様を更新します。'
+              : '仕様またはタスクを1件選び、反対側の関連ページを更新します。'
           }}
         </span>
       </div>
@@ -201,10 +205,10 @@ const relationCount = computed(() =>
                 <span class="relation-task-id">{{ task.taskId }}</span>
                 <span class="relation-node-title">{{ task.title }}</span>
                 <span
-                  v-if="task.relatedSpecs.length > 1"
+                  v-if="relatedSpecs(task.url).length > 1"
                   class="relation-shared-count"
                 >
-                  {{ task.relatedSpecs.length }}仕様に関連
+                  {{ relatedSpecs(task.url).length }}仕様に関連
                 </span>
               </a>
             </div>

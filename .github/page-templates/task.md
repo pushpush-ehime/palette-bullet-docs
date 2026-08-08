@@ -12,8 +12,7 @@ order: 90
 # milestone: プロトタイプ
 # assignees: [高平]
 # due: 2026-08-10
-relatedSpecs:
-  - /spec/player/spec-page
+relatedSpecs: []
 ---
 
 # PB-TASK-0000｜タスク名

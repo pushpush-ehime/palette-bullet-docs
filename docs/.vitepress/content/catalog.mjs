@@ -334,6 +334,10 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
         relatedSpecs: Array.isArray(frontmatter.relatedSpecs)
           ? frontmatter.relatedSpecs.map(normalizePageUrl)
           : [],
+        relatedTasks: Array.isArray(frontmatter.relatedTasks)
+          ? frontmatter.relatedTasks.map(normalizePageUrl)
+          : [],
+        hasInlineRelations: /<PageRelations(?:\s|\/>)/.test(source),
         /*
          * Notionへ転記する進行管理の項目。
          * すべて任意で、書かれていなければ空にする。
@@ -517,10 +521,7 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
 
           return {
             text: categoryIndex.category,
-            collapsed:
-              directory === activeDirectory
-                ? false
-                : (categoryIndex.frontmatter.collapsed ?? true),
+            collapsed: true,
             items
           }
         }),
@@ -586,10 +587,7 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
 
             return {
               text: categoryIndex.category,
-              collapsed:
-                directory === activeDirectory
-                  ? false
-                  : (categoryIndex.frontmatter.collapsed ?? true),
+              collapsed: true,
               items
             }
           }),
@@ -706,6 +704,47 @@ export function validateCatalog(catalog) {
     ])
   )
 
+  function validateRelatedPages(
+    entry,
+    { field, targetPageType, relationLabel, targetLabel }
+  ) {
+    if (entry.frontmatter[field] === undefined) return
+
+    if (!Array.isArray(entry.frontmatter[field])) {
+      errors.push(
+        `${entry.relativePath}: ${field}は配列で指定してください。`
+      )
+      return
+    }
+
+    const relatedUrls = entry[field]
+
+    const canonicalRelatedUrls = relatedUrls.map(canonicalCatalogUrl)
+
+    if (new Set(canonicalRelatedUrls).size !== canonicalRelatedUrls.length) {
+      errors.push(
+        `${entry.relativePath}: ${field}に同じ${relationLabel}が重複しています。`
+      )
+    }
+
+    for (const relatedUrl of relatedUrls) {
+      const target = urls.get(canonicalCatalogUrl(relatedUrl))
+
+      if (!target) {
+        errors.push(
+          `${entry.relativePath}: 関連${relationLabel}${relatedUrl}が見つかりません。`
+        )
+        continue
+      }
+
+      if (target.pageType !== targetPageType) {
+        errors.push(
+          `${entry.relativePath}: ${relatedUrl}は${targetLabel}ではありません。`
+        )
+      }
+    }
+  }
+
   for (const entry of catalog) {
     /*
      * Markdown共通の検査
@@ -744,18 +783,21 @@ export function validateCatalog(catalog) {
      * 関連付け設定の検査
      */
 
-    if (entry.frontmatter.relatedTasks !== undefined) {
-      errors.push(
-        `${entry.relativePath}: relatedTasksは使わず、タスク側のrelatedSpecsで関係を指定してください。`
-      )
-    }
-
     if (
       entry.frontmatter.relatedSpecs !== undefined &&
       entry.pageType !== 'task'
     ) {
       errors.push(
         `${entry.relativePath}: relatedSpecsはタスクページだけで使用してください。`
+      )
+    }
+
+    if (
+      entry.frontmatter.relatedTasks !== undefined &&
+      entry.pageType !== 'spec'
+    ) {
+      errors.push(
+        `${entry.relativePath}: relatedTasksは仕様ページだけで使用してください。`
       )
     }
 
@@ -810,6 +852,13 @@ export function validateCatalog(catalog) {
           `${entry.relativePath}: categoryを「${categoryIndex.category}」にしてください。`
         )
       }
+
+      validateRelatedPages(entry, {
+        field: 'relatedTasks',
+        targetPageType: 'task',
+        relationLabel: 'タスク',
+        targetLabel: 'タスクページ'
+      })
     }
 
     /*
@@ -887,47 +936,12 @@ export function validateCatalog(catalog) {
         )
       }
 
-      /*
-       * relatedSpecsは任意。
-       *
-       * 指定されている場合だけ、
-       * 配列・重複・リンク先を確認する。
-       */
-      if (entry.frontmatter.relatedSpecs !== undefined) {
-        if (!Array.isArray(entry.frontmatter.relatedSpecs)) {
-          errors.push(
-            `${entry.relativePath}: relatedSpecsは配列で指定してください。`
-          )
-        } else {
-          if (
-            new Set(entry.relatedSpecs).size !==
-            entry.relatedSpecs.length
-          ) {
-            errors.push(
-              `${entry.relativePath}: relatedSpecsに同じ仕様が重複しています。`
-            )
-          }
-
-          for (const relatedSpec of entry.relatedSpecs) {
-            const target = urls.get(
-              canonicalCatalogUrl(relatedSpec)
-            )
-
-            if (!target) {
-              errors.push(
-                `${entry.relativePath}: 関連仕様${relatedSpec}が見つかりません。`
-              )
-              continue
-            }
-
-            if (target.pageType !== 'spec') {
-              errors.push(
-                `${entry.relativePath}: ${relatedSpec}は仕様ページではありません。`
-              )
-            }
-          }
-        }
-      }
+      validateRelatedPages(entry, {
+        field: 'relatedSpecs',
+        targetPageType: 'spec',
+        relationLabel: '仕様',
+        targetLabel: '仕様ページ'
+      })
 
       /*
        * Notionへ転記する項目の検査。

@@ -58,7 +58,9 @@ function catalogEntry({
     taskId,
     order,
     categoryOrder,
-    relatedSpecs: [],
+    relatedSpecs: Array.isArray(data.relatedSpecs) ? data.relatedSpecs : [],
+    relatedTasks: Array.isArray(data.relatedTasks) ? data.relatedTasks : [],
+    hasInlineRelations: false,
     team,
     priority: '',
     milestone: '',
@@ -76,6 +78,16 @@ function findSidebarItem(items, link) {
   for (const item of items) {
     if (item.link === link) return item
     const nested = item.items ? findSidebarItem(item.items, link) : undefined
+    if (nested) return nested
+  }
+
+  return undefined
+}
+
+function findSidebarGroup(items, text) {
+  for (const item of items) {
+    if (item.text === text && item.items) return item
+    const nested = item.items ? findSidebarGroup(item.items, text) : undefined
     if (nested) return nested
   }
 
@@ -108,6 +120,79 @@ test('カテゴリページのtaskIdを検査で拒否する', () => {
     errors.some(
       (error) =>
         error.includes('taskId') && error.includes('タスクページだけ')
+    )
+  )
+})
+
+test('仕様側のrelatedTasksを許可してタスク参照を検査する', () => {
+  const spec = catalogEntry({
+    relativePath: 'spec/player/index.md',
+    url: '/spec/player/',
+    pageType: 'spec',
+    title: 'Player',
+    category: 'Player',
+    frontmatter: {
+      relatedTasks: ['/tasks/player/pb-task-0001']
+    }
+  })
+  const taskCategory = catalogEntry({
+    relativePath: 'tasks/player/index.md',
+    url: '/tasks/player/',
+    pageType: 'task-category',
+    title: 'Playerタスク',
+    category: 'Player'
+  })
+  const task = catalogEntry({
+    relativePath: 'tasks/player/pb-task-0001.md',
+    url: '/tasks/player/pb-task-0001',
+    pageType: 'task',
+    title: 'Player実装',
+    category: 'Player',
+    taskId: 'PB-TASK-0001'
+  })
+
+  const errors = validateCatalog([spec, taskCategory, task])
+  assert.equal(errors.some((error) => error.includes('relatedTasks')), false)
+})
+
+test('relatedTasksの重複・不存在・非タスク参照を拒否する', () => {
+  const spec = catalogEntry({
+    relativePath: 'spec/player/index.md',
+    url: '/spec/player/',
+    pageType: 'spec',
+    title: 'Player',
+    category: 'Player',
+    frontmatter: {
+      relatedTasks: [
+        '/spec/player/',
+        '/tasks/missing/pb-task-9999',
+        '/spec/player'
+      ]
+    }
+  })
+
+  const errors = validateCatalog([spec])
+  assert.ok(errors.some((error) => error.includes('重複')))
+  assert.ok(errors.some((error) => error.includes('見つかりません')))
+  assert.ok(errors.some((error) => error.includes('タスクページではありません')))
+})
+
+test('relatedTasksは仕様ページ以外では拒否する', () => {
+  const task = catalogEntry({
+    relativePath: 'tasks/player/pb-task-0001.md',
+    url: '/tasks/player/pb-task-0001',
+    pageType: 'task',
+    title: 'Player実装',
+    category: 'Player',
+    taskId: 'PB-TASK-0001',
+    frontmatter: { relatedTasks: [] }
+  })
+
+  const errors = validateCatalog([task])
+  assert.ok(
+    errors.some(
+      (error) =>
+        error.includes('relatedTasks') && error.includes('仕様ページだけ')
     )
   )
 })
@@ -176,6 +261,46 @@ test('サイドバーはteamに応じた班ラベルを付ける', () => {
   assert.doesNotMatch(programmer.text, /data-team="sound"/)
   assert.doesNotMatch(unassigned.text, /sidebar-team-badge/)
   assert.ok(addPage)
+})
+
+test('サイドバーの仕様・タスクカテゴリは現在のルートでも初期状態を閉じる', () => {
+  const catalog = [
+    catalogEntry({
+      relativePath: 'spec/index.md',
+      url: '/spec/',
+      pageType: 'spec-index',
+      title: '仕様一覧'
+    }),
+    catalogEntry({
+      relativePath: 'spec/player/index.md',
+      url: '/spec/player/',
+      pageType: 'spec',
+      title: 'Player',
+      category: 'Player',
+      frontmatter: { collapsed: false }
+    }),
+    catalogEntry({
+      relativePath: 'tasks/index.md',
+      url: '/tasks/',
+      pageType: 'task-index',
+      title: 'タスク一覧'
+    }),
+    catalogEntry({
+      relativePath: 'tasks/bgm/index.md',
+      url: '/tasks/bgm/',
+      pageType: 'task-category',
+      title: 'BGM',
+      category: 'BGM',
+      frontmatter: { collapsed: false }
+    })
+  ]
+
+  const sidebars = buildSidebars(catalog).sidebar
+  const specCategory = findSidebarGroup(sidebars['/spec/player/'], 'Player')
+  const taskCategory = findSidebarGroup(sidebars['/tasks/bgm/'], 'BGM')
+
+  assert.equal(specCategory?.collapsed, true)
+  assert.equal(taskCategory?.collapsed, true)
 })
 
 test('担当班の選択値でコメント状態のteamを有効化する', () => {

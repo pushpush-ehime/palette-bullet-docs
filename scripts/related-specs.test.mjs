@@ -2,8 +2,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parseFrontmatter } from '../docs/.vitepress/content/catalog.mjs'
 import {
+  formatRelatedPages,
+  getRelatedPages,
   getRelatedSpecs,
-  setRelatedSpecs
+  getRelatedTasks,
+  relationFieldForPageType,
+  setRelatedPages,
+  setRelatedSpecs,
+  setRelatedTasks
 } from '../docs/.vitepress/content/related-specs.js'
 
 test('relatedSpecsを複数選択の内容へ置き換える', () => {
@@ -121,6 +127,10 @@ relatedSpecs: []
     /重複/
   )
   assert.throws(
+    () => setRelatedSpecs(source, ['/spec/player', '/spec/player/']),
+    /重複/
+  )
+  assert.throws(
     () => getRelatedSpecs(`---
 relatedSpecs: []
 relatedSpecs: []
@@ -153,5 +163,102 @@ test('壊れたfrontmatterはrelatedSpecs更新前に拒否する', () => {
   assert.throws(
     () => getRelatedSpecs('---\ntitle: 閉じていない'),
     /frontmatterが閉じられていません/
+  )
+})
+
+test('ページ種別から保存する関連フィールドを選べる', () => {
+  assert.equal(relationFieldForPageType('spec'), 'relatedTasks')
+  assert.equal(relationFieldForPageType('task'), 'relatedSpecs')
+  assert.throws(() => relationFieldForPageType('spec-index'), /specまたはtask/)
+})
+
+test('relatedTasksもrelatedSpecsと同じ形式で生成・更新できる', () => {
+  const source = [
+    '---',
+    'title: 仕様',
+    'pageType: spec',
+    'relatedTasks: [/tasks/old.html]',
+    'status: 未決',
+    '---',
+    '',
+    '# 本文',
+    '',
+    '本文中のrelatedTasks: は変更しない',
+    ''
+  ].join('\r\n')
+
+  const updated = setRelatedTasks(source, [
+    '/tasks/player/pb-task-0001',
+    'tasks/camera/pb-task-0003'
+  ])
+
+  assert.deepEqual(getRelatedTasks(updated), [
+    '/tasks/player/pb-task-0001',
+    '/tasks/camera/pb-task-0003'
+  ])
+  assert.deepEqual(
+    getRelatedPages(updated, 'relatedTasks'),
+    getRelatedTasks(updated)
+  )
+  assert.deepEqual(parseFrontmatter(updated).data.relatedTasks, [
+    '/tasks/player/pb-task-0001',
+    '/tasks/camera/pb-task-0003'
+  ])
+  assert.match(updated, /本文中のrelatedTasks: は変更しない/)
+  assert.equal(updated.replaceAll('\r\n', '').includes('\n'), false)
+})
+
+test('関連フィールドのYAML生成は空配列と複数URLで共通化される', () => {
+  assert.equal(formatRelatedPages('relatedSpecs', []), 'relatedSpecs: []')
+  assert.equal(
+    formatRelatedPages('relatedTasks', [
+      'tasks/player/pb-task-0001.html',
+      '/tasks/camera/pb-task-0003'
+    ]),
+    [
+      'relatedTasks:',
+      '  - /tasks/player/pb-task-0001',
+      '  - /tasks/camera/pb-task-0003'
+    ].join('\n')
+  )
+})
+
+test('汎用setは指定した関連フィールドだけを更新する', () => {
+  const source = `---
+title: 仕様
+relatedSpecs:
+  - /spec/keep
+relatedTasks:
+  - /tasks/old
+---
+
+本文
+`
+  const updated = setRelatedPages(source, 'relatedTasks', ['/tasks/new'])
+
+  assert.deepEqual(getRelatedSpecs(updated), ['/spec/keep'])
+  assert.deepEqual(getRelatedTasks(updated), ['/tasks/new'])
+  assert.match(updated, /relatedSpecs:\n  - \/spec\/keep/)
+})
+
+test('relatedTasksの空選択・重複・不正フィールドを安全に扱う', () => {
+  const source = `---
+title: 仕様
+pageType: spec
+relatedTasks:
+  - /tasks/old
+---
+`
+  const empty = setRelatedTasks(source, [])
+
+  assert.match(empty, /relatedTasks: \[\]\n---/)
+  assert.deepEqual(getRelatedTasks(empty), [])
+  assert.throws(
+    () => setRelatedTasks(source, ['/tasks/a', 'tasks/a.html']),
+    /relatedTasks.*重複/
+  )
+  assert.throws(
+    () => getRelatedPages(source, 'relatedPages'),
+    /relatedSpecsまたはrelatedTasks/
   )
 })

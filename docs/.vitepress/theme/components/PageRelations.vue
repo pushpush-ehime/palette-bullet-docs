@@ -4,15 +4,14 @@ import { useData } from 'vitepress'
 import { data as catalog } from '../../content/catalog.data.js'
 import { pageHref, pageUrlFromRelative } from '../utils'
 import {
-  indexTasksBySpec,
+  relationIndexes,
   relationState,
-  relationStateLabels,
-  specsForTask
+  relationStateLabels
 } from '../relations'
 import StatusBadge from './StatusBadge.vue'
 
 const { page } = useData()
-const tasksBySpec = indexTasksBySpec(catalog)
+const { tasksBySpec, specsByTask } = relationIndexes(catalog)
 const currentUrl = computed(() => pageUrlFromRelative(page.value.relativePath))
 const currentEntry = computed(() =>
   catalog.find((entry) => entry.url === currentUrl.value)
@@ -24,7 +23,7 @@ const relatedTasks = computed(() =>
 )
 const relatedSpecs = computed(() =>
   currentEntry.value?.pageType === 'task'
-    ? specsForTask(catalog, currentEntry.value)
+    ? (specsByTask.get(currentEntry.value.url) ?? [])
     : []
 )
 const emptyState = computed(() => {

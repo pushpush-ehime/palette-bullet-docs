@@ -6,7 +6,7 @@ category: 新しい仕様カテゴリ
 categoryOrder: 90
 order: 0
 status: 未決
-collapsed: false
+collapsed: true
 ---
 
 # 新しい仕様カテゴリ

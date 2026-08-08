@@ -4,7 +4,7 @@ description: このカテゴリで扱うタスク
 pageType: task-category
 category: 新しいタスクカテゴリ
 categoryOrder: 90
-collapsed: false
+collapsed: true
 ---
 
 # 新しいタスクカテゴリ

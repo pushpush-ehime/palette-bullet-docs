@@ -14,6 +14,8 @@ export interface CatalogEntry {
   order: number
   categoryOrder: number
   relatedSpecs: string[]
+  relatedTasks: string[]
+  hasInlineRelations: boolean
   notionUrl: string
   openQuestions: string[]
   purpose: string
@@ -39,6 +41,8 @@ export default createContentLoader('**/*.md', {
       order: entry.order,
       categoryOrder: entry.categoryOrder,
       relatedSpecs: entry.relatedSpecs,
+      relatedTasks: entry.relatedTasks,
+      hasInlineRelations: entry.hasInlineRelations,
       notionUrl: entry.notionUrl,
       openQuestions: entry.openQuestions,
       purpose: entry.purpose,

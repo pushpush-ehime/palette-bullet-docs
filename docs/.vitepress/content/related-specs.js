@@ -22,7 +22,20 @@ function splitLines(source) {
   return lines
 }
 
-function frontmatterDocument(source) {
+const RELATION_FIELDS = new Set(['relatedSpecs', 'relatedTasks'])
+
+function assertRelationField(field) {
+  if (!RELATION_FIELDS.has(field)) {
+    throw new Error(
+      '関連フィールドはrelatedSpecsまたはrelatedTasksを指定してください。'
+    )
+  }
+
+  return field
+}
+
+function frontmatterDocument(source, field) {
+  const relationField = assertRelationField(field)
   const lines = splitLines(source)
 
   if (lines[0]?.text !== '---') {
@@ -40,11 +53,11 @@ function frontmatterDocument(source) {
   const keyIndexes = lines
     .slice(1, closingIndex)
     .flatMap((line, index) =>
-      /^relatedSpecs:/.test(line.text) ? [index + 1] : []
+      line.text.startsWith(`${relationField}:`) ? [index + 1] : []
     )
 
   if (keyIndexes.length > 1) {
-    throw new Error('relatedSpecsがfrontmatter内に複数あります。')
+    throw new Error(`${relationField}がfrontmatter内に複数あります。`)
   }
 
   return {
@@ -83,15 +96,15 @@ function unquote(value) {
   return trimmed
 }
 
-function normalizeUrl(value) {
+function normalizeUrl(value, field) {
   if (typeof value !== 'string') {
-    throw new Error('relatedSpecsのURLは文字列で指定してください。')
+    throw new Error(`${field}のURLは文字列で指定してください。`)
   }
 
   let url = value.trim()
 
   if (!url || /[\r\n]/.test(url)) {
-    throw new Error('relatedSpecsに空または改行を含むURLは指定できません。')
+    throw new Error(`${field}に空または改行を含むURLは指定できません。`)
   }
 
   if (!url.startsWith('/')) url = `/${url}`
@@ -99,15 +112,18 @@ function normalizeUrl(value) {
   return url
 }
 
-function normalizeUrls(urls) {
+function normalizeUrls(urls, field) {
   if (!Array.isArray(urls)) {
-    throw new Error('relatedSpecsは配列で指定してください。')
+    throw new Error(`${field}は配列で指定してください。`)
   }
 
-  const normalized = urls.map(normalizeUrl)
+  const normalized = urls.map((url) => normalizeUrl(url, field))
+  const canonical = normalized.map((url) =>
+    url === '/' ? url : url.replace(/\/+$/, '')
+  )
 
-  if (new Set(normalized).size !== normalized.length) {
-    throw new Error('relatedSpecsに同じ仕様URLが重複しています。')
+  if (new Set(canonical).size !== canonical.length) {
+    throw new Error(`${field}に同じURLが重複しています。`)
   }
 
   return normalized
@@ -120,25 +136,53 @@ function arraysEqual(left, right) {
   )
 }
 
-/** 文頭のfrontmatterからrelatedSpecsを読み取る。 */
-export function getRelatedSpecs(source) {
-  const { lines, closingIndex, keyIndex } = frontmatterDocument(source)
+/** ページ種別に対応する関連フィールド名を返す。 */
+export function relationFieldForPageType(pageType) {
+  if (pageType === 'spec') return 'relatedTasks'
+  if (pageType === 'task') return 'relatedSpecs'
+
+  throw new Error('関連付けを設定できるpageTypeはspecまたはtaskです。')
+}
+
+/** 関連フィールドを既存frontmatterと同じYAML形式で生成する。 */
+export function formatRelatedPages(field, urls) {
+  const relationField = assertRelationField(field)
+  const normalized = normalizeUrls(urls, relationField)
+
+  if (!normalized.length) return `${relationField}: []`
+
+  return [
+    `${relationField}:`,
+    ...normalized.map((url) => `  - ${url}`)
+  ].join('\n')
+}
+
+/** 文頭のfrontmatterから指定した関連URLを読み取る。 */
+export function getRelatedPages(source, field) {
+  const relationField = assertRelationField(field)
+  const { lines, closingIndex, keyIndex } = frontmatterDocument(
+    source,
+    relationField
+  )
 
   if (keyIndex === -1) return []
 
   const inlineValue = lines[keyIndex].text
-    .replace(/^relatedSpecs:\s*/, '')
+    .slice(`${relationField}:`.length)
     .trim()
 
   if (inlineValue) {
     if (inlineValue === '[]') return []
     if (!inlineValue.startsWith('[') || !inlineValue.endsWith(']')) {
-      throw new Error('relatedSpecsは配列で指定してください。')
+      throw new Error(`${relationField}は配列で指定してください。`)
     }
 
     const values = inlineValue.slice(1, -1).trim()
     return values
-      ? normalizeUrls(values.split(',').map((value) => unquote(value)))
+      ? normalizeUrls(
+          values.split(',').map((value) => unquote(value)),
+          relationField
+        )
       : []
   }
 
@@ -150,26 +194,29 @@ export function getRelatedSpecs(source) {
     if (match) urls.push(unquote(match[1]))
   }
 
-  return normalizeUrls(urls)
+  return normalizeUrls(urls, relationField)
 }
 
 /**
  * 文頭のfrontmatterだけを変更し、コメント・本文・改行コードを保つ。
  * 選択が0件なら、既存フィールドを空配列にして関連付けを解除する。
  */
-export function setRelatedSpecs(source, urls) {
-  const normalized = normalizeUrls(urls)
-  const current = getRelatedSpecs(source)
+export function setRelatedPages(source, field, urls) {
+  const relationField = assertRelationField(field)
+  const normalized = normalizeUrls(urls, relationField)
+  const current = getRelatedPages(source, relationField)
 
   if (arraysEqual(current, normalized)) return source
 
-  const { lines, closingIndex, keyIndex, lineBreak } = frontmatterDocument(source)
+  const { lines, closingIndex, keyIndex, lineBreak } = frontmatterDocument(
+    source,
+    relationField
+  )
 
   if (keyIndex === -1) {
-    const inserted = [
-      { text: 'relatedSpecs:', eol: lineBreak },
-      ...normalized.map((url) => ({ text: `  - ${url}`, eol: lineBreak }))
-    ]
+    const inserted = formatRelatedPages(relationField, normalized)
+      .split('\n')
+      .map((text) => ({ text, eol: lineBreak }))
     lines.splice(closingIndex, 0, ...inserted)
     return lines.map((line) => line.text + line.eol).join('')
   }
@@ -180,7 +227,9 @@ export function setRelatedSpecs(source, urls) {
     if (/^\s+-\s+/.test(lines[index].text)) lines.splice(index, 1)
   }
 
-  lines[keyIndex].text = normalized.length ? 'relatedSpecs:' : 'relatedSpecs: []'
+  lines[keyIndex].text = normalized.length
+    ? `${relationField}:`
+    : `${relationField}: []`
 
   if (normalized.length) {
     lines.splice(
@@ -191,4 +240,24 @@ export function setRelatedSpecs(source, urls) {
   }
 
   return lines.map((line) => line.text + line.eol).join('')
+}
+
+/** 文頭のfrontmatterからrelatedSpecsを読み取る。 */
+export function getRelatedSpecs(source) {
+  return getRelatedPages(source, 'relatedSpecs')
+}
+
+/** 文頭のfrontmatterのrelatedSpecsだけを変更する。 */
+export function setRelatedSpecs(source, urls) {
+  return setRelatedPages(source, 'relatedSpecs', urls)
+}
+
+/** 文頭のfrontmatterからrelatedTasksを読み取る。 */
+export function getRelatedTasks(source) {
+  return getRelatedPages(source, 'relatedTasks')
+}
+
+/** 文頭のfrontmatterのrelatedTasksだけを変更する。 */
+export function setRelatedTasks(source, urls) {
+  return setRelatedPages(source, 'relatedTasks', urls)
 }

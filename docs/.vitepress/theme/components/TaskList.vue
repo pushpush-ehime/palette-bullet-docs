@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { data as catalog } from '../../content/catalog.data.js'
 import { pageHref } from '../utils'
+import { indexSpecsByTask, sortTasks } from '../relations'
 
 const props = withDefaults(
   defineProps<{
@@ -13,15 +14,8 @@ const props = withDefaults(
 const query = ref('')
 const selectedCategory = ref('')
 
-const pagesByUrl = new Map(catalog.map((page) => [page.url, page]))
-const tasks = catalog
-  .filter((page) => page.pageType === 'task')
-  .sort(
-    (left, right) =>
-      left.categoryOrder - right.categoryOrder ||
-      left.order - right.order ||
-      left.taskId.localeCompare(right.taskId)
-  )
+const tasks = sortTasks(catalog.filter((page) => page.pageType === 'task'))
+const specsByTask = indexSpecsByTask(catalog)
 
 const categories = [...new Set(tasks.map((task) => task.category))]
 
@@ -30,7 +24,9 @@ const filteredTasks = computed(() => {
   const category = props.category || selectedCategory.value
 
   return tasks.filter((task) => {
-    const relatedSpecTitles = task.relatedSpecs.map(specTitle).join(' ')
+    const relatedSpecTitles = relatedSpecs(task.url)
+      .map((spec) => spec.title)
+      .join(' ')
     const matchesCategory = !category || task.category === category
     const matchesSearch =
       !search ||
@@ -41,8 +37,8 @@ const filteredTasks = computed(() => {
   })
 })
 
-function specTitle(url: string) {
-  return pagesByUrl.get(url)?.title ?? url
+function relatedSpecs(taskUrl: string) {
+  return specsByTask.get(taskUrl) ?? []
 }
 </script>
 
@@ -86,9 +82,12 @@ function specTitle(url: string) {
             <td>{{ task.title }}</td>
             <td v-if="!props.category">{{ task.category }}</td>
             <td>
-              <template v-for="(spec, index) in task.relatedSpecs" :key="spec">
+              <template
+                v-for="(spec, index) in relatedSpecs(task.url)"
+                :key="spec.url"
+              >
                 <span v-if="index">、</span>
-                <a :href="pageHref(spec)">{{ specTitle(spec) }}</a>
+                <a :href="pageHref(spec.url)">{{ spec.title }}</a>
               </template>
             </td>
             <td>

@@ -8,7 +8,6 @@ const categoryType = ref<CategoryType>('spec')
 const categoryName = ref('')
 const directory = ref('')
 const categoryOrder = ref(90)
-const initiallyOpen = ref(true)
 const markdownSource = ref('')
 const lastTemplateMarkdown = ref('')
 const copied = ref(false)
@@ -72,8 +71,6 @@ const defaultBody = computed(() => {
 
 const templateMarkdown = computed(() => {
   const name = categoryName.value.trim()
-  const collapsed = !initiallyOpen.value
-
   if (categoryType.value === 'spec') {
     return `---
 title: ${yamlString(name)}
@@ -83,7 +80,7 @@ category: ${yamlString(name)}
 categoryOrder: ${categoryOrder.value}
 order: 0
 status: 未決
-collapsed: ${collapsed}
+collapsed: true
 ---
 
 # ${name}
@@ -98,7 +95,7 @@ description: このカテゴリで扱うタスク
 pageType: task-category
 category: ${yamlString(name)}
 categoryOrder: ${categoryOrder.value}
-collapsed: ${collapsed}
+collapsed: true
 ---
 
 # ${name}
@@ -215,13 +212,6 @@ async function openGitHub() {
         >
       </label>
 
-      <label class="category-create-checkbox">
-        <input
-          v-model="initiallyOpen"
-          type="checkbox"
-        >
-        初期状態でカテゴリを開く
-      </label>
     </div>
 
     <p

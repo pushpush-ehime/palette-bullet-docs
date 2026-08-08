@@ -1,4 +1,5 @@
 import type { CatalogEntry } from '../content/catalog.data.js'
+import { buildRelationEdges } from '../content/relation-graph.js'
 
 export type RelationState =
   | 'linked'
@@ -41,27 +42,47 @@ export function sortTasks(tasks: CatalogEntry[]) {
   )
 }
 
-export function indexTasksBySpec(catalog: CatalogEntry[]) {
+export function relationIndexes(catalog: CatalogEntry[]) {
+  const pagesByUrl = new Map(catalog.map((page) => [page.url, page]))
   const tasksBySpec = new Map<string, CatalogEntry[]>()
-  const tasks = sortTasks(catalog.filter((page) => page.pageType === 'task'))
+  const specsByTask = new Map<string, CatalogEntry[]>()
+  const edges = buildRelationEdges(catalog)
 
-  for (const task of tasks) {
-    for (const specUrl of task.relatedSpecs) {
-      const relatedTasks = tasksBySpec.get(specUrl) ?? []
-      relatedTasks.push(task)
-      tasksBySpec.set(specUrl, relatedTasks)
-    }
+  for (const edge of edges) {
+    const spec = pagesByUrl.get(edge.specUrl)
+    const task = pagesByUrl.get(edge.taskUrl)
+    if (spec?.pageType !== 'spec' || task?.pageType !== 'task') continue
+
+    const relatedTasks = tasksBySpec.get(spec.url) ?? []
+    relatedTasks.push(task)
+    tasksBySpec.set(spec.url, relatedTasks)
+
+    const relatedSpecs = specsByTask.get(task.url) ?? []
+    relatedSpecs.push(spec)
+    specsByTask.set(task.url, relatedSpecs)
   }
 
-  return tasksBySpec
+  for (const [url, tasks] of tasksBySpec) {
+    tasksBySpec.set(url, sortTasks(tasks))
+  }
+
+  for (const [url, specs] of specsByTask) {
+    specsByTask.set(url, sortSpecs(specs))
+  }
+
+  return { edges, tasksBySpec, specsByTask }
+}
+
+export function indexTasksBySpec(catalog: CatalogEntry[]) {
+  return relationIndexes(catalog).tasksBySpec
+}
+
+export function indexSpecsByTask(catalog: CatalogEntry[]) {
+  return relationIndexes(catalog).specsByTask
 }
 
 export function specsForTask(catalog: CatalogEntry[], task: CatalogEntry) {
-  const pagesByUrl = new Map(catalog.map((page) => [page.url, page]))
-
-  return task.relatedSpecs
-    .map((url) => pagesByUrl.get(url))
-    .filter((page): page is CatalogEntry => page?.pageType === 'spec')
+  return indexSpecsByTask(catalog).get(task.url) ?? []
 }
 
 export function relationState(spec: CatalogEntry, relatedTaskCount: number): RelationState {
