@@ -4,6 +4,8 @@ pageType: task
 taskId: PB-TASK-0010
 category: "BGM"
 team: プログラム
+relatedSpecs:
+  - /spec/bgm/bgm-music-chart
 ---
 
 # 01. MusicChart ScriptableObject作成
