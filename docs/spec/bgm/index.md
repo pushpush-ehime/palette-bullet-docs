@@ -30,6 +30,7 @@ collapsed: false
 * MIDIには、ゲームで使用する楽器のノート情報を残す
 
 ::: info
+```text
 FLAC + MIDI
       ↓
 Unity Editor
@@ -37,4 +38,5 @@ Unity Editor
 MusicChart
       ↓
 ゲームで使用
+```
 :::
