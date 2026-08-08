@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { isTaskTeam, setTaskTeam } from '../../content/task-team.js'
 import { parseMarkdownDocument } from '../markdown-preview'
 import MarkdownEditor from './MarkdownEditor.vue'
+import TaskTeamField from './TaskTeamField.vue'
 
 const repository = 'pushpush-ehime/palette-bullet-docs'
 const branch = 'main'
@@ -16,6 +18,28 @@ const commitMessageCopied = ref(false)
 
 const parsedDocument = computed(() =>
   parseMarkdownDocument(markdownSource.value)
+)
+
+const isTaskPage = computed(
+  () => parsedDocument.value.frontmatter.pageType === 'task'
+)
+
+const taskTeam = computed({
+  get: () => String(parsedDocument.value.frontmatter.team ?? ''),
+  set: (value: string) => {
+    if (!isTaskTeam(value)) return
+    markdownSource.value = setTaskTeam(markdownSource.value, value)
+  }
+})
+
+const taskTeamError = computed(() =>
+  isTaskPage.value && !isTaskTeam(taskTeam.value)
+    ? '担当班を選択してください。'
+    : ''
+)
+
+const formError = computed(
+  () => parsedDocument.value.error || taskTeamError.value
 )
 
 const pageTitle = computed(() => {
@@ -116,7 +140,7 @@ function encodePath(path: string) {
 }
 
 async function copyMarkdown() {
-  if (!markdownSource.value) {
+  if (!markdownSource.value || formError.value) {
     return
   }
 
@@ -142,7 +166,7 @@ async function copyCommitMessage() {
 }
 
 async function openGitHub() {
-  if (!githubEditUrl.value || !markdownSource.value) {
+  if (!githubEditUrl.value || !markdownSource.value || formError.value) {
     return
   }
 
@@ -185,11 +209,21 @@ async function openGitHub() {
         <code>docs/{{ filePath }}</code>
       </div>
 
+      <div
+        v-if="isTaskPage"
+        class="page-create-fields"
+      >
+        <TaskTeamField
+          v-model="taskTeam"
+          required
+        />
+      </div>
+
       <p
-        v-if="parsedDocument.error"
+        v-if="formError"
         class="page-create-error"
       >
-        {{ parsedDocument.error }}
+        {{ formError }}
       </p>
 
       <MarkdownEditor
@@ -216,6 +250,7 @@ async function openGitHub() {
       <div class="page-create-actions">
         <button
           type="button"
+          :disabled="Boolean(formError)"
           @click="copyMarkdown"
         >
           {{ markdownCopied ? 'コピーしました' : '本文をコピー' }}
@@ -224,6 +259,7 @@ async function openGitHub() {
         <button
           type="button"
           class="primary"
+          :disabled="Boolean(formError)"
           @click="openGitHub"
         >
           本文をコピーしてGitHubで編集

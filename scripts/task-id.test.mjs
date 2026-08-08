@@ -5,7 +5,15 @@ import {
   validateCatalog
 } from '../docs/.vitepress/content/catalog.mjs'
 import { nextTaskId } from '../docs/.vitepress/content/task-id.js'
-import { migrateTaskIds } from './notion-sync.mjs'
+import {
+  isTaskTeam,
+  setTaskTeam
+} from '../docs/.vitepress/content/task-team.js'
+import {
+  diffOwnedProperties,
+  fetchExistingTasks,
+  migrateTaskIds
+} from './notion-sync.mjs'
 
 function catalogEntry({
   relativePath,
@@ -170,6 +178,138 @@ test('サイドバーはteamに応じた班ラベルを付ける', () => {
   assert.ok(addPage)
 })
 
+test('担当班の選択値でコメント状態のteamを有効化する', () => {
+  const source = [
+    '---',
+    'title: タスク',
+    'pageType: task',
+    'category: Player',
+    '# team: プログラム',
+    'relatedSpecs:',
+    '  - /spec/player/',
+    '---',
+    '',
+    '本文のteam: は変更しない',
+    ''
+  ].join('\r\n')
+
+  const updated = setTaskTeam(source, 'サウンド')
+
+  assert.match(updated, /category: Player\r\nteam: サウンド\r\nrelatedSpecs:/)
+  assert.match(updated, /本文のteam: は変更しない/)
+  assert.equal(updated.replaceAll('\r\n', '').includes('\n'), false)
+})
+
+test('teamがないfrontmatterにはcategoryの直後へ追加する', () => {
+  const source = `---
+title: タスク
+pageType: task
+category: Player
+---
+
+# タスク
+`
+
+  assert.match(
+    setTaskTeam(source, 'デザイン'),
+    /category: Player\nteam: デザイン\n---/
+  )
+  assert.equal(isTaskTeam('企画'), true)
+  assert.equal(isTaskTeam('プランナー'), false)
+  assert.throws(() => setTaskTeam(source, 'プランナー'), /選択肢にありません/)
+  assert.throws(
+    () => setTaskTeam('# frontmatterなし', '企画'),
+    /frontmatterが見つかりません/
+  )
+})
+
+test('frontmatterのteamをNotionの班へ継続同期する', () => {
+  const changes = diffOwnedProperties(
+    {
+      title: 'タスク',
+      designUrl: 'https://example.com/task',
+      team: 'プログラム'
+    },
+    {
+      title: 'タスク',
+      team: 'サウンド'
+    },
+    'https://example.com/task'
+  )
+
+  assert.deepEqual(changes, {
+    班: { select: { name: 'サウンド' } }
+  })
+
+  assert.deepEqual(
+    diffOwnedProperties(
+      {
+        title: 'タスク',
+        designUrl: 'https://example.com/task',
+        team: 'サウンド'
+      },
+      {
+        title: 'タスク',
+        team: 'サウンド'
+      },
+      'https://example.com/task'
+    ),
+    {}
+  )
+})
+
+test('frontmatterにteamがなければNotionの既存班を保持する', () => {
+  const unchanged = diffOwnedProperties(
+    {
+      title: 'タスク',
+      designUrl: 'https://example.com/task',
+      team: '企画'
+    },
+    {
+      title: 'タスク',
+      team: ''
+    },
+    'https://example.com/task'
+  )
+
+  assert.deepEqual(unchanged, {})
+})
+
+test('Notionの班selectを既存タスク情報として読み取る', async () => {
+  const client = {
+    async post(path) {
+      assert.equal(path, '/databases/task-db/query')
+      return {
+        results: [
+          {
+            id: 'task-page',
+            url: 'https://www.notion.so/task-page',
+            properties: {
+              タスクID: {
+                rich_text: [{ plain_text: 'PB-TASK-0001' }]
+              },
+              タスク: {
+                title: [{ plain_text: 'Playerの基本移動' }]
+              },
+              設計書: {
+                url: 'https://example.com/task'
+              },
+              班: {
+                select: { name: '  プログラム  ' }
+              }
+            }
+          }
+        ],
+        has_more: false
+      }
+    }
+  }
+
+  const tasks = await fetchExistingTasks(client, 'task-db')
+
+  assert.equal(tasks.get('PB-TASK-0001').team, 'プログラム')
+})
+
 test('Notionの旧IDを同じページのまま正しいIDへ移行する', async () => {
   const calls = []
   const client = {
@@ -203,6 +343,7 @@ test('Notionの旧IDを同じページのまま正しいIDへ移行する', asyn
         url: 'https://www.notion.so/drywet',
         taskId: 'PB-TASK-0012',
         title: 'DryWetMIDIの導入',
+        team: 'サウンド',
         designUrl:
           'https://pushpush-ehime.github.io/palette-bullet-docs/tasks/music-chart-scriptableobject/pb-task-0012'
       }
@@ -226,6 +367,7 @@ test('Notionの旧IDを同じページのまま正しいIDへ移行する', asyn
   assert.deepEqual(migrated, ['PB-TASK-0012→PB-TASK-0011'])
   assert.equal(existingTasks.has('PB-TASK-0012'), false)
   assert.equal(existingTasks.get('PB-TASK-0011').id, 'drywet-page')
+  assert.equal(existingTasks.get('PB-TASK-0011').team, 'サウンド')
   assert.equal(calls[0].path, '/blocks/drywet-page/children?page_size=100')
   assert.equal(calls[1].path, '/blocks/reference-block')
   assert.equal(

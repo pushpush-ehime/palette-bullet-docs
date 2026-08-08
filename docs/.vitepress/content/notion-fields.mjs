@@ -57,7 +57,7 @@ export const MEMBERS = [
 
 /**
  * frontmatterに書かれていないときにNotionへ入れる初期値。
- * 起票後の変更はNotion側で行う（同期スクリプトは上書きしない）。
+ * teamはfrontmatterに明示された後も同期し、その他の進行項目は起票時だけ使う。
  */
 export const DEFAULT_TASK_FIELDS = {
   team: 'プログラム',

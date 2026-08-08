@@ -2,6 +2,7 @@ import { createContentLoader } from 'vitepress'
 import { loadCatalog } from './catalog.mjs'
 
 export interface CatalogEntry {
+  relativePath: string
   url: string
   title: string
   description: string
@@ -26,6 +27,7 @@ export { data }
 export default createContentLoader('**/*.md', {
   transform() {
     return loadCatalog().map((entry) => ({
+      relativePath: entry.relativePath,
       url: entry.url,
       title: entry.title,
       description: entry.description,

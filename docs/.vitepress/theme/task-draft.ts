@@ -1,5 +1,7 @@
 import type { CatalogEntry } from '../content/catalog.data.js'
+import { setRelatedSpecs } from '../content/related-specs.js'
 import { nextTaskId } from '../content/task-id.js'
+import { setTaskTeam } from '../content/task-team.js'
 
 export { nextTaskId }
 
@@ -56,11 +58,6 @@ function yamlValue(value: string) {
 /** 置換文字列の`$&`などが展開されないよう、置換は必ず関数で渡す。 */
 function setField(source: string, key: string, value: string) {
   return source.replace(new RegExp(`^${key}:.*$`, 'm'), () => `${key}: ${value}`)
-}
-
-function setRelatedSpecs(source: string, urls: string[]) {
-  const list = urls.map((url) => `  - ${url}\n`).join('')
-  return source.replace(/^relatedSpecs:\n(?:[ \t]+-.*\n)*/m, () => `relatedSpecs:\n${list}`)
 }
 
 function sectionRange(lines: string[], heading: string) {
@@ -135,6 +132,7 @@ export interface DraftOptions {
   copySpecContent?: boolean
   quoteLimit?: number
   questionLimit?: number
+  team?: string
 }
 
 export function buildTaskDraft(
@@ -145,7 +143,8 @@ export function buildTaskDraft(
   {
     copySpecContent = true,
     quoteLimit = QUOTE_STEPS[0].quoteLimit,
-    questionLimit = QUOTE_STEPS[0].questionLimit
+    questionLimit = QUOTE_STEPS[0].questionLimit,
+    team = ''
   }: DraftOptions = {}
 ) {
   const title = `${spec.title}の実装`
@@ -155,6 +154,7 @@ export function buildTaskDraft(
   draft = setField(draft, 'description', yamlValue(`「${spec.title}」の仕様を実装する`))
   draft = setField(draft, 'taskId', taskId)
   draft = setField(draft, 'category', yamlValue(category))
+  if (team) draft = setTaskTeam(draft, team)
   draft = setRelatedSpecs(draft, [spec.url])
   // frontmatterのコメント行に当たらないよう、H1の書式で絞り込む。
   draft = draft.replace(/^# PB-TASK-.*$/m, () => `# ${taskId}｜${title}`)
@@ -212,10 +212,18 @@ export function newTaskLink(
   template: string,
   spec: CatalogEntry,
   taskId: string,
-  location: TaskLocation
+  location: TaskLocation,
+  team: string
 ) {
   const draftUrl = (options: DraftOptions) =>
-    newTaskUrl(location, taskId, buildTaskDraft(template, spec, taskId, location.category, options))
+    newTaskUrl(
+      location,
+      taskId,
+      buildTaskDraft(template, spec, taskId, location.category, {
+        ...options,
+        team
+      })
+    )
 
   for (const step of QUOTE_STEPS) {
     const url = draftUrl(step)

@@ -9,7 +9,7 @@
  *   NOTION_TASK_DB_ID  タスクDBのID
  *
  * 役割分担
- *   設計書サイト … 作業内容・完了条件の正。タスク名と設計書URLはこちらが上書きする。
+ *   設計書サイト … 作業内容・完了条件の正。タスク名・設計書URLと、明示された班はこちらが上書きする。
  *   Notion       … 進行管理の正。状態・担当・期限・優先度は起票時だけ書き込み、
  *                  以降は触らない（人がNotion上で動かすため）。
  *
@@ -236,7 +236,7 @@ function createClient(token) {
   }
 }
 
-async function fetchExistingTasks(client, databaseId) {
+export async function fetchExistingTasks(client, databaseId) {
   const tasks = new Map()
   let cursor
 
@@ -266,7 +266,8 @@ async function fetchExistingTasks(client, databaseId) {
         url: page.url,
         taskId,
         title: plainText(page.properties?.['タスク']?.title).trim(),
-        designUrl: page.properties?.['設計書']?.url ?? ''
+        designUrl: page.properties?.['設計書']?.url ?? '',
+        team: page.properties?.['班']?.select?.name?.trim() ?? ''
       })
     }
 
@@ -504,9 +505,10 @@ function buildNewPage(task, databaseId, siteUrl) {
 
 /*
  * 設計書サイト側が正の項目だけを比べる。
+ * 班はfrontmatterに明示された場合だけ設計書サイトを正とする。
  * 状態・担当・期限・優先度はNotionで動かすので、ここでは扱わない。
  */
-function diffOwnedProperties(existing, task, siteUrl) {
+export function diffOwnedProperties(existing, task, siteUrl) {
   const changes = {}
 
   if (existing.title !== task.title) {
@@ -515,6 +517,10 @@ function diffOwnedProperties(existing, task, siteUrl) {
 
   if (existing.designUrl !== siteUrl) {
     changes['設計書'] = { url: siteUrl }
+  }
+
+  if (task.team && existing.team !== task.team) {
+    changes['班'] = { select: { name: task.team } }
   }
 
   return changes

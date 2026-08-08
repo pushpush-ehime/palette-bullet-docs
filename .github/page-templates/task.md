@@ -5,8 +5,9 @@ pageType: task
 taskId: PB-TASK-0000
 category: Player
 order: 90
-# ここから下は任意。Notionチケットを作るときの初期値になる。
+# 担当班はサイトのタスク作成画面で選択する。
 # team: プログラム
+# ここから下は任意。Notionチケットを作るときの初期値になる。
 # priority: B
 # milestone: プロトタイプ
 # assignees: [高平]

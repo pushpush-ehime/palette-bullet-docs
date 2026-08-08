@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { isTaskTeam, setTaskTeam } from '../../content/task-team.js'
 import MarkdownEditor from './MarkdownEditor.vue'
+import TaskTeamField from './TaskTeamField.vue'
 
 type PageType = 'spec' | 'task'
 
@@ -11,6 +13,7 @@ const title = ref('')
 const fileName = ref('')
 const status = ref('未決')
 const taskId = ref('PB-TASK-0000')
+const team = ref('')
 const markdownSource = ref('')
 const lastTemplateMarkdown = ref('')
 
@@ -34,6 +37,12 @@ onMounted(() => {
   if (queryTaskId && taskIdPattern.test(queryTaskId)) {
     taskId.value = queryTaskId
   }
+
+  const queryTeam = query.get('team') ?? ''
+
+  if (isTaskTeam(queryTeam)) {
+    team.value = queryTeam
+  }
 })
 
 function yamlString(value: string) {
@@ -46,6 +55,25 @@ const normalizedFileName = computed(() => {
   }
 
   return fileName.value.trim()
+})
+
+const taskMarkdownError = computed(() => {
+  if (
+    pageType.value !== 'task' ||
+    !markdownSource.value ||
+    !isTaskTeam(team.value)
+  ) {
+    return ''
+  }
+
+  try {
+    setTaskTeam(markdownSource.value, team.value)
+    return ''
+  } catch (error) {
+    return error instanceof Error
+      ? error.message
+      : 'Markdownのfrontmatterを更新できませんでした。'
+  }
 })
 
 const formError = computed(() => {
@@ -76,6 +104,14 @@ const formError = computed(() => {
     !taskIdPattern.test(taskId.value.trim())
   ) {
     return 'タスクIDはPB-TASK-0001形式で入力してください。'
+  }
+
+  if (pageType.value === 'task' && !isTaskTeam(team.value)) {
+    return '担当班を選択してください。'
+  }
+
+  if (taskMarkdownError.value) {
+    return taskMarkdownError.value
   }
 
   return ''
@@ -114,6 +150,7 @@ title: ${yamlString(pageTitle)}
 pageType: task
 taskId: ${id}
 category: ${yamlString(pageCategory)}
+team: ${team.value}
 ---
 
 # ${id}｜${pageTitle}
@@ -122,7 +159,17 @@ ${defaultBody.value}
 `
 })
 
-const generatedMarkdown = computed(() => markdownSource.value)
+const generatedMarkdown = computed(() => {
+  if (pageType.value !== 'task' || !isTaskTeam(team.value)) {
+    return markdownSource.value
+  }
+
+  try {
+    return setTaskTeam(markdownSource.value, team.value)
+  } catch {
+    return markdownSource.value
+  }
+})
 
 watch(templateMarkdown, (nextTemplate) => {
   if (
@@ -134,6 +181,23 @@ watch(templateMarkdown, (nextTemplate) => {
 
   lastTemplateMarkdown.value = nextTemplate
 }, { immediate: true })
+
+watch([team, markdownSource, pageType], ([nextTeam, nextSource, nextType]) => {
+  if (
+    nextType !== 'task' ||
+    !isTaskTeam(nextTeam) ||
+    !nextSource
+  ) {
+    return
+  }
+
+  try {
+    const updated = setTaskTeam(nextSource, nextTeam)
+    if (updated !== nextSource) markdownSource.value = updated
+  } catch {
+    // formErrorでfrontmatterの問題を表示し、コピーとGitHub作成を止める。
+  }
+})
 
 const destinationPath = computed(() => {
   const root = pageType.value === 'spec' ? 'spec' : 'tasks'
@@ -268,6 +332,12 @@ async function openGitHub() {
           PB-TASK-0001形式で入力します。
         </small>
       </label>
+
+      <TaskTeamField
+        v-if="pageType === 'task'"
+        v-model="team"
+        required
+      />
     </div>
 
     <p
