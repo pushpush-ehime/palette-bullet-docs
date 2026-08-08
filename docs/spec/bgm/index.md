@@ -28,3 +28,13 @@ collapsed: false
 * FLACとMIDIの**曲の開始位置を必ず揃える**
 * 冒頭の無音部分を片方だけ削除しない
 * MIDIには、ゲームで使用する楽器のノート情報を残す
+
+::: info
+FLAC + MIDI
+      ↓
+Unity Editor
+      ↓
+MusicChart
+      ↓
+ゲームで使用
+:::
