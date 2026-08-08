@@ -3,9 +3,10 @@ title: "01. MusicChart ScriptableObject作成"
 pageType: task
 taskId: PB-TASK-0010
 category: "BGM"
+team: プログラム
 ---
 
-# MusicChart ScriptableObject作成
+# 01. MusicChart ScriptableObject作成
 
 ## 目的
 

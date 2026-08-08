@@ -496,6 +496,46 @@
     border-left: 5px solid transparent;
   }
 }
+
+/* タスクの担当班。本文色は変えず、小さなラベルだけで判別できるようにする。 */
+.sidebar-team-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-end: 6px;
+  padding: 1px 5px;
+  border-inline-start: 3px solid currentColor;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+  vertical-align: 1px;
+}
+
+.sidebar-team-badge[data-team='sound'] {
+  color: var(--vp-c-green-1);
+  background: var(--vp-c-green-soft);
+}
+
+.sidebar-team-badge[data-team='programmer'] {
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+}
+
+.sidebar-team-badge[data-team='design'] {
+  color: var(--vp-c-purple-1);
+  background: var(--vp-c-purple-soft);
+}
+
+.sidebar-team-badge[data-team='planning'] {
+  color: var(--vp-c-yellow-1);
+  background: var(--vp-c-yellow-soft);
+}
+
+.sidebar-team-badge[data-team='management'] {
+  color: var(--vp-c-default-1);
+  background: var(--vp-c-default-soft);
+}
+
 /* 現在のカテゴリ末尾に表示される「ページを追加」リンク */
 .VPSidebar a[href^='https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/'] {
   display: flex;

@@ -66,6 +66,10 @@ relatedSpecs:
 一覧にない値を書くと、Pull Requestの検査で止まります。
 メンバーや選択肢を増やしたときは、Notion側と`docs/.vitepress/content/notion-fields.mjs`の両方を更新してください。
 
+`team`はNotionの「班」とサイドバーの担当班ラベルで共通して使用します。
+例えば`team: サウンド`のタスクには、Light Mode・Dark Modeのどちらでも読める緑のラベルが付きます。
+色分けはフォルダやカテゴリ名ではなく、各タスクに書かれた`team`だけで判定します。
+
 ::: warning 起票後の変更
 `team`・`priority`・`milestone`・`assignees`・`due`は、チケットを作るときだけ使われます。
 あとから書き換えてもNotionには反映されません。進行管理はNotion上で行ってください。

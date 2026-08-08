@@ -20,6 +20,7 @@
 
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import {
   loadCatalog,
   getSectionContent,
@@ -35,6 +36,19 @@ import {
 
 const NOTION_API = 'https://api.notion.com/v1'
 const NOTION_VERSION = '2022-06-28'
+
+/**
+ * 過去に誤って採番されたTask IDの移行。
+ * 旧IDが再利用された場合も誤ったページを上書きしないよう、移行元の同一性も固定する。
+ */
+export const TASK_ID_MIGRATIONS = [
+  {
+    from: 'PB-TASK-0012',
+    to: 'PB-TASK-0011',
+    sourceTitle: 'DryWetMIDIの導入',
+    sourceDesignUrl: `${SITE_BASE_URL}/tasks/music-chart-scriptableobject/pb-task-0012`
+  }
+]
 
 /** Notionタスクページに必要なプロパティ */
 const REQUIRED_PROPERTIES = [
@@ -60,10 +74,16 @@ const WRITE_INTERVAL = 350
 
 const dryRun = process.argv.includes('--dry-run')
 
-main().catch((error) => {
-  console.error(`同期に失敗しました：${error.message}`)
-  process.exitCode = 1
-})
+const executedFile = process.argv[1]
+  ? pathToFileURL(resolve(process.argv[1])).href
+  : ''
+
+if (import.meta.url === executedFile) {
+  main().catch((error) => {
+    console.error(`同期に失敗しました：${error.message}`)
+    process.exitCode = 1
+  })
+}
 
 async function main() {
   const token = process.env.NOTION_TOKEN?.trim()
@@ -97,6 +117,13 @@ async function main() {
   const tasks = catalog
     .filter((entry) => entry.pageType === 'task')
     .sort((left, right) => left.taskId.localeCompare(right.taskId))
+
+  const migrated = await migrateTaskIds({
+    client,
+    existingTasks,
+    tasks,
+    isDryRun: dryRun
+  })
 
   const created = []
   const updated = []
@@ -143,7 +170,7 @@ async function main() {
   }
 
   writeLinks(links)
-  report({ created, updated, links, unchanged, tasks, databaseTitle })
+  report({ created, migrated, updated, links, unchanged, tasks, databaseTitle })
 }
 
 /*
@@ -237,6 +264,7 @@ async function fetchExistingTasks(client, databaseId) {
       tasks.set(taskId, {
         id: page.id,
         url: page.url,
+        taskId,
         title: plainText(page.properties?.['タスク']?.title).trim(),
         designUrl: page.properties?.['設計書']?.url ?? ''
       })
@@ -246,6 +274,181 @@ async function fetchExistingTasks(client, databaseId) {
   } while (cursor)
 
   return tasks
+}
+
+/**
+ * 誤採番済みのNotionページを同じページのまま正しいIDへ移行する。
+ * 先にカタログ上の実タスクを確認するため、旧IDが将来再利用されても
+ * その新しいタスクを移行対象にはしない。
+ */
+export async function migrateTaskIds({
+  client,
+  existingTasks,
+  tasks,
+  isDryRun = false,
+  migrations = TASK_ID_MIGRATIONS
+}) {
+  const taskById = new Map(tasks.map((task) => [task.taskId, task]))
+  const migrated = []
+
+  for (const migration of migrations) {
+    const task = taskById.get(migration.to)
+    const previous = existingTasks.get(migration.from)
+    if (!task || !previous) continue
+
+    if (!isExpectedMigrationSource(previous, migration)) {
+      const currentSourceTask = taskById.get(migration.from)
+      if (
+        currentSourceTask &&
+        isExpectedCanonicalTask(previous, currentSourceTask)
+      ) {
+        continue
+      }
+
+      throw new Error(
+        `Notionの${migration.from}を移行元「${migration.sourceTitle}」にも現在の実タスクにも特定できないため、自動同期を停止しました。ページを確認してから再実行してください。`
+      )
+    }
+
+    if (existingTasks.has(migration.to)) {
+      throw new Error(
+        `Notionに${migration.from}と${migration.to}の両方があります。重複を確認してから再実行してください。`
+      )
+    }
+
+    const siteUrl = `${SITE_BASE_URL}${task.url}`
+    const properties = {
+      タスク: { title: richText(task.title) },
+      タスクID: { rich_text: richText(task.taskId) },
+      設計書: { url: siteUrl }
+    }
+
+    if (isDryRun) {
+      console.log(
+        `[ID移行予定] ${migration.from} → ${migration.to}｜${task.title}`
+      )
+    } else {
+      await updateTaskReferenceBlock(
+        client,
+        previous.id,
+        migration.from,
+        task,
+        siteUrl
+      )
+      await client.patch(`/pages/${previous.id}`, { properties })
+      console.log(
+        `[ID移行] ${migration.from} → ${migration.to}｜${task.title}`
+      )
+    }
+
+    existingTasks.delete(migration.from)
+    existingTasks.set(migration.to, {
+      ...previous,
+      taskId: migration.to,
+      title: task.title,
+      designUrl: siteUrl
+    })
+    migrated.push(`${migration.from}→${migration.to}`)
+  }
+
+  return migrated
+}
+
+function isExpectedMigrationSource(previous, migration) {
+  const actualTitle = normalizeMigrationTitle(previous.title)
+  const expectedTitle = normalizeMigrationTitle(migration.sourceTitle)
+  const actualDesignUrl = normalizeMigrationUrl(previous.designUrl)
+  const expectedDesignUrl = normalizeMigrationUrl(migration.sourceDesignUrl)
+
+  return Boolean(
+    actualTitle &&
+      expectedTitle &&
+      actualTitle === expectedTitle &&
+      actualDesignUrl &&
+      expectedDesignUrl &&
+      actualDesignUrl === expectedDesignUrl
+  )
+}
+
+function isExpectedCanonicalTask(previous, task) {
+  const actualTitle = normalizeMigrationTitle(previous.title)
+  const expectedTitle = normalizeMigrationTitle(task.title)
+  const actualDesignUrl = normalizeMigrationUrl(previous.designUrl)
+  const expectedDesignUrl = normalizeMigrationUrl(
+    `${SITE_BASE_URL}${task.url}`
+  )
+
+  return Boolean(
+    actualTitle &&
+      expectedTitle &&
+      actualTitle === expectedTitle &&
+      actualDesignUrl &&
+      actualDesignUrl === expectedDesignUrl
+  )
+}
+
+function normalizeMigrationTitle(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/^\d+\.\s*/, '')
+}
+
+function normalizeMigrationUrl(value) {
+  return String(value ?? '').trim().replace(/\/+$/, '')
+}
+
+async function updateTaskReferenceBlock(
+  client,
+  pageId,
+  previousTaskId,
+  task,
+  siteUrl
+) {
+  const blocks = await fetchBlockChildren(client, pageId)
+  const referenceBlock = blocks.find(
+    (block) =>
+      block.type === 'paragraph' &&
+      plainText(block.paragraph?.rich_text).startsWith(`${previousTaskId}｜`)
+  )
+
+  if (!referenceBlock) {
+    console.warn(
+      `注意：Notionページ本文に${previousTaskId}の参照が見つからなかったため、プロパティだけを更新しました。`
+    )
+    return
+  }
+
+  await client.patch(`/blocks/${referenceBlock.id}`, {
+    paragraph: {
+      rich_text: [
+        {
+          type: 'text',
+          text: {
+            content: `${task.taskId}｜${task.title}`,
+            link: { url: siteUrl }
+          }
+        }
+      ]
+    }
+  })
+}
+
+async function fetchBlockChildren(client, blockId) {
+  const blocks = []
+  let cursor
+
+  do {
+    const query = new URLSearchParams({ page_size: '100' })
+    if (cursor) query.set('start_cursor', cursor)
+
+    const response = await client.get(
+      `/blocks/${blockId}/children?${query.toString()}`
+    )
+    blocks.push(...response.results)
+    cursor = response.has_more ? response.next_cursor : undefined
+  } while (cursor)
+
+  return blocks
 }
 
 function assertDatabaseSchema(database) {
@@ -498,10 +701,19 @@ function categoryIcon(task) {
  * 実行結果の表示
  */
 
-function report({ created, updated, links, unchanged, tasks, databaseTitle }) {
+function report({
+  created,
+  migrated,
+  updated,
+  links,
+  unchanged,
+  tasks,
+  databaseTitle
+}) {
   const prefix = dryRun ? '（--dry-run）' : ''
   const lines = [
     `${prefix}タスクページ${tasks.length}件をNotion「${databaseTitle}」と同期しました。`,
+    `- Task IDを移行：${migrated.length}件${listOf(migrated)}`,
     `- 新しく起票：${created.length}件${listOf(created)}`,
     `- 内容を更新：${updated.length}件${listOf(updated)}`,
     `- 変更なし：${unchanged.length}件`,

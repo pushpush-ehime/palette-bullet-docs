@@ -9,6 +9,7 @@ export interface CatalogEntry {
   category: string
   status: string
   taskId: string
+  team: string
   order: number
   categoryOrder: number
   relatedSpecs: string[]
@@ -32,6 +33,7 @@ export default createContentLoader('**/*.md', {
       category: entry.category,
       status: entry.status,
       taskId: entry.taskId,
+      team: entry.team,
       order: entry.order,
       categoryOrder: entry.categoryOrder,
       relatedSpecs: entry.relatedSpecs,

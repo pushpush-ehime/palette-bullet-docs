@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, relative, resolve } from 'node:path'
+import { nextTaskId, TASK_ID_PATTERN } from './task-id.js'
 import {
   DUE_PATTERN,
   NOTION_LINKS_FILE,
@@ -14,6 +15,16 @@ import {
 
 export const VALID_STATUSES = ['確定', '仮仕様', '未決', '対象外', '廃止']
 
+const TASK_PAGE_ONLY_KEYS = ['taskId', ...TASK_ONLY_KEYS]
+
+const SIDEBAR_TEAM_KEYS = {
+  企画: 'planning',
+  プログラム: 'programmer',
+  デザイン: 'design',
+  サウンド: 'sound',
+  全体管理: 'management'
+}
+
 function toPosix(value) {
   return value.replaceAll('\\', '/')
 }
@@ -26,6 +37,32 @@ function toText(value) {
   if (value === undefined || value === null) return ''
   if (typeof value === 'string') return value.trim()
   return String(value)
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => {
+    const entities = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }
+
+    return entities[character]
+  })
+}
+
+export function sidebarTaskText(task) {
+  const text = escapeHtml(`${task.taskId} ${task.title}`)
+  const teamKey = SIDEBAR_TEAM_KEYS[task.team]
+  if (!teamKey) return text
+
+  const team = escapeHtml(task.team)
+  return (
+    `<span class="sidebar-team-badge" data-team="${teamKey}" ` +
+    `title="担当班: ${team}">${team}</span>${text}`
+  )
 }
 
 function parseScalar(rawValue) {
@@ -422,17 +459,7 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
     return { categoryIndex, directory, tasks }
   })
 
-  const nextTaskNumber =
-    catalog
-      .map((entry) => entry.taskId?.match(/^PB-TASK-(\d{4})$/)?.[1])
-      .filter(Boolean)
-      .reduce(
-        (maximum, value) => Math.max(maximum, Number(value)),
-        0
-      ) + 1
-
-  const nextTaskId =
-    `PB-TASK-${String(nextTaskNumber).padStart(4, '0')}`
+  const suggestedTaskId = nextTaskId(catalog)
 
   function createAddPageItem(rootName, directory, category) {
     const type = rootName === 'spec' ? 'spec' : 'task'
@@ -443,7 +470,7 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
     })
 
     if (type === 'task') {
-      query.set('taskId', nextTaskId)
+      query.set('taskId', suggestedTaskId)
     }
 
     return {
@@ -548,7 +575,7 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
               ...tasks
                 .filter((task) => task.url !== categoryIndex.url)
                 .map((task) => ({
-                  text: `${task.taskId} ${task.title}`,
+                  text: sidebarTaskText(task),
                   link: task.url
                 }))
             ]
@@ -737,7 +764,7 @@ export function validateCatalog(catalog) {
      */
 
     if (entry.pageType !== 'task') {
-      for (const key of TASK_ONLY_KEYS) {
+      for (const key of TASK_PAGE_ONLY_KEYS) {
         if (entry.frontmatter[key] !== undefined) {
           errors.push(
             `${entry.relativePath}: ${key}はタスクページだけで使用してください。`
@@ -808,7 +835,7 @@ export function validateCatalog(catalog) {
        * タスクID
        */
 
-      if (!/^PB-TASK-\d{4}$/.test(entry.taskId)) {
+      if (!TASK_ID_PATTERN.test(entry.taskId)) {
         errors.push(
           `${entry.relativePath}: taskIdはPB-TASK-0001形式にしてください。`
         )

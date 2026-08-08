@@ -1,4 +1,7 @@
 import type { CatalogEntry } from '../content/catalog.data.js'
+import { nextTaskId } from '../content/task-id.js'
+
+export { nextTaskId }
 
 const REPOSITORY = 'pushpush-ehime/palette-bullet-docs'
 const DEFAULT_BRANCH = 'main'
@@ -21,15 +24,6 @@ const PLACEHOLDERS = ['', '未決', 'なし', '未定']
 export interface TaskLocation {
   directory: string
   category: string
-}
-
-export function nextTaskId(catalog: CatalogEntry[]) {
-  const maxNumber = catalog.reduce((max, entry) => {
-    const matched = /^PB-TASK-(\d{4})$/.exec(entry.taskId ?? '')
-    return matched ? Math.max(max, Number(matched[1])) : max
-  }, 0)
-
-  return `PB-TASK-${String(maxNumber + 1).padStart(4, '0')}`
 }
 
 export function taskLocation(catalog: CatalogEntry[], specUrl: string): TaskLocation {

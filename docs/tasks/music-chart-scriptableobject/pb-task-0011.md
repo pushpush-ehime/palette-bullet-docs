@@ -1,11 +1,12 @@
 ---
-title: "DryWetMIDIの導入"
+title: "02. DryWetMIDIの導入"
 pageType: task
-taskId: PB-TASK-0012
+taskId: PB-TASK-0011
 category: "BGM"
+team: プログラム
 ---
 
-# DryWetMIDI導入
+# 02. DryWetMIDIの導入
 
 ## 目的
 

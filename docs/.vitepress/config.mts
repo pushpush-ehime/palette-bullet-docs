@@ -7,7 +7,7 @@ import {
 
 const siteBase = '/palette-bullet-docs/'
 const catalog = loadCatalog()
-// assertValidCatalog(catalog)
+assertValidCatalog(catalog)
 
 const generatedSidebars = buildSidebars(catalog, {
   leadingItems: [
