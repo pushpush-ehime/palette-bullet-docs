@@ -1,5 +1,5 @@
 ---
-title: "BGM情報読み取り"
+title: "03. BGM情報読み取り"
 description: MIDIファイルから音符・Track・テンポなどの基本情報を読み取る
 pageType: task
 taskId: PB-TASK-0012
@@ -7,7 +7,7 @@ category: "BGM"
 team: プログラム
 ---
 
-# PB-TASK-0012｜BGM情報読み取り
+# PB-TASK-0012｜03.BGM情報読み取り
 ## 目的
 
 DryWetMIDIを使用して、MIDIファイルからゲームに必要な基本情報を取得できるようにする。
