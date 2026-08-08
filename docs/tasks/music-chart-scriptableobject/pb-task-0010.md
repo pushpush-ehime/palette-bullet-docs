@@ -88,6 +88,3 @@ MusicChart
 - Random Sectionを登録できる
 - 同期補正値を設定できる
 - 保存後にUnityを再起動しても設定内容が保持される
-
-relatedSpecs:
-  - /spec/bgm/bgm-music-chart
