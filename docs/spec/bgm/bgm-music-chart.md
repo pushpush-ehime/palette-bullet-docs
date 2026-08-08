@@ -3,6 +3,12 @@ title: "BGM MusicChart仕様"
 pageType: spec
 category: "BGM"
 status: 仮仕様
+relatedTasks:
+  - /tasks/music-chart-scriptableobject/pb-task-0012
+  - /tasks/music-chart-scriptableobject/pb-task-0013
+  - /tasks/music-chart-scriptableobject/pb-task-0014
+  - /tasks/music-chart-scriptableobject/pb-task-0015
+  - /tasks/music-chart-scriptableobject/pb-task-0016
 ---
 
 # BGM MusicChart仕様
