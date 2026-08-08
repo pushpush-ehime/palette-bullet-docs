@@ -1,5 +1,5 @@
 ---
-title: "BGM"
+title: "00. BGM下準備"
 description: このカテゴリで扱うタスク
 pageType: task-category
 category: "BGM"
@@ -7,83 +7,91 @@ categoryOrder: 90
 collapsed: true
 ---
 
-# MusicChart ScriptableObject作成
+# BGM下準備
 
 ## 目的
 
-BGMごとの音楽情報・攻撃イベント情報を保存する`MusicChart`を作成する。
+BGMシステムの実装を始めるために、必要なフォルダとテスト用音楽データを準備する。
 
-ゲーム実行中はMIDIを直接解析せず、生成された`MusicChart.asset`を使用する。
+## フォルダ作成
 
-## 実装内容
-
-`MusicChart`をScriptableObjectとして作成する。
-
-MusicChartには以下の情報を保存できるようにする。
+BGMシステム用に以下のフォルダを作成する。
 
 ```text
-MusicChart
-├─ BGM
-│  └─ AudioClip
-│
-├─ Music Data
-│  ├─ TempoMap
-│  └─ NoteEvents
-│     ├─ 音程
-│     ├─ Track
-│     └─ 演奏位置
-│
-├─ Shaondama Settings
-│  └─ 使用するTrack
-│
-├─ Attack Events
-│  ├─ 発生位置
-│  ├─ 必要音
-│  ├─ Type（Chord / Arpeggio）
-│  ├─ アルペジオ順序
-│  ├─ 予告時間
-│  └─ Harmony
-│     ├─ Root（例：C）
-│     └─ Quality（例：Major）
-│
-├─ Random Sections
-│  ├─ 開始位置
-│  ├─ 終了位置
-│  └─ AttackEvent候補
-│
-└─ Sync Settings
-   └─ 同期補正値
+Assets/
+└─ PaletteBullet/
+   └─ Music/
+      ├─ Audio/
+      ├─ MIDI/
+      ├─ Charts/
+      ├─ Scripts/
+      ├─ Editor/
+      └─ Test/
 ```
 
-## 今回実装する範囲
+### 各フォルダの用途
 
-* `MusicChart` ScriptableObjectを作成する
-* Projectウィンドウから`MusicChart.asset`を新規作成できるようにする
-* MusicChartが必要なデータを保持できるクラス構造を作る
-* Inspectorから各項目を確認・編集できるようにする
+| フォルダ       | 用途                           |
+| ---------- | ---------------------------- |
+| `Audio/`   | FLACなどのBGMファイル               |
+| `MIDI/`    | BGMに対応するMIDIファイル             |
+| `Charts/`  | `MusicChart.asset`           |
+| `Scripts/` | BGMシステムのRuntime用スクリプト        |
+| `Editor/`  | MIDI ImporterなどEditor専用スクリプト |
+| `Test/`    | BGMシステム確認用のScene・テストデータ      |
 
-## 今回実装しないもの
 
-* MIDI読み込み
-* DryWetMIDI導入
-* MIDIからNoteEventの自動生成
-* BGM再生
-* DSP同期
-* AttackEventの実行
-* ランダム攻撃処理
-* 専用MusicChart Editor
+## テスト用BGMを用意する
 
-これらは別タスクで実装する。
+実装確認用として、同じ曲の以下のファイルを1セット用意する。
+
+```text
+BattleTest.flac
+BattleTest.mid
+```
+
+### 条件
+
+* FLACとMIDIは同じ曲であること
+* 同じDAWプロジェクトから書き出すこと
+* 曲の開始位置を揃えること
+* MIDIとFLACでテンポ・演奏位置が一致していること
+* MIDIにはゲームで使用したい楽器のNote情報が含まれていること
+
+### ファイル配置
+
+用意したファイルを以下へ配置する。
+
+```text
+Music/
+├─ Audio/
+│  └─ BattleTest.flac
+│
+└─ MIDI/
+   └─ BattleTest.mid
+```
+## テストSceneを作成する
+
+BGMシステムの動作確認専用Sceneを作成する。
+`Music/Test/MusicSystemTest.unity`
+
+本番Sceneではなく、このSceneを使用してBGM再生・MIDI読み込み・MusicChart・同期処理などを確認する。
 
 ## 完了条件
+- BGM用フォルダが作成されている
+- テスト用FLACが配置されている
+- 同じ曲のMIDIが配置されている
+- FLACとMIDIの開始位置が一致している
+- MusicSystemTest Sceneが作成されている
+## このページでは行わないこと
 
-* Unity上で`MusicChart.asset`を作成できる
-* BGMのAudioClipを設定できる
-* NoteEventを登録できる
-* シャオンダマ対象Trackを登録できる
-* AttackEventを登録できる
-* Chord / Arpeggioを設定できる
-* Root / Qualityを設定できる
-* Random Sectionを登録できる
-* 同期補正値を設定できる
-* 保存後にUnityを再起動しても設定内容が保持される
+以下は後続タスクで実装する。
+
+- MusicChartの作成
+- DryWetMIDIの導入
+- MIDI Importerの作成
+- MIDI解析
+- BGM再生処理
+- BGMとゲームイベントの同期
+- AttackEventの実行
+- シャオンダマ生成
