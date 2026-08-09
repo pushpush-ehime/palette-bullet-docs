@@ -323,7 +323,7 @@ AttackEvent
 C / E / G
 ```
 
-に対して、Playerが必要な構成を持っている場合は攻撃を成立させる。
+に対して、Playerが必要な構成音を一つでもチャージできている場合は攻撃を成立させる。
 
 必要音の一致条件・同音重複・オクターブ・Chord / Arpeggioなどの詳細な成立条件は、[AttackEvent成立判定仕様](/spec/bgm/bgm-attack-judgement)で定義する。
 
