@@ -31,7 +31,9 @@ MusicChart
 │     └─ 演奏位置
 │
 ├─ Shaondama Settings
-│  └─ 使用するTrack
+│  ├─ 使用するTrack
+│  ├─ InitialTargetCount・・・最低何個保証するか
+│  └─ MinimumLeadTime・・・最小先行時間
 │
 ├─ Attack Events
 │  ├─ 発生位置
@@ -46,8 +48,9 @@ MusicChart
 ├─ Random Sections
 │  ├─ 開始位置
 │  ├─ 終了位置
-│  └─ AttackEvent候補
-│
+│  ├─ AttackEvent候補
+│  └─ 選択数
+│ 
 └─ Sync Settings
    └─ 同期補正値
 ```
