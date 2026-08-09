@@ -1147,6 +1147,108 @@
   background: var(--vp-c-default-soft);
 }
 
+/* どのページからでも利用できる担当班フィルター。 */
+.task-sidebar-team-filter {
+  margin: 4px 0 14px;
+}
+
+.task-sidebar-team-filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.task-sidebar-team-filter-buttons button {
+  min-height: 34px;
+  padding: 5px 9px;
+  color: var(--vp-c-text-2);
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.task-sidebar-team-filter-buttons button:hover {
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.task-sidebar-team-filter-buttons button.is-active {
+  color: var(--vp-button-brand-text);
+  background: var(--vp-button-brand-bg);
+  border-color: var(--vp-button-brand-bg);
+  box-shadow: 0 0 0 2px var(--vp-c-brand-soft);
+}
+
+.task-sidebar-team-filter-buttons button:focus-visible {
+  outline: 2px solid var(--vp-c-brand-2);
+  outline-offset: 2px;
+}
+
+/* タスク説明見出しの直下にフィルターを配置する。 */
+.VPSidebarItem:has(
+    > .item .task-sidebar-team-filter-anchor
+  ):not(:has(> .task-sidebar-team-filter)) {
+  display: none;
+}
+
+.VPSidebarItem:has(> .item .task-sidebar-team-filter-anchor) {
+  padding-bottom: 0;
+}
+
+.VPSidebarItem:has(> .item .task-sidebar-team-filter-anchor) > .item {
+  display: none;
+}
+
+.VPSidebarItem:has(> .item .task-sidebar-team-filter-anchor)
+  > .task-sidebar-team-filter {
+  margin-bottom: 14px;
+}
+
+/*
+ * VitePressのSidebarItem型にはclass/data属性がないため、生成済みtext内の
+ * markerを起点にDefault Theme内のタスク一覧だけを絞り込む。
+ */
+html[data-task-sidebar-team]:not([data-task-sidebar-team='all'])
+  .VPSidebarItem:has(> .item .sidebar-task-list-root)
+  .sidebar-team-badge {
+  display: none;
+}
+
+html[data-task-sidebar-team='programmer']
+  .VPSidebarItem:has(> .item .sidebar-task-list-root)
+  .VPSidebarItem.is-link:has(.sidebar-task-entry):not(:has(.sidebar-task-entry[data-sidebar-team='programmer'])),
+html[data-task-sidebar-team='planning']
+  .VPSidebarItem:has(> .item .sidebar-task-list-root)
+  .VPSidebarItem.is-link:has(.sidebar-task-entry):not(:has(.sidebar-task-entry[data-sidebar-team='planning'])),
+html[data-task-sidebar-team='design']
+  .VPSidebarItem:has(> .item .sidebar-task-list-root)
+  .VPSidebarItem.is-link:has(.sidebar-task-entry):not(:has(.sidebar-task-entry[data-sidebar-team='design'])),
+html[data-task-sidebar-team='sound']
+  .VPSidebarItem:has(> .item .sidebar-task-list-root)
+  .VPSidebarItem.is-link:has(.sidebar-task-entry):not(:has(.sidebar-task-entry[data-sidebar-team='sound'])) {
+  display: none;
+}
+
+html[data-task-sidebar-team='programmer']
+  .VPSidebarItem:has(> .item .sidebar-task-list-root)
+  > .items > .VPSidebarItem.collapsible:not(:has(.sidebar-task-entry[data-sidebar-team='programmer'])),
+html[data-task-sidebar-team='planning']
+  .VPSidebarItem:has(> .item .sidebar-task-list-root)
+  > .items > .VPSidebarItem.collapsible:not(:has(.sidebar-task-entry[data-sidebar-team='planning'])),
+html[data-task-sidebar-team='design']
+  .VPSidebarItem:has(> .item .sidebar-task-list-root)
+  > .items > .VPSidebarItem.collapsible:not(:has(.sidebar-task-entry[data-sidebar-team='design'])),
+html[data-task-sidebar-team='sound']
+  .VPSidebarItem:has(> .item .sidebar-task-list-root)
+  > .items > .VPSidebarItem.collapsible:not(:has(.sidebar-task-entry[data-sidebar-team='sound'])) {
+  display: none;
+}
+
 /* 現在のカテゴリ末尾に表示される「ページを追加」リンク */
 .VPSidebar a[href^='https://github.com/pushpush-ehime/palette-bullet-docs/new/main/docs/'] {
   display: flex;

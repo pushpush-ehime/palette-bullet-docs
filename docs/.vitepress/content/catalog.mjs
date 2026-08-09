@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, relative, resolve } from 'node:path'
 import { nextTaskId, TASK_ID_PATTERN } from './task-id.js'
+import { sidebarTeamKey } from './sidebar-team-filter.js'
 import {
   DUE_PATTERN,
   NOTION_LINKS_FILE,
@@ -16,14 +17,6 @@ import {
 export const VALID_STATUSES = ['確定', '仮仕様', '未決', '対象外', '廃止']
 
 const TASK_PAGE_ONLY_KEYS = ['taskId', ...TASK_ONLY_KEYS]
-
-const SIDEBAR_TEAM_KEYS = {
-  企画: 'planning',
-  プログラム: 'programmer',
-  デザイン: 'design',
-  サウンド: 'sound',
-  全体管理: 'management'
-}
 
 function toPosix(value) {
   return value.replaceAll('\\', '/')
@@ -55,13 +48,20 @@ function escapeHtml(value) {
 
 export function sidebarTaskText(task) {
   const text = escapeHtml(`${task.taskId} ${task.title}`)
-  const teamKey = SIDEBAR_TEAM_KEYS[task.team]
-  if (!teamKey) return text
+  const teamKey = sidebarTeamKey(task.team)
+  const badge = teamKey === 'unassigned'
+    ? ''
+    : (() => {
+        const team = escapeHtml(task.team)
+        return (
+          `<span class="sidebar-team-badge" data-team="${teamKey}" ` +
+          `title="担当班: ${team}">${team}</span>`
+        )
+      })()
 
-  const team = escapeHtml(task.team)
   return (
-    `<span class="sidebar-team-badge" data-team="${teamKey}" ` +
-    `title="担当班: ${team}">${team}</span>${text}`
+    `<span class="sidebar-task-entry" data-sidebar-team="${teamKey}">` +
+    `${badge}${text}</span>`
   )
 }
 
@@ -551,6 +551,10 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
   function createTaskSidebar(activeDirectory = '') {
     const taskItems = [
       {
+        text:
+          '<span class="task-sidebar-team-filter-anchor" aria-hidden="true"></span>'
+      },
+      {
         text: taskRoot?.frontmatter.sidebarTitle ?? 'タスク一覧',
         link: taskRoot?.url ?? '/tasks/'
       },
@@ -562,7 +566,7 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
 
     if (taskCategories.length > 0) {
       taskItems.push({
-        text: 'タスク一覧',
+        text: '<span class="sidebar-task-list-root">タスク一覧</span>',
         collapsed: false,
         items: [
           ...taskCategories.map(({ categoryIndex, directory, tasks }) => {
@@ -604,7 +608,10 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
     ]
   }
 
-  function createFullSidebar({ specDirectory = '', taskDirectory = '' } = {}) {
+  function createFullSidebar({
+    specDirectory = '',
+    taskDirectory = ''
+  } = {}) {
     return [
       ...leadingItems,
       ...createSpecSidebar(specDirectory),

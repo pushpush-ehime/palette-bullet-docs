@@ -253,17 +253,22 @@ test('サイドバーはteamに応じた班ラベルを付ける', () => {
     '/guide/create-page?type=task&directory=bgm&category=BGM&taskId=PB-TASK-0004'
   )
 
+  assert.match(JSON.stringify(sidebar), /sidebar-task-list-root/)
   assert.match(sound.text, /data-team="sound"/)
+  assert.match(sound.text, /class="sidebar-task-entry"/)
+  assert.match(sound.text, /data-sidebar-team="sound"/)
   assert.match(sound.text, /サウンド/)
   assert.match(sound.text, /&lt;確認&gt;/)
   assert.doesNotMatch(sound.text, /<確認>/)
   assert.match(programmer.text, /data-team="programmer"/)
+  assert.match(programmer.text, /data-sidebar-team="programmer"/)
   assert.doesNotMatch(programmer.text, /data-team="sound"/)
   assert.doesNotMatch(unassigned.text, /sidebar-team-badge/)
+  assert.match(unassigned.text, /data-sidebar-team="unassigned"/)
   assert.ok(addPage)
 })
 
-test('サイドバーの仕様・タスクカテゴリは現在のルートでも初期状態を閉じる', () => {
+test('サイドバーのカテゴリを閉じ、担当班フィルターを全ルートへ配置する', () => {
   const catalog = [
     catalogEntry({
       relativePath: 'spec/index.md',
@@ -298,9 +303,41 @@ test('サイドバーの仕様・タスクカテゴリは現在のルートで�
   const sidebars = buildSidebars(catalog).sidebar
   const specCategory = findSidebarGroup(sidebars['/spec/player/'], 'Player')
   const taskCategory = findSidebarGroup(sidebars['/tasks/bgm/'], 'BGM')
+  const taskRouteGroups = sidebars['/tasks/bgm/']
+  const taskSection = findSidebarGroup(taskRouteGroups, 'タスク説明')
+  assert.ok(taskSection)
+
+  const taskFilterIndex = taskSection.items.findIndex((item) =>
+    String(item.text).includes('task-sidebar-team-filter-anchor')
+  )
+  const taskSectionIndex = taskRouteGroups.findIndex((group) =>
+    JSON.stringify(group).includes('sidebar-task-list-root')
+  )
+  const taskListIndex = taskSection.items.findIndex((item) =>
+    String(item.text).includes('sidebar-task-list-root')
+  )
 
   assert.equal(specCategory?.collapsed, true)
   assert.equal(taskCategory?.collapsed, true)
+  assert.equal(taskFilterIndex, 0)
+  assert.ok(taskListIndex > taskFilterIndex)
+  assert.match(JSON.stringify(taskRouteGroups[taskSectionIndex - 1]), /\/spec\//)
+
+  for (const route of ['/spec/player/', '/spec/', '/tasks/', '/']) {
+    const routeTaskSection = findSidebarGroup(sidebars[route], 'タスク説明')
+    assert.ok(routeTaskSection)
+    assert.equal(
+      routeTaskSection.items.findIndex((item) =>
+        String(item.text).includes('task-sidebar-team-filter-anchor')
+      ),
+      0
+    )
+    const sidebarSource = JSON.stringify(sidebars[route])
+    assert.equal(
+      (sidebarSource.match(/task-sidebar-team-filter-anchor/g) ?? []).length,
+      1
+    )
+  }
 })
 
 test('担当班の選択値でコメント状態のteamを有効化する', () => {
