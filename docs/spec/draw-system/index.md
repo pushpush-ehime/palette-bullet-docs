@@ -1,14 +1,14 @@
 ---
-title: ドローシステム
+title: チャージシステム
 description: Palette Bulletのドローシステム仕様
 pageType: spec
-category: ドローシステム
+category: チャージシステム
 categoryOrder: 40
 order: 0
 status: 未決
 ---
 
-# ドローシステム
+# チャージシステム
 
 ## ページ概要
 
