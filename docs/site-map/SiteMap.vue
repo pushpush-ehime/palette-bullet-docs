@@ -8,8 +8,13 @@ const guidePages = data
   .filter(page => page.pageType === 'guide' || page.url.includes('/guide/'))
   .sort((a, b) => (a.order || 99) - (b.order || 99))
 
-// トップレベルの単独ページ（ゲーム概要・仕様タスク対応・用語集）
-const topLevelUrls = ['/game-overview', '/relations', '/glossary']
+// トップレベルの単独ページ
+const topLevelUrls = [
+  '/game-overview',
+  '/relations',
+  '/glossary',
+  '/open-questions'
+]
 const topLevelPages = topLevelUrls
   .map(url => data.find(page => page.url === url))
   .filter(Boolean)

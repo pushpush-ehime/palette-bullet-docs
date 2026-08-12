@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, dirname, relative, resolve } from 'node:path'
+import MarkdownIt from 'markdown-it'
 import { nextTaskId, TASK_ID_PATTERN } from './task-id.js'
 import { sidebarTeamKey } from './sidebar-team-filter.js'
 import {
@@ -17,6 +18,8 @@ import {
 export const VALID_STATUSES = ['確定', '仮仕様', '未決', '対象外', '廃止']
 
 const TASK_PAGE_ONLY_KEYS = ['taskId', ...TASK_ONLY_KEYS]
+const markdown = new MarkdownIt({ html: true })
+const UNCONFIRMED_SUFFIX_PATTERN = /(?:（未確定）|\(未確定\))$/
 
 function toPosix(value) {
   return value.replaceAll('\\', '/')
@@ -192,19 +195,126 @@ export function getSectionContent(structure, headingText) {
   return structure.lines.slice(heading.line + 1, endLine).join('\n').trim()
 }
 
-function extractOpenQuestions(structure) {
-  const content = getSectionContent(structure, '未決事項')
-  if (!content || content === '未決' || content === 'なし') return []
+function markdownBody(source) {
+  const normalized = source.replaceAll('\r\n', '\n')
+  if (!normalized.startsWith('---\n')) return normalized
 
-  return content
-    .split('\n')
-    .map((line) => line.match(/^\s*[-*+]\s+(.+)$/)?.[1]?.trim())
-    .filter(Boolean)
-    .map((question) =>
-      question
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-        .replaceAll('`', '')
-    )
+  const frontmatterEnd = normalized.indexOf('\n---\n', 4)
+  return frontmatterEnd === -1
+    ? normalized
+    : normalized.slice(frontmatterEnd + 5)
+}
+
+function inlineText(token) {
+  return (token.children ?? [])
+    .map((child) => {
+      if (child.type === 'text' || child.type === 'code_inline') {
+        return child.content
+      }
+
+      if (child.type === 'image') {
+        return child.content
+      }
+
+      if (child.type === 'softbreak' || child.type === 'hardbreak') {
+        return ' '
+      }
+
+      if (child.type === 'html_inline') {
+        return child.content.replace(/<[^>]*>/g, '')
+      }
+
+      return ''
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function listItemText(tokens, itemIndex) {
+  const itemLevel = tokens[itemIndex].level
+
+  for (let index = itemIndex + 1; index < tokens.length; index += 1) {
+    const token = tokens[index]
+
+    if (token.type === 'list_item_close' && token.level === itemLevel) {
+      return ''
+    }
+
+    // 子の箇条書きは、その子自身のlist_item_openで個別に処理する。
+    if (token.type === 'list_item_open' && token.level > itemLevel) {
+      return ''
+    }
+
+    if (token.type === 'inline') {
+      return inlineText(token)
+    }
+  }
+
+  return ''
+}
+
+/**
+ * 未確定事項として扱うMarkdownの箇条書きを、本文に現れる順で返す。
+ *
+ * - `## 未決事項` 内の箇条書き
+ * - 本文中の任意の箇条書きで、末尾が `（未確定）` のもの
+ */
+export function extractOpenQuestions(source) {
+  const tokens = markdown.parse(markdownBody(source), {})
+  const questions = []
+  const seen = new Set()
+  const listTypes = []
+  let inOpenQuestionsSection = false
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]
+
+    if (token.type === 'heading_open' && token.level === 0) {
+      const headingLevel = Number(token.tag.slice(1))
+
+      if (headingLevel <= 2) {
+        const heading = tokens[index + 1]
+        inOpenQuestionsSection =
+          headingLevel === 2 &&
+          heading?.type === 'inline' &&
+          inlineText(heading) === '未決事項'
+      }
+    }
+
+    if (token.type === 'bullet_list_open') {
+      listTypes.push('bullet')
+      continue
+    }
+
+    if (token.type === 'ordered_list_open') {
+      listTypes.push('ordered')
+      continue
+    }
+
+    if (token.type === 'bullet_list_close' || token.type === 'ordered_list_close') {
+      listTypes.pop()
+      continue
+    }
+
+    if (token.type !== 'list_item_open' || listTypes.at(-1) !== 'bullet') {
+      continue
+    }
+
+    const question = listItemText(tokens, index)
+    const hasUnconfirmedSuffix = UNCONFIRMED_SUFFIX_PATTERN.test(question)
+
+    if (
+      question &&
+      (inOpenQuestionsSection || hasUnconfirmedSuffix) &&
+      !seen.has(question)
+    ) {
+      seen.add(question)
+      questions.push(question)
+    }
+  }
+
+  return questions
 }
 
 function extractSpecSections(structure, pageType) {
@@ -356,7 +466,7 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
         notionUrl:
           toText(frontmatter.notionUrl) ||
           toText(notionLinks[toText(frontmatter.taskId)]),
-        openQuestions: extractOpenQuestions(structure),
+        openQuestions: extractOpenQuestions(source),
         purpose: specSections.purpose,
         constraints: specSections.constraints,
         updatedAt: includeUpdated ? updatedAt(filePath, repositoryRoot) : ''
@@ -420,14 +530,17 @@ function categoryDefinitions(catalog, pageType, rootName) {
 }
 /**
  * @param {ReturnType<typeof loadCatalog>} catalog
- * @param {{ leadingItems?: SidebarItem[] }} [options]
+ * @param {{ leadingItems?: SidebarItem[], trailingItems?: SidebarItem[] }} [options]
  * @returns {{
  *   spec: SidebarItem[],
  *   tasks: SidebarItem[],
  *   sidebar: SidebarMulti
  * }}
  */
-export function buildSidebars(catalog, { leadingItems = [] } = {}) {
+export function buildSidebars(
+  catalog,
+  { leadingItems = [], trailingItems = [] } = {}
+) {
   const specRoot = catalog.find((entry) => entry.pageType === 'spec-index')
   const taskRoot = catalog.find((entry) => entry.pageType === 'task-index')
 
@@ -615,7 +728,8 @@ export function buildSidebars(catalog, { leadingItems = [] } = {}) {
     return [
       ...leadingItems,
       ...createSpecSidebar(specDirectory),
-      ...createTaskSidebar(taskDirectory)
+      ...createTaskSidebar(taskDirectory),
+      ...trailingItems
     ]
   }
 

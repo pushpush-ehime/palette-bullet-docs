@@ -23,6 +23,12 @@ const generatedSidebars = buildSidebars(catalog, {
         { text: '用語集', link: '/glossary' }
       ]
     }
+  ],
+  trailingItems: [
+    {
+      text: '未確定事項一覧',
+      link: '/open-questions'
+    }
   ]
 })
 

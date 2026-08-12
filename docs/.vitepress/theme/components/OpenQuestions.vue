@@ -5,7 +5,6 @@ import { pageHref } from '../utils'
 
 const questions = computed(() =>
   catalog
-    .filter((page) => page.pageType === 'spec')
     .flatMap((page) =>
       page.openQuestions.map((question) => ({
         pageTitle: page.title,
@@ -21,9 +20,11 @@ const questions = computed(() =>
   <ul v-if="questions.length" class="open-question-list">
     <li v-for="item in questions" :key="`${item.pageUrl}-${item.question}`">
       <a :href="pageHref(item.pageUrl)">{{ item.pageTitle }}</a>
-      <span class="open-question-category">{{ item.category }}</span>
+      <span v-if="item.category" class="open-question-category">
+        {{ item.category }}
+      </span>
       <span>{{ item.question }}</span>
     </li>
   </ul>
-  <p v-else>未決事項はありません。</p>
+  <p v-else>未確定事項はありません。</p>
 </template>
