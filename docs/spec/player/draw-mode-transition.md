@@ -1,5 +1,5 @@
 ---
-title: Playerアクション｜パリィ・マーカー
+title: Playerアクション｜パリィ
 description: Palette Bulletアクション（パリィ）
 pageType: spec
 category: Player
