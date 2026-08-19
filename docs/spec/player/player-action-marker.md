@@ -1,5 +1,5 @@
 ---
-title: "Playerアクション|マーカー"
+title: "Playerアクション｜マーカー"
 pageType: spec
 category: "Player"
 status: 仮仕様
