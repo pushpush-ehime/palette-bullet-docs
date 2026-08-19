@@ -7,46 +7,51 @@ categoryOrder: 60
 order: 0
 status: 未決
 ---
-
-# 戦闘
-
-## ページ概要
-
-- 対象担当：未決
-- 関連ページ：[Playerと戦闘の接続](/spec/player/combat-connection)、[敵](/spec/enemy/)
+# 戦闘状態
 
 ## 目的
 
-戦闘で起きるゲーム上の挙動を定義します。
+このページでは、戦闘状態について定義します。
 
-## プレイヤーから見た挙動
+戦闘の開始・終了条件や判定方法の詳細は、Combat System側の仕様で定義します。
 
-未決
+## 戦闘状態の管理
 
-## 詳細仕様
+戦闘状態はCombat Systemが管理し、以下の2つの状態を持ちます。
 
-未決
+* `NonCombat`：非戦闘状態
+* `Combat`：戦闘状態
 
-## 状態別の挙動
+戦闘状態は、`Free`や`Charging`、`MarkerAiming`などのPlayerのアクションステートとは別に管理します。
 
-未決
+## 戦闘開始時
 
-## 他システムとの接続
+Combat Systemが戦闘開始条件を満たしたと判定すると、戦闘状態を以下のように切り替えます。
 
-未決
+```text
+NonCombat
+↓
+Combat
+```
 
-## 例外・禁止事項
+戦闘開始条件の具体的な判定方法は、Combat System側で定義します。
 
-未決
+`Combat`へ移行すると、通常BGMから戦闘BGMへ切り替わります。
 
-## パラメータ
+AttackEventは戦闘BGMに設定されているため、戦闘BGMの開始に伴ってAttackEventの進行が始まります。
 
-未決
+AttackEvent自体の処理については、AttackEvent側の仕様で定義します。
 
-## 未決事項
+## 戦闘終了時
 
-未決
+Combat Systemが戦闘終了条件を満たしたと判定すると、戦闘状態を以下のように切り替えます。
 
-## 関連タスク
+```text
+Combat
+↓
+NonCombat
+```
+
+戦闘終了条件の具体的な判定方法は、Combat System側で定義します。
 
 <PageRelations />
