@@ -61,7 +61,7 @@ status: 仮仕様
 ## 他システムとの接続
 
 - 生成：MIDI駆動生成ページ（作成中）
-- なぞり・選択操作：[ドローシステム](/spec/draw-system/)、[シャオンダマ選択との接続](/spec/player/shaondama-selection-connection)
+- なぞり・選択操作：[ドローシステム](/spec/draw-system/)
 - 発射・飛翔・ダメージ：Combatカテゴリ（作成予定）
 
 ## 例外・禁止事項
