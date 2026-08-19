@@ -1,12 +1,11 @@
 ---
-title: シャオンダマ選択
+title: Playerアクション｜チャージ
 description: Playerとシャオンダマ選択
 pageType: spec
 category: Player
 order: 50
 status: 未決
 ---
-
 # Playerアクション｜チャージ
 
 ## 目的
