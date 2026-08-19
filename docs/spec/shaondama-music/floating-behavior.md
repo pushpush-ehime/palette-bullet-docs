@@ -13,7 +13,7 @@ status: 仮仕様
 
 - 対象担当：プログラム班・デザイン班
 - 出典：統合仕様書v3.2 §4.2.2
-- 関連ページ：MIDI駆動生成（作成中）、[ドローシステム](/spec/draw-system/)、[シャオンダマ選択との接続](/spec/player/shaondama-selection-connection)
+- 関連ページ：MIDI駆動生成（作成中）、[ドローシステム](/spec/draw-system/)
 
 ## 目的
 
