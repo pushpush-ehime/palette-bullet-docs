@@ -21,6 +21,7 @@ relatedTasks: []
 * `Grounded → Airborne`の遷移
 * ジャンプ開始時の上方向速度
 * `Dashing`中のジャンプ
+* `ClickCharging / DragCharging`中のジャンプ
 * ジャンプ後に開始できるAction
 * 着地時の処理
 
@@ -46,28 +47,36 @@ Jump専用のStateは作成しません。
 
 その後の空中での移動、落下、着地は`MovementState = Airborne`として処理します。
 
+Jumpによって変更するStateは、原則として`MovementState`のみです。
+
+現在実行中のActionをJumpによって終了する必要がある場合のみ、そのAction固有のルールに従って`ActionState`も変更します。
+
 ## 使用可能条件
 
 ジャンプは、以下の条件をすべて満たしている場合に開始できます。
 
 * `RootState = Gameplay`
 * `MovementState = Grounded`
-* 現在のStateによってジャンプが禁止されていない
+* 現在成立しているStateによってジャンプが禁止されていない
 
 各状態からジャンプできるかを以下に示します。
 
-| 現在の状態                | Jump | 備考                      |
-| -------------------- | ---- | ----------------------- |
-| `ActionState = None` | ○    | 通常ジャンプ                  |
-| `Dashing`            | ○    | Jump可能なDash内部Phaseの場合のみ |
-| `MarkerFiring`       | ×    | 入力を無視                   |
-| `ClickCharging`      | ×    | 入力を無視                   |
-| `DragCharging`       | ×    | 入力を無視                   |
-| `Parrying`           | ×    | 入力を無視                   |
-| `Aiming`             | ×    | 入力を無視                   |
-| `SmallHit`           | ×    | 入力を無視                   |
-| `BigHit`             | ×    | 入力を無視                   |
-| `Airborne`           | ×    | 空中ジャンプは行わない             |
+| 現在の状態                | Jump | 備考                                        |
+| -------------------- | ---- | ----------------------------------------- |
+| `ActionState = None` | ○    | 通常ジャンプ                                    |
+| `Dashing`            | ○    | Jump可能なDash内部Phaseの場合のみ                   |
+| `MarkerFiring`       | ×    | 入力を無視                                     |
+| `ClickCharging`      | ○    | Actionを維持し、`MovementState`のみ`Airborne`へ変更 |
+| `DragCharging`       | ○    | Actionを維持し、`MovementState`のみ`Airborne`へ変更 |
+| `Parrying`           | ×    | 入力を無視                                     |
+| `Aiming`             | ×    | 入力を無視                                     |
+| `SmallHit`           | ×    | 入力を無視                                     |
+| `BigHit`             | ×    | 入力を無視                                     |
+| `Airborne`           | ×    | 空中ジャンプは行わない                               |
+
+複数のStateが同時成立している場合は、それぞれのStateによるJump制限を確認します。
+
+例えば`ClickCharging`や`DragCharging`自体はJump可能ですが、`Aiming`も同時成立している場合はAimingによるJump禁止を優先するためJumpできません。
 
 ジャンプできない状態でJump入力が行われた場合、入力は無視します。
 
@@ -95,11 +104,65 @@ Jump入力を受け付けた時点で、Playerへジャンプ用の上方向速�
 
 その後、`MovementState`を`Airborne`へ変更します。
 
+## Charging中のジャンプ
+
+`ClickCharging`と`DragCharging`は、どちらも`MovementState = Grounded`であればActionを維持したままJumpできます。
+
+Charge中のJumpはActionのキャンセルではありません。
+
+Jumpによって`MovementState`のみを`Grounded`から`Airborne`へ変更し、現在のChargeの`ActionState`は維持します。
+
+### ClickCharging中のジャンプ
+
+`ActionState = ClickCharging`中でもJumpできます。
+
+```text
+MovementState = Grounded
+ActionState   = ClickCharging
+↓
+Jump入力
+↓
+上方向のJumpVelocityを付与
+↓
+MovementState = Airborne
+ActionState   = ClickCharging
+```
+
+JumpによってClickChargingを終了しません。
+
+Airborne移行後もClickChargingをそのまま継続します。
+
+ClickCharging自体の処理については「Playerアクション｜チャージ」を正とします。
+
+### DragCharging中のジャンプ
+
+`ActionState = DragCharging`中でもJumpできます。
+
+```text
+MovementState = Grounded
+ActionState   = DragCharging
+↓
+Jump入力
+↓
+上方向のJumpVelocityを付与
+↓
+MovementState = Airborne
+ActionState   = DragCharging
+```
+
+JumpによってDragChargingを終了しません。
+
+Airborne移行後もDragChargingをそのまま継続します。
+
+DragCharging中に保持しているAction固有の情報も、Jumpしたことだけを理由に破棄しません。
+
+DragCharging自体の処理については「Playerアクション｜チャージ」を正とします。
+
 ## Dashing中のジャンプ
 
 `ActionState = Dashing`中でも、Jump可能なDash内部Phaseであればジャンプできます。
 
-Dashing中にジャンプした場合は、通常ジャンプとは異なり、`Dashing`を終了します。
+Dashing中にジャンプした場合は、通常ジャンプやCharge中Jumpとは異なり、`Dashing`を終了します。
 
 ```text
 MovementState = Grounded
@@ -114,6 +177,17 @@ Dashing終了
 MovementState = Airborne
 ActionState   = None
 ```
+
+つまり、Jump時のState変更は以下のように異なります。
+
+| Jump開始時のActionState | MovementState         | ActionState       |
+| ------------------- | --------------------- | ----------------- |
+| `None`              | `Grounded → Airborne` | `None`維持          |
+| `ClickCharging`     | `Grounded → Airborne` | `ClickCharging`維持 |
+| `DragCharging`      | `Grounded → Airborne` | `DragCharging`維持  |
+| `Dashing`           | `Grounded → Airborne` | `Dashing → None`  |
+
+`Dashing`は、Jumpによって`ActionState`も変更する例外です。
 
 ### Jump可能なタイミング
 
@@ -179,6 +253,24 @@ ActionState   = ClickCharging
 AimState      = Normal
 ```
 
+一方、ClickChargingまたはDragCharging中にJumpした場合は、Airborne移行後にChargeを新しく開始するのではなく、Jump前から成立していたActionをそのまま継続します。
+
+```text
+Grounded + ClickCharging
+↓
+Jump
+↓
+Airborne + ClickCharging
+```
+
+```text
+Grounded + DragCharging
+↓
+Jump
+↓
+Airborne + DragCharging
+```
+
 Actionの開始可否については「Playerアクション遷移」のルールを正とします。
 
 ## 着地
@@ -229,6 +321,20 @@ ActionState   = DragCharging
 
 となります。
 
+そのため、Chargeについては以下の流れが成立します。
+
+```text
+Grounded + Charge
+↓
+Jump
+↓
+Airborne + Charge
+↓
+着地
+↓
+Grounded + Charge
+```
+
 各Actionに着地による終了条件が個別に設定されている場合のみ、そのAction固有のルールを優先します。
 
 ## 他Stateとの関係
@@ -246,8 +352,8 @@ Jump入力を受け付けられるかどうかは、現在成立している各S
 | `Dashing`       | 指定された内部PhaseのみJump可能 |
 | `Aiming`        | Jump不可               |
 | `MarkerFiring`  | Jump不可               |
-| `ClickCharging` | Jump不可               |
-| `DragCharging`  | Jump不可               |
+| `ClickCharging` | Jump可能。Actionを維持     |
+| `DragCharging`  | Jump可能。Actionを維持     |
 | `Parrying`      | Jump不可               |
 | `SmallHit`      | Jump不可               |
 | `BigHit`        | Jump不可               |
@@ -256,6 +362,8 @@ Jump入力を受け付けられるかどうかは、現在成立している各S
 | `Dead`          | Jump不可               |
 
 Jumpによって変更するStateは原則として`MovementState`のみです。
+
+`ClickCharging`または`DragCharging`中にJumpした場合もこの原則に従い、`MovementState`のみを`Grounded → Airborne`へ変更します。
 
 例外として、`Dashing`中にJumpした場合は`ActionState = Dashing`を終了して`None`へ変更します。
 
