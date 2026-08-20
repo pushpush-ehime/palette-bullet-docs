@@ -1,5 +1,5 @@
 ---
-title: Player基本移動
+title: Player移動｜WASD移動
 description: Palette BulletにおけるPlayerの基本移動仕様
 pageType: spec
 category: Player
