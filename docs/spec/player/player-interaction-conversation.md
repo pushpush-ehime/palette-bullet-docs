@@ -52,11 +52,26 @@ ConversationはGameplay内部のStateではありません。
 Conversationは、以下の条件を満たしている場合に開始できます。
 
 - `RootState = Gameplay`
+- `MovementState = Grounded`
 - `ReactionState = None`
 - 有効な会話対象のNPCが存在する
 - NPC固有の会話開始条件を満たしている
 
-`SmallHit`または`BigHit`中はConversationを開始できません。
+`MovementState = Airborne`ではConversationを開始できません。
+
+```text
+MovementState = Airborne
+↓
+Interact入力
+↓
+Conversation開始不可
+```
+
+空中で行われたInteract入力は先行入力として保持しません。
+
+着地後にConversationを開始する場合は、改めてInteract入力を行う必要があります。
+
+`SmallHit`または`BigHit`中もConversationを開始できません。
 
 ```text
 ReactionState = SmallHit / BigHit
@@ -185,7 +200,11 @@ Move入力
 通常移動しない
 ```
 
-Conversation開始時には、Gameplay中の通常移動を停止します。
+Conversationは`MovementState = Grounded`の場合のみ開始できます。
+
+そのため、通常の`Gameplay → Conversation`遷移によって、Playerが空中にいる状態でConversationへ入ることはありません。
+
+Conversation開始時にはGameplay中の通常移動を停止します。
 
 ## Conversation中の被弾
 
