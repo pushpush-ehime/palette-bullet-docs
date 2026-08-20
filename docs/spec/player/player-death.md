@@ -158,7 +158,21 @@ ReactionState
 ```
 
 DeadはGameplay外のRootStateであるため、Dead中はGameplay内部StateMachineによる通常処理を行いません。
+死亡時の`MovementState`が`Grounded / Airborne`のどちらであってもDeadへ遷移できます。
 
+```text
+MovementState = Airborne
+↓
+死亡条件成立
+↓
+Gameplay内部のMovementState管理終了
+↓
+RootState = Dead
+```
+
+Deadへ遷移した後は`MovementState`による空中制御を行いません。
+
+ただし、Playerに作用する重力そのものは停止せず、空中で死亡した場合はDead中も落下を継続します。
 ## ActionStateの終了
 
 死亡時は、現在のActionStateに関係なくActionを強制終了します。
@@ -306,7 +320,7 @@ RootState = Dead
 
 ## Dead中の移動
 
-Dead中はPlayerの通常移動を行いません。
+Dead中はPlayerの通常移動およびPlayer入力による空中制御を行いません。
 
 ```text
 RootState = Dead
@@ -316,7 +330,31 @@ Move入力
 通常移動しない
 ```
 
-死亡モーションによって必要な移動がある場合は、死亡演出側の処理として扱います。
+ただし、**Dead中も重力による落下は継続します。**
+
+空中で死亡した場合は、Deadへ遷移してGameplay内部の`MovementState`管理を終了した後も、Playerは重力によって落下します。
+
+```text
+Airborne中
+↓
+死亡条件成立
+↓
+RootState = Dead
+↓
+通常移動・空中制御停止
+↓
+重力による落下継続
+↓
+地面へ着地
+```
+
+Dead中に地面へ到達した場合は、その位置で接地します。
+
+Dead中に`MovementState = Grounded`へ遷移するわけではありません。
+
+`MovementState`はGameplay内部のStateであるため、Dead中は管理しません。
+
+死亡モーションによって必要な追加移動がある場合は、重力による落下とは別に死亡演出側の処理として扱います。
 
 ## Dead中の操作
 
