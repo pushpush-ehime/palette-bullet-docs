@@ -308,6 +308,11 @@ DragCharging
 
 これらのState中にPlayerを移動させる必要がある場合は、Move入力による通常移動ではなく、それぞれのState固有の処理として定義します。
 
+Gameplayの通常移動を行わないことと、Playerに作用する物理処理を停止することは同義ではありません。
+
+Conversation / Interactingの開始可能なMovementStateについては、それぞれのRootState仕様を正とします。
+
+Dead中の重力・落下については「Player死亡」を正とします。
 ## パラメータ
 
 基本移動に関する主な調整項目を以下に示します。
