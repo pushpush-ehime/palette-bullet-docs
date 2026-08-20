@@ -425,6 +425,7 @@ Dashing中に入力できる次のActionについては「Playerアクション�
 
 * `MarkerFiring`
 * `DragCharging`
+* `ClickCharging`
 
 これらの入力はDashingを即座に終了させません。
 
