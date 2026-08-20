@@ -81,7 +81,7 @@ ReactionState = None
 | 現在のActionState  | Dashing | MarkerFiring | ClickCharging | DragCharging | Parrying |
 | --------------- | ------- | ------------ | ------------- | ------------ | -------- |
 | `None`          | `→`     | `→`          | `→`           | `→`          | `→`      |
-| `Dashing`       | `―`     | `B→`         | `×`           | `B→`         | `×`      |
+| `Dashing`       | `―`     | `B→`         | `B→`           | `B→`         | `×`      |
 | `MarkerFiring`  | `C→`    | `×`          | `×`           | `×`          | `×`      |
 | `ClickCharging` | `C→`    | `×`          | `×`           | `×`          | `×`      |
 | `DragCharging`  | `→`     | `×`          | `×`           | `―`          | `×`      |
@@ -226,10 +226,11 @@ ActionState = None
 
 現在、ActionState間で先行入力を使用する遷移は以下です。
 
-| 現在のAction  | 先行入力するAction   |
-| ---------- | -------------- |
-| `Dashing`  | `MarkerFiring` |
-| `Dashing`  | `DragCharging` |
+| 現在のAction | 先行入力するAction |
+| --- | --- |
+| `Dashing` | `MarkerFiring` |
+| `Dashing` | `ClickCharging` |
+| `Dashing` | `DragCharging` |
 
 先行入力されたActionは、現在のActionが正常終了した時点で開始条件を再確認します。
 
