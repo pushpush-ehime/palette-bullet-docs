@@ -79,11 +79,26 @@ Interact対象固有の条件として、距離や進行状況などが必要な
 Interactingは、以下の条件を満たしている場合に開始できます。
 
 - `RootState = Gameplay`
+- `MovementState = Grounded`
 - `ReactionState = None`
 - 有効なInteract対象が存在する
 - 対象固有のInteraction開始条件を満たしている
 
-`SmallHit`または`BigHit`中はInteractingを開始できません。
+`MovementState = Airborne`ではInteractingを開始できません。
+
+```text
+MovementState = Airborne
+↓
+Interact入力
+↓
+Interacting開始不可
+```
+
+空中で行われたInteract入力は先行入力として保持しません。
+
+着地後にInteractingを開始する場合は、改めてInteract入力を行う必要があります。
+
+`SmallHit`または`BigHit`中もInteractingを開始できません。
 
 ```text
 ReactionState = SmallHit / BigHit
@@ -92,7 +107,6 @@ Interact入力
 ↓
 Interacting開始不可
 ```
-
 ## GameplayからInteractingへの遷移
 
 会話以外のInteractionを開始する場合は、`RootState = Gameplay`から`Interacting`へ変更します。
@@ -209,6 +223,10 @@ Move入力
 ↓
 通常移動しない
 ```
+
+Interactingは`MovementState = Grounded`の場合のみ開始できます。
+
+そのため、通常の`Gameplay → Interacting`遷移によって、Playerが空中にいる状態でInteractingへ入ることはありません。
 
 Interacting開始時にはGameplay中の通常移動を停止します。
 
