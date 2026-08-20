@@ -18,6 +18,7 @@ relatedTasks: []
 
 * `Parrying`の開始条件
 * `ActionState = Parrying`への遷移
+* スタミナ消費
 * Parrying内部Phase
 * パリィ判定
 * 成功・失敗・空振り
@@ -30,6 +31,8 @@ relatedTasks: []
 * Parryingの終了条件
 
 ActionState間の遷移可否については「Playerアクション遷移」を正とします。
+
+HP・スタミナの共通仕様については「Playerステータス」を正とします。
 
 被弾時に`SmallHit`または`BigHit`のどちらになるかについては「Playerリアクション｜被弾」で定義します。
 
@@ -52,6 +55,8 @@ Parrying
 
 敵の攻撃に対してパリィ判定が有効なタイミングで攻撃を受けた場合、パリィ成功となります。
 
+Parryingを開始するたびにスタミナを消費します。
+
 ## 使用可能条件
 
 Parryingは、以下の条件をすべて満たしている場合に開始できます。
@@ -60,6 +65,7 @@ Parryingは、以下の条件をすべて満たしている場合に開始でき
 * `MovementState = Grounded`
 * `ReactionState = None`
 * 現在の`ActionState`からParryingの開始が許可されている
+* Parry開始に必要なスタミナが残っている
 
 通常状態では、
 
@@ -70,12 +76,18 @@ ReactionState = None
 ↓
 Parry入力
 ↓
+Parry開始条件確認
+↓
+必要スタミナあり
+↓
 ActionState = Parrying
 ```
 
 となります。
 
 Airborne中はParryingを開始できません。
+
+スタミナが不足している場合もParryingを開始できません。
 
 また、以下のActionStateからParryingへ直接遷移することはできません。
 
@@ -88,6 +100,38 @@ Airborne中はParryingを開始できません。
 
 先行入力としても保持しません。
 
+## スタミナ不足
+
+Parry開始に必要なスタミナが不足している場合、Parryingを開始しません。
+
+```text
+Parry入力
+↓
+Parry開始条件確認
+↓
+スタミナ不足
+↓
+Parrying開始不可
+```
+
+Parryingを開始できない場合は、現在成立しているGameplay Stateを維持します。
+
+例えばAiming中にParry入力を行っても、スタミナ不足の場合はAimingを終了しません。
+
+```text
+ActionState = None
+AimState    = Aiming
+↓
+Parry入力
+↓
+スタミナ不足
+↓
+ActionState = None
+AimState    = Aiming
+```
+
+スタミナ不足を理由に、現在のActionやAimを先に終了してはいけません。
+
 ## Parrying開始
 
 Parry入力を受け付け、開始条件を満たしている場合、Parryingを開始します。
@@ -98,6 +142,10 @@ Parry入力を受け付け、開始条件を満たしている場合、Parrying�
 Parry入力
 ↓
 Parry開始条件確認
+↓
+必要スタミナあり
+↓
+スタミナ消費
 ↓
 必要に応じてAiming終了
 ↓
@@ -110,9 +158,51 @@ ActionState = Parrying
 Parryモーション開始
 ```
 
+Parry開始条件が成立していることを確認してから、スタミナを消費します。
+
+スタミナ消費後にParryingを開始します。
+
 Parrying開始時にPlayerの通常移動を停止します。
 
 また、開始時点のPlayerの向きを保持し、Parryingが終了するまでPlayer本体の向きを変更しません。
+
+## スタミナ消費
+
+Parryは、Parryingを1回開始するたびにスタミナを1回消費します。
+
+```text
+Parry開始条件確認
+↓
+必要スタミナあり
+↓
+スタミナ消費
+↓
+Parrying開始
+```
+
+Parrying中に継続的なスタミナ消費は行いません。
+
+ただし、Parry再入力によって新しいParryingを開始する場合は、新しいParryingの開始分として再びスタミナを消費します。
+
+Parryのスタミナ消費量、スタミナ回復、最大スタミナについては「Playerステータス」を正とします。
+
+## Parrying中のスタミナ回復
+
+`ActionState = Parrying`の間はスタミナを回復しません。
+
+```text
+Parrying
+↓
+スタミナ回復なし
+↓
+Parrying終了
+↓
+Playerステータス側の回復待機処理へ
+```
+
+Parry再入力によって新しいParryingを連続して開始している場合も、Parryingが続いている間はスタミナを回復しません。
+
+具体的な回復開始条件や回復速度については「Playerステータス」を正とします。
 
 ## Parrying内部Phase
 
@@ -238,7 +328,9 @@ Parrying中のParry再入力は、モーション後半に設定されたParry�
 
 これは先行入力ではありません。
 
-受付区間中に新しいParry入力が行われた場合、現在のParryingをその場で終了し、新しいParryingを即座に最初から開始します。
+受付区間中に新しいParry入力が行われた場合、新しいParryingの開始条件を確認します。
+
+開始条件を満たしている場合のみ、スタミナを消費して現在のParryingを終了し、新しいParryingを即座に最初から開始します。
 
 ```text
 Parrying
@@ -248,6 +340,12 @@ Recovery Phase
 Parry再入力受付区間
 ↓
 Parry入力
+↓
+新しいParryingの開始条件確認
+↓
+必要スタミナあり
+↓
+スタミナ消費
 ↓
 現在のParryingを終了
 ↓
@@ -266,6 +364,8 @@ Parrying
 
 となります。
 
+新しいParryingを開始するたびに、Parry1回分のスタミナを消費します。
+
 実装上は現在のParryingを再開始し、以下をすべて初期状態へ戻します。
 
 * Parryモーションの再生位置
@@ -275,6 +375,34 @@ Parrying
 * そのParryingですでにパリィ成功したかどうか
 
 そのため、再開始されたParryingでは再び1回の攻撃をパリィできます。
+
+## Parry再入力時のスタミナ不足
+
+Parry再入力受付区間でParry入力が行われても、新しいParryingを開始するためのスタミナが不足している場合は再開始しません。
+
+```text
+Parrying
+↓
+Parry再入力受付区間
+↓
+Parry入力
+↓
+新しいParryingの開始条件確認
+↓
+スタミナ不足
+↓
+再開始しない
+↓
+現在のParrying継続
+```
+
+この場合、現在のParryingを終了しません。
+
+スタミナも消費しません。
+
+現在のParryingは、そのまま通常のRecovery Phaseを継続します。
+
+新しいParryingを開始できることを確認する前に、現在のParryingを終了してはいけません。
 
 ## 再入力受付前のParry入力
 
@@ -293,6 +421,8 @@ Parry入力
 ```
 
 入力を先行入力として保持しません。
+
+スタミナも消費しません。
 
 Parry再入力受付区間へ入った後に、改めてParry入力を行う必要があります。
 
@@ -313,6 +443,8 @@ Parry入力をHold
 ```
 
 連続してParryingを行う場合は、1回ごとにParry入力を押し直す必要があります。
+
+Holdしているだけでは追加のスタミナも消費しません。
 
 ## パリィ成功
 
@@ -337,6 +469,8 @@ ReactionState = None
 ```
 
 パリィ成功専用のPlayer Stateは作成しません。
+
+パリィ成功によってスタミナを追加消費または回復することはありません。
 
 ## パリィ失敗
 
@@ -364,11 +498,17 @@ ReactionState = SmallHit / BigHit
 
 `SmallHit`または`BigHit`の判定方法は「Playerリアクション｜被弾」を正とします。
 
+被弾によってParryingが強制終了した場合、スタミナを返却しません。
+
+その後のスタミナ回復については「Playerステータス」の回復ルールに従います。
+
 ## 空振り
 
 Parrying中に敵の攻撃を一度もパリィしなかった場合は、空振りとなります。
 
 空振りによる追加のState変更やペナルティは発生しません。
+
+消費したスタミナは返却しません。
 
 Parry再入力が行われなければ、モーション終了までParryingを継続します。
 
@@ -413,6 +553,8 @@ Parrying
 ↓
 再入力受付区間でParry入力
 ↓
+新しいParrying開始条件成立
+↓
 新しいParrying開始
 ↓
 現在のPlayer向きを再取得
@@ -424,7 +566,7 @@ Parrying
 
 AimingとParryingは同時成立できません。
 
-`AimState = Aiming`の状態からParryingを開始する場合は、Aimingを終了してからParryingを開始します。
+`AimState = Aiming`の状態からParryingを開始する場合は、Parryの開始条件をすべて確認した後、Aimingを終了してParryingを開始します。
 
 ```text
 MovementState = Grounded
@@ -433,9 +575,17 @@ AimState      = Aiming
 ↓
 Parry入力
 ↓
+Parry開始条件確認
+↓
+必要スタミナあり
+↓
+スタミナ消費
+↓
 AimState      = Normal
 ActionState   = Parrying
 ```
+
+スタミナ不足などによってParryingを開始できない場合は、Aimingを終了しません。
 
 Parrying中のAim入力は受け付けません。
 
@@ -454,6 +604,8 @@ Parry入力
 ↓
 入力を無視
 ```
+
+この場合、スタミナは消費しません。
 
 ### Parrying中に接地を失った場合
 
@@ -477,6 +629,8 @@ ActionState   = None
 
 接地喪失による終了は、Parryingの正常終了として扱いません。
 
+消費したスタミナは返却しません。
+
 保持しているParry入力は存在しないため、接地喪失後に自動的にParryingを再開することはありません。
 
 ## 他Actionとの関係
@@ -485,15 +639,15 @@ Parryingは排他的な`ActionState`です。
 
 Parrying中に他のGameplay Actionを開始することはできません。
 
-| 入力            | Parrying中    |
-| ------------- | ------------ |
-| Dash          | ×            |
-| MarkerFiring  | ×            |
-| ClickCharging | ×            |
-| DragCharging  | ×            |
-| Aim           | ×            |
-| Jump          | ×            |
-| Parry         | 再入力受付区間のみ再開始 |
+| 入力 | Parrying中 |
+| --- | --- |
+| Dash | × |
+| MarkerFiring | × |
+| ClickCharging | × |
+| DragCharging | × |
+| Aim | × |
+| Jump | × |
+| Parry | 再入力受付区間のみ再開始 |
 
 `×`となっている入力は無視します。
 
@@ -519,6 +673,8 @@ ParryingよりReactionStateによる割り込みを優先します。
 
 被弾によって終了した場合、Parryingを自動的に再開始しません。
 
+消費済みのスタミナも返却しません。
+
 ## RootStateによる強制終了
 
 Parrying中に`Gameplay`から別のRootStateへ遷移する場合、Parryingを強制終了します。
@@ -542,19 +698,21 @@ ActionStateを終了
 
 RootState変更による終了後にParryingを自動再開することはありません。
 
+消費済みのスタミナは返却しません。
+
 ## Parryingの終了
 
 Parryingの主な終了条件を以下に示します。
 
-| 終了原因        | ActionState        | 備考                               |
-| ----------- | ------------------ | -------------------------------- |
-| モーション正常終了   | `None`             | 通常終了                             |
-| Parry再入力    | `Parrying`         | 現在のParryingを終了し、新しいParryingを即時開始 |
-| 接地喪失        | `None`             | `MovementState = Airborne`へ変更    |
-| `SmallHit`  | `None`             | ReactionStateを優先                 |
-| `BigHit`    | `None`             | ReactionStateを優先                 |
-| RootState変更 | Gameplay内部Action終了 | 強制終了                             |
-| `Dead`      | Gameplay内部Action終了 | Deadを最優先                         |
+| 終了原因 | ActionState | スタミナ | 備考 |
+| --- | --- | --- | --- |
+| モーション正常終了 | `None` | 返却しない | 通常終了 |
+| Parry再入力 | `Parrying` | 新しいParry分を追加消費 | 現在のParryingを終了し、新しいParryingを即時開始 |
+| 接地喪失 | `None` | 返却しない | `MovementState = Airborne`へ変更 |
+| `SmallHit` | `None` | 返却しない | ReactionStateを優先 |
+| `BigHit` | `None` | 返却しない | ReactionStateを優先 |
+| RootState変更 | Gameplay内部Action終了 | 返却しない | 強制終了 |
+| `Dead` | Gameplay内部Action終了 | 返却しない | Deadを最優先 |
 
 正常終了した場合は、
 
@@ -564,6 +722,8 @@ Parrying
 モーション終了
 ↓
 ActionState = None
+↓
+Playerステータス側のスタミナ回復待機へ
 ```
 
 となります。
@@ -572,13 +732,15 @@ ActionState = None
 
 Parry固有の主な調整項目を以下に示します。
 
-| パラメータ                      | 内容                       | 値  |
-| -------------------------- | ------------------------ | -- |
-| `ParryMotionDuration`      | Parryモーション全体の時間          | 未定 |
-| `ParryStartup`             | Parrying開始からパリィ判定開始までの時間 | 未定 |
-| `ParryWindow`              | パリィ判定が有効な時間              | 未定 |
-| `ParryRestartAcceptTiming` | Parry再入力を受け付け始めるタイミング    | 未定 |
-| `ParryEvaluationWindow`    | 段階評価に使用するタイミング範囲         | 未定 |
+| パラメータ | 内容 | 値 |
+| --- | --- | --- |
+| `ParryMotionDuration` | Parryモーション全体の時間 | 未定 |
+| `ParryStartup` | Parrying開始からパリィ判定開始までの時間 | 未定 |
+| `ParryWindow` | パリィ判定が有効な時間 | 未定 |
+| `ParryRestartAcceptTiming` | Parry再入力を受け付け始めるタイミング | 未定 |
+| `ParryEvaluationWindow` | 段階評価に使用するタイミング範囲 | 未定 |
+
+Parry1回あたりのスタミナ消費量`ParryStaminaCost`は「Playerステータス」で管理します。
 
 `ParryRestartAcceptTiming`はRecovery Phase後半になるよう調整します。
 
@@ -586,18 +748,21 @@ Parry固有の主な調整項目を以下に示します。
 
 ## 各ページとの責務分離
 
-| 内容                      | 管理ページ           |
-| ----------------------- | --------------- |
-| Parryingの開始・Phase・判定・終了 | 本ページ            |
-| Parry再入力による再開始          | 本ページ            |
-| 1回のParryingでパリィ可能な回数    | 本ページ            |
-| パリィ成功・失敗・空振り            | 本ページ            |
-| ActionState間の遷移可否       | Playerアクション遷移   |
-| Aimingのカメラ・移動・向き制御      | Playerアクション｜照準  |
-| Player通常移動の停止           | Player基本移動      |
-| Grounded / Airborne     | Player移動仕様      |
-| SmallHit / BigHitの判定    | Playerリアクション｜被弾 |
-| PlayerのHP減少             | Playerステータス     |
+| 内容 | 管理ページ |
+| --- | --- |
+| Parryingの開始・Phase・判定・終了 | 本ページ |
+| Parry開始時のスタミナ確認・消費タイミング | 本ページ |
+| Parry再入力による再開始 | 本ページ |
+| Parry再入力時のスタミナ確認 | 本ページ |
+| 1回のParryingでパリィ可能な回数 | 本ページ |
+| パリィ成功・失敗・空振り | 本ページ |
+| ActionState間の遷移可否 | Playerアクション遷移 |
+| スタミナ最大値・消費量・回復 | Playerステータス |
+| Aimingのカメラ・移動・向き制御 | Playerアクション｜照準 |
+| Player通常移動の停止 | Player基本移動 |
+| Grounded / Airborne | Player移動仕様 |
+| SmallHit / BigHitの判定 | Playerリアクション｜被弾 |
+| PlayerのHP減少 | Playerステータス |
 
 ## 未決事項
 
