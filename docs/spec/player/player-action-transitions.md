@@ -85,7 +85,7 @@ ReactionState = None
 | `MarkerFiring`  | `C→`    | `×`          | `×`           | `×`          | `×`      |
 | `ClickCharging` | `C→`    | `×`          | `×`           | `×`          | `×`      |
 | `DragCharging`  | `→`     | `×`          | `×`           | `―`          | `×`      |
-| `Parrying`      | `×`     | `×`          | `×`           | `×`          | `-`     |
+| `Parrying`      | `×`     | `×`          | `×`           | `×`          | `―`     |
 
 `C→`が可能になる具体的なタイミングは、それぞれのAction仕様で定義します。
 
