@@ -289,7 +289,6 @@ ActionState = None
 - `Aiming`
 - Action先行入力
 - Aim開始要求
-- Conversation開始前の被弾リアクション
 
 Gameplayへ戻った後、新しい入力を受け取ってActionを開始します。
 
