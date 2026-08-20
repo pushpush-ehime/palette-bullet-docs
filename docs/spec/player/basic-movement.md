@@ -212,8 +212,6 @@ Parry開始時にはPlayerの通常移動を停止し、Parry固有の挙動に�
 
 Move入力が行われても、被弾リアクション中の通常移動には使用しません。
 
-`SmallHit`中に`DragCharging`が継続している場合でも、DragCharging自体は継続しますが、通常移動は停止します。
-
 ### Dashing
 
 `ActionState = Dashing`では、本ページの通常移動速度を使用した通常移動ではなく、Dash固有の移動処理を使用します。
