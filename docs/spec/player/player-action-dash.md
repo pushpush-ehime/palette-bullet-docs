@@ -548,7 +548,13 @@ Dash中のMarkerFiringやDragChargingの先行入力受付時間については�
 
 * 初動高速移動Phaseの加速・減速方法
 * Dash継続Phaseの開始時に速度をどのように接続するか
-* Dash継続Phase中にMove入力がない場合、完全停止とするか慣性を残すか
+* Dash継続Phase中にMove入力がない場合、完全停止とするか慣性を残すか→Move入力なし
+↓
+移動しない
+↓
+Shift Hold
+↓
+Dashingは維持（Dash方向 = Dash開始時のPlayer正面方向）
 * Dash継続Phaseの旋回速度に制限を設けるか
 
 <PageRelations />
