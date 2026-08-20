@@ -230,7 +230,6 @@ ActionState = None
 | ---------- | -------------- |
 | `Dashing`  | `MarkerFiring` |
 | `Dashing`  | `DragCharging` |
-| `Parrying` | `Parrying`     |
 
 先行入力されたActionは、現在のActionが正常終了した時点で開始条件を再確認します。
 
