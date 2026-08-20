@@ -29,7 +29,7 @@ relatedTasks: []
 
 照準そのもののカメラ・Player向き・移動速度・入力方式については「Playerアクション｜照準」を正とします。
 
-ActionState間の遷移、キャンセル、先行入力などの共通ルールについては「Playerアクション遷移」を正とします。
+ActionState間の遷移、キャンセル、Action先行入力、Dashキャンセル入力バッファなどの共通ルールについては「Playerアクション遷移」を正とします。
 
 マーカーオブジェクト自体の移動、衝突、付着、寿命などについては、マーカーオブジェクト側の仕様で定義します。
 
@@ -145,7 +145,8 @@ MarkerFiring開始直後から、実際にマーカーが発射されるまで�
 
 * 発射モーションを再生する
 * マーカー発射前のモーションを行う
-* Dashによるキャンセルはできない
+* Dashによる即時キャンセルはできない
+* キャンセル受付開始直前のDash入力は短時間バッファできる
 * Marker再入力を受け付けない
 
 ```text
@@ -156,6 +157,10 @@ MarkerFiring開始
 発射タイミング
 ```
 
+Dash要求がバッファされている場合でも、このPhaseを途中で終了しません。
+
+マーカーは予定どおり発射し、その後にDashキャンセルを評価します。
+
 ### 発射後・Dashキャンセル可能Phase
 
 マーカーが実際に生成・発射された直後から、MarkerFiring終了までのPhaseです。
@@ -164,8 +169,9 @@ MarkerFiring開始
 
 * 発射後モーションを継続する
 * Dashキャンセルを受け付ける
+* 有効なDashキャンセル入力バッファがあればDash要求を評価する
 * Marker再入力を受け付けない
-* 通常終了までMarkerFiringを継続する
+* Dashキャンセルが成立しない場合は通常終了までMarkerFiringを継続する
 
 ```text
 発射タイミング
@@ -173,6 +179,8 @@ MarkerFiring開始
 マーカー生成・発射
 ↓
 Dashキャンセル受付開始
+↓
+有効なDash要求があれば評価
 ↓
 発射後モーション
 ↓
@@ -199,6 +207,8 @@ MarkerFiring
 
 具体的な発射タイミングは、Animation Eventなどで調整できるようにします。
 
+Dash要求がバッファされていても、発射Eventを中止しません。
+
 ### 発射方向
 
 マーカーは、発射Eventが実行された時点の画面中央のレティクル方向へ発射します。
@@ -212,6 +222,8 @@ MarkerFiring
 ↓
 Marker発射
 ```
+
+Marker入力時点やMarkerFiring開始時点では、発射方向を固定しません。
 
 発射方向が確定した後にAimStateやPlayerの向きが変化しても、すでに発射されたマーカーの進行方向には影響しません。
 
@@ -285,6 +297,8 @@ MarkerFiring自体は継続します。
 
 つまり、MarkerFiringは**開始時にAimingであることを要求しますが、開始後にAimingを維持することまでは要求しません。**
 
+Aim終了によってMarkerFiringをキャンセルすることはありません。
+
 ## 移動
 
 MarkerFiring中もMove入力による移動は可能です。
@@ -324,68 +338,156 @@ Marker発射
 ↓
 Dashキャンセル受付開始
 ↓
-Dash入力
-↓
 Dash開始条件確認
+↓
+条件成立
 ↓
 MarkerFiring終了
 ↓
 Dashing
 ```
 
+Dashキャンセル入力バッファを使用する場合も、遷移種別は`C→`のままです。
+
+`B→`によるAction先行入力として扱いません。
+
 ### 発射前のDash入力
 
-発射前・キャンセル不可PhaseでDash入力が行われた場合は、MarkerFiringをキャンセルしません。
+発射前・キャンセル不可Phaseでは、Dash入力によってMarkerFiringを即座にキャンセルできません。
 
-Dash入力は先行入力として保持せず、無視します。
+ただし、Dashキャンセル受付開始直前にDash入力が行われた場合は、Dash要求を短時間だけ保持できます。
 
 ```text
 MarkerFiring
 ↓
+発射前・キャンセル不可Phase
+↓
+キャンセル受付直前にDash入力
+↓
+Dash要求を短時間保持
+↓
+MarkerFiring継続
+↓
+Marker発射
+↓
+Dashキャンセル可能Phase
+↓
+保持中のDash要求を評価
+```
+
+Dash要求を保持している間もMarkerFiringは継続し、マーカー発射Eventを予定どおり実行します。
+
+Dash入力を理由に発射前のMarkerFiringを終了しません。
+
+### Dashキャンセル入力バッファ
+
+発射前に保持したDash要求が、Marker発射後のDashキャンセル受付開始時点でも有効な場合、その時点でDashingの開始条件を確認します。
+
+```text
+MarkerFiring
+↓
+発射前にDash入力
+↓
+Dash要求を短時間保持
+↓
+Marker発射
+↓
+Dashキャンセル受付開始
+↓
+Dash要求がまだ有効
+↓
+Dash開始条件確認
+│
+├─ 条件成立
+│   ↓
+│   MarkerFiring終了
+│   ↓
+│   Dashing
+│
+└─ 条件不成立
+    ↓
+    Dashingへ遷移しない
+    ↓
+    MarkerFiring継続
+```
+
+Dash要求をバッファしていたこと自体は、Dashingの開始を保証しません。
+
+スタミナなどのDash開始条件は、キャンセルを実行する時点で確認します。
+
+Dash開始条件を満たしていない場合、MarkerFiringだけを終了することはありません。
+
+Dashキャンセル入力バッファの共通ルールについては「Playerアクション遷移」を正とします。
+
+### バッファ時間を超えた場合
+
+Dash要求は無期限に保持しません。
+
+保持時間内にMarker発射およびDashキャンセル受付開始へ到達しなかった場合は、Dash要求を破棄します。
+
+```text
 発射前
 ↓
 Dash入力
 ↓
-入力を無視
+Dash要求を保持
+↓
+保持時間を超過
+↓
+Dash要求を破棄
 ↓
 MarkerFiring継続
 ```
 
-キャンセル受付開始後に再度Dash入力が必要です。
+その後Markerが発射されても、破棄済みのDash要求を使用してDashingへ遷移しません。
+
+Dashingへ遷移するには、新しい有効なDash入力が必要です。
+
+具体的なバッファ時間は調整パラメータとし、本ページでは固定しません。
 
 ### 発射後のDash入力
 
-マーカー発射後にDash入力が行われ、Dash開始条件を満たしている場合はMarkerFiringを終了してDashingへ遷移します。
+マーカー発射後・Dashキャンセル可能Phaseで直接Dash入力が行われた場合は、その時点でDash開始条件を確認します。
 
 ```text
 Marker発射済み
 ↓
 Dash入力
 ↓
-Dash開始条件成立
-↓
-MarkerFiring終了
-↓
-Dashing
+Dash開始条件確認
+│
+├─ 条件成立
+│   ↓
+│   MarkerFiring終了
+│   ↓
+│   Dashing
+│
+└─ 条件不成立
+    ↓
+    MarkerFiring継続
 ```
+
+この場合は発射前の入力バッファを経由せず、通常の`C→`としてDashキャンセルを評価します。
 
 発射済みのマーカーオブジェクトは、Dashキャンセルによって削除しません。
 
-### Dashを開始できない場合
+### Dash開始時のAim
 
-スタミナ不足などによってDashingを開始できない場合は、MarkerFiringを終了しません。
+MarkerFiringとAimingが同時成立している状態からDashingを開始する場合、Dash側の共通ルールに従ってAimingを終了します。
 
 ```text
-MarkerFiring
+ActionState = MarkerFiring
+AimState    = Aiming
 ↓
-Dashキャンセル可能Phase
+Dashキャンセル成立
 ↓
-Dash入力
-↓
-Dash開始条件不成立
-↓
-MarkerFiring継続
+ActionState = Dashing
+AimState    = Normal
 ```
+
+すでにMarkerFiring中にAimを終了している場合は、`AimState = Normal`のままDashingへ遷移します。
+
+Dashingの開始条件およびDash開始時の処理については「Playerアクション｜ダッシュ」を正とします。
 
 ## Marker再入力
 
@@ -401,7 +503,7 @@ Marker入力
 MarkerFiring継続
 ```
 
-Marker入力を先行入力として保持することもありません。
+Marker入力をAction先行入力として保持することもありません。
 
 MarkerFiringが正常終了して`ActionState = None`へ戻った後、再度MarkerFiring開始条件を満たしている場合に次のMarkerFiringを開始できます。
 
@@ -455,6 +557,8 @@ Airborne移行によってAimingは終了しますが、MarkerFiringは終了し
 
 MarkerFiring中にAirborneへ移行した後の移動は「Player基本移動」の空中制御に従います。
 
+Airborne中はDashingを開始できないため、Dashキャンセル入力バッファを保持していた場合でも、Dash開始条件を満たしていなければDashingへ遷移しません。
+
 ## ReactionStateによる強制終了
 
 `SmallHit`または`BigHit`が成立した場合、MarkerFiringを強制終了します。
@@ -466,6 +570,8 @@ SmallHit / BigHit
 ↓
 ActionState = None
 ```
+
+ReactionStateによる強制終了は通常のDash要求より優先します。
 
 ### 発射前に被弾した場合
 
@@ -482,6 +588,8 @@ MarkerFiring強制終了
 ↓
 Marker未発射
 ```
+
+発射前に保持していたDashキャンセル入力バッファも使用しません。
 
 ### 発射後に被弾した場合
 
@@ -524,6 +632,8 @@ MarkerFiring終了
 発射Eventより前に強制終了した場合、マーカーは生成しません。
 
 発射Event後に強制終了した場合、すでに発射済みのマーカーは削除しません。
+
+強制終了時には、保持しているDashキャンセル入力バッファを使用しません。
 
 `Dead`への遷移は他のPlayer状態より優先します。
 
@@ -586,29 +696,35 @@ MarkerFiring固有の主な調整項目を以下に示します。
 
 実際の発射・キャンセル受付タイミングはAnimation Eventなどで調整可能にします。
 
+Dashキャンセル入力バッファの具体的な保持時間は、共通の調整パラメータとして「Playerアクション遷移」のルールに従います。
+
 移動速度の最終決定については「Player基本移動」を正とします。
 
 ## 各ページとの責務分離
 
 Markerに関係する仕様は、以下のように管理します。
 
-| 内容                       | 管理ページ                |
-| ------------------------ | -------------------- |
-| `None → MarkerFiring`    | 本ページ / Playerアクション遷移 |
-| MarkerFiring開始条件         | 本ページ                 |
-| Marker発射モーション            | 本ページ                 |
-| Marker発射タイミング            | 本ページ                 |
-| 発射方向・発射位置                | 本ページ                 |
-| Dashキャンセル受付開始タイミング       | 本ページ                 |
-| MarkerFiring中の再入力        | 本ページ                 |
-| MarkerFiring中の移動速度補正     | 本ページ / Player基本移動    |
-| `Normal ↔ Aiming`        | Playerアクション｜照準       |
-| Aiming中のカメラ              | Playerアクション｜照準       |
-| Aiming中のPlayer向き         | Playerアクション｜照準       |
-| Aim入力方式                  | Player入力と操作          |
-| ActionState間の遷移可否        | Playerアクション遷移        |
-| SmallHit / BigHitによる共通中断 | Playerアクション遷移        |
-| マーカーオブジェクトの飛行・衝突・付着      | マーカーオブジェクト側の仕様       |
+| 内容                            | 管理ページ                            |
+| ----------------------------- | -------------------------------- |
+| `None → MarkerFiring`         | 本ページ / Playerアクション遷移             |
+| MarkerFiring開始条件              | 本ページ                             |
+| Marker発射モーション                 | 本ページ                             |
+| Marker発射タイミング                 | 本ページ                             |
+| 発射方向・発射位置                     | 本ページ                             |
+| Dashキャンセル受付開始タイミング            | 本ページ                             |
+| 発射前後のDash入力に対するMarker固有処理     | 本ページ                             |
+| MarkerFiring中の再入力             | 本ページ                             |
+| MarkerFiring中の移動速度補正          | 本ページ / Player基本移動                |
+| `MarkerFiring → Dashing = C→` | Playerアクション遷移                    |
+| Dashキャンセル入力バッファの共通ルール         | Playerアクション遷移                    |
+| Dash遷移時の共通開始条件確認              | Playerアクション遷移 / Playerアクション｜ダッシュ |
+| `Normal ↔ Aiming`             | Playerアクション｜照準                   |
+| Aiming中のカメラ                   | Playerアクション｜照準                   |
+| Aiming中のPlayer向き              | Playerアクション｜照準                   |
+| Aim入力方式                       | Player入力と操作                      |
+| ActionState間の遷移可否             | Playerアクション遷移                    |
+| SmallHit / BigHitによる共通中断      | Playerアクション遷移                    |
+| マーカーオブジェクトの飛行・衝突・付着           | マーカーオブジェクト側の仕様                   |
 
 ## 未決事項
 
