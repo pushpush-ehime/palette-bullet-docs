@@ -256,7 +256,15 @@ AimState    = Normal
 ↓
 ダメージ適用
 ↓
-ReactionState = SmallHit / BigHit
+HP確認
+│
+├─ HP = 0
+│   ↓
+│   RootState = Dead
+│
+└─ HP > 0
+    ↓
+    ReactionState = SmallHit / BigHit
 ```
 
 `MovementState`はGameplayへ戻った時点の接地状態から決定します。
