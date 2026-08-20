@@ -27,6 +27,8 @@ ActionState
 * チャージの共通使用条件
 * チャージ対象
 * Click / Dragの入力判定
+* 入力判定中にStateが変化した場合の処理
+* Dashing中のCharge先行入力
 * `ClickCharging`の開始・判定・終了
 * `DragCharging`の開始・選択・判定・終了
 * Dashとの遷移
@@ -36,7 +38,9 @@ ActionState
 * RootState変更による強制終了
 * チャージ成功と`miss`の扱い
 
-ActionState間の遷移可否については「Playerアクション遷移」を正とします。
+ActionState間の遷移可否、キャンセル、先行入力については「Playerアクション遷移」を正とします。
+
+本ページでは、共通のCharge入力から`ClickCharging / DragCharging`を判定する処理と、その入力判定の有効期間を定義します。
 
 Aiming中のカメラ・Playerの向き・Aim固有の移動補正については「Playerアクション｜照準」を正とします。
 
@@ -50,22 +54,22 @@ Aiming中のカメラ・Playerの向き・Aim固有の移動補正について�
 
 チャージには以下の2種類があります。
 
-| ActionState     | 用途                 |
-| --------------- | ------------------ |
-| `ClickCharging` | 1つのシャオンダマを選択する     |
-| `DragCharging`  | 複数のシャオンダマを連続して選択する |
+| ActionState | 用途 |
+| --- | --- |
+| `ClickCharging` | 1つのシャオンダマを選択する |
+| `DragCharging` | 複数のシャオンダマを連続して選択する |
 
-両者は同じ「Charge入力」から開始しますが、別のActionStateとして管理します。
+両者は同じCharge入力から判定しますが、別のActionStateとして管理します。
 
 ## 共通使用可能条件
 
-ClickChargingおよびDragChargingは、以下の条件を満たしている場合に開始できます。
+ClickChargingおよびDragChargingを実際に開始する場合は、以下の条件を満たしている必要があります。
 
 * `RootState = Gameplay`
 * `ReactionState = None`
 * チャージ可能なAttackEventが存在する
 * 戦闘BGMが再生されている
-* 現在の`ActionState`から対象Chargeへの開始が許可されている
+* 現在の`ActionState`から対象Chargeへの遷移が許可されている
 
 `Grounded`と`Airborne`のどちらでも開始できます。
 
@@ -77,15 +81,33 @@ MovementState = Airborne
 Charge開始可能
 ```
 
-ただし、現在のActionStateによって開始が禁止されている場合はChargeを開始しません。
+通常は、
 
-例えば、以下のAction中はChargeを開始できません。
+```text
+ActionState = None
+↓
+ClickCharging / DragCharging
+```
 
-* `Dashing`
-* `MarkerFiring`
-* `Parrying`
+として開始します。
 
-ActionState間の開始可否については「Playerアクション遷移」の遷移表を正とします。
+`Dashing`中はその場でChargeを開始しませんが、例外としてCharge入力の判定を行い、判定結果を先行入力として保持できます。
+
+```text
+ActionState = Dashing
+↓
+Charge入力
+↓
+Click / Drag判定
+↓
+ClickCharging または DragChargingを先行入力
+```
+
+`Dashing → ClickCharging`および`Dashing → DragCharging`は、どちらも「Playerアクション遷移」で`B→`として定義します。
+
+`MarkerFiring`、`ClickCharging`、`DragCharging`、`Parrying`中は、新しいCharge入力を受け付けません。
+
+ActionState間の遷移可否そのものについては「Playerアクション遷移」を正とします。
 
 ## チャージ対象
 
@@ -128,59 +150,366 @@ ClickChargingとDragChargingは同じCharge入力を使用します。
 
 Charge入力を押した瞬間には、まだ`ActionState`を変更しません。
 
-まず入力方法を判定し、その結果によってClickChargingまたはDragChargingを開始します。
+まず入力方法を判定し、その結果によってClickChargingまたはDragChargingの開始を要求します。
 
 ```text
-Charge入力押下
+Charge入力Press
 ↓
-入力判定
+Click / Drag入力判定
 │
 ├─ Drag条件成立
 │   ↓
-│   DragCharging開始
+│   DragCharging要求
 │
 └─ Drag条件が成立せずRelease
     ↓
-    ClickCharging開始
+    ClickCharging要求
 ```
 
-この入力判定中はPlayerのStateではありません。
+この**Click / Drag入力判定中はPlayerのStateではありません。**
+
+また、この時点では`Pending Action`にも登録しません。
+
+ClickChargingまたはDragChargingのどちらであるかが確定した時点で、初めて対象Actionの開始要求として扱います。
+
+### 入力判定を開始できるState
+
+Charge入力PressによってClick / Drag入力判定を開始できるのは、以下の場合です。
+
+```text
+RootState = Gameplay
+ReactionState = None
++
+ActionState = None
+または
+ActionState = Dashing
+```
+
+`ActionState = None`では、判定結果に応じてChargeを通常開始します。
+
+`ActionState = Dashing`では、その場でChargeを開始せず、判定結果をAction先行入力として使用します。
+
+それ以外のActionStateでは、Charge入力Press自体を無視します。
+
+| ActionState | Charge入力判定 |
+| --- | --- |
+| `None` | ○ |
+| `Dashing` | ○：先行入力用 |
+| `MarkerFiring` | × |
+| `ClickCharging` | × |
+| `DragCharging` | × |
+| `Parrying` | × |
+
+入力判定を開始しなかったCharge入力は、後からStateが変化しても復活させません。
+
+```text
+Parrying
+↓
+Charge Press
+↓
+入力を無視
+↓
+Parrying終了
+↓
+Charge Release
+↓
+何も開始しない
+```
+
+新しくChargeを開始するには、改めてCharge入力をPressする必要があります。
 
 ### Click判定
 
 Charge入力を押してから、Drag条件を満たさないまま入力を離した場合、ClickChargingとして扱います。
 
 ```text
-Charge入力押下
+Charge入力Press
 ↓
 Drag条件未成立
 ↓
 Charge入力Release
 ↓
-ClickCharging開始
+ClickCharging要求
 ```
 
 ### Drag判定
 
-Charge入力を押し続けた状態で、入力が設定されたDrag開始条件を満たした場合、DragChargingを開始します。
+Charge入力を押し続けた状態で、入力が設定されたDrag開始条件を満たした場合、DragChargingとして扱います。
 
 Drag条件には、マウス移動量などを使用します。
 
 ```text
-Charge入力押下
+Charge入力Press
 ↓
 入力継続
 ↓
 Drag開始条件成立
 ↓
-DragCharging開始
+DragCharging要求
 ```
 
 Drag判定に使用する具体的な閾値はパラメータとして調整します。
 
+## 入力判定中にStateが変化した場合
+
+Click / Drag入力判定を開始した後、判定結果が確定する前にPlayerのStateが変化する場合があります。
+
+入力判定は、**現在のStateでもCharge入力を有効に扱える場合のみ継続**します。
+
+### ActionStateがNoneからDashingへ変化した場合
+
+入力判定中にDashingが開始された場合は、入力判定を破棄しません。
+
+```text
+ActionState = None
+↓
+Charge Press
+↓
+Click / Drag入力判定中
+↓
+Dash開始
+↓
+ActionState = Dashing
+↓
+入力判定継続
+```
+
+その後ClickまたはDragが確定した場合は、Dashingからの先行入力として扱います。
+
+### Dashingが正常終了した場合
+
+Dashing中にCharge入力判定を開始し、Click / Dragがまだ確定していない状態でDashingが正常終了した場合、入力判定は継続します。
+
+```text
+Dashing
+↓
+Charge Press
+↓
+Click / Drag入力判定中
+↓
+Dashing正常終了
+↓
+ActionState = None
+↓
+入力判定継続
+```
+
+その後、
+
+* Releaseした場合はClickCharging
+* Drag条件が成立した場合はDragCharging
+
+として、現在の`ActionState = None`から開始を試みます。
+
+開始時にはChargeの共通使用可能条件を改めて確認します。
+
+### Charge開始不可のActionStateへ変化した場合
+
+入力判定中に、Charge開始不可のActionStateへ遷移した場合は入力判定を破棄します。
+
+対象は主に以下です。
+
+* `MarkerFiring`
+* `ClickCharging`
+* `DragCharging`
+* `Parrying`
+
+```text
+Charge Press
+↓
+入力判定中
+↓
+Parrying開始
+↓
+入力判定破棄
+↓
+Parrying終了
+↓
+Charge Release
+↓
+Chargeは開始しない
+```
+
+破棄した入力を後から復活させません。
+
+### ReactionStateが開始した場合
+
+Click / Drag入力判定中に`SmallHit`または`BigHit`が成立した場合、入力判定を破棄します。
+
+```text
+Charge Press
+↓
+入力判定中
+↓
+SmallHit / BigHit
+↓
+入力判定破棄
+```
+
+Reaction終了後に同じ入力のReleaseやDrag条件成立を検出しても、Chargeを開始しません。
+
+新しいCharge入力Pressが必要です。
+
+`SmallHit`中に既存の`DragCharging`を継続できる仕様は、**すでに`ActionState = DragCharging`が成立している場合のみ**適用します。
+
+入力判定中はまだDragChargingではないため、この例外の対象にはなりません。
+
+### RootStateが変更された場合
+
+入力判定中に`Gameplay`から別のRootStateへ遷移した場合、入力判定を破棄します。
+
+対象は主に以下です。
+
+* `Conversation`
+* `Interacting`
+* `Dead`
+
+```text
+Charge Press
+↓
+入力判定中
+↓
+RootState変更
+↓
+入力判定破棄
+```
+
+Gameplayへ戻った後も入力判定を再開しません。
+
+### MovementState・AimStateのみが変化した場合
+
+`Grounded / Airborne`はどちらもChargeを使用できるため、MovementStateの変化だけを理由に入力判定を破棄しません。
+
+また、ChargeはAimingと同時成立できるため、AimStateの変化だけを理由に入力判定を破棄しません。
+
+ただし、Dashing中のJumpや接地喪失など、**Dashingを特殊終了させる処理が同時に発生する場合**は、Dashing側の先行入力破棄ルールを優先します。
+
+## Dashing中のCharge先行入力
+
+`Dashing → ClickCharging`および`Dashing → DragCharging`は、どちらも`B→`とします。
+
+遷移種別そのものについては「Playerアクション遷移」を正とします。
+
+本ページでは、共通Charge入力からどちらのActionを先行入力するかを決定する処理を定義します。
+
+### ClickChargingの先行入力
+
+Dashing中にCharge入力をPressし、Drag条件が成立しないままReleaseした場合、ClickChargingの先行入力として登録します。
+
+```text
+Dashing
+↓
+Charge Press
+↓
+Drag条件未成立
+↓
+Charge Release
+↓
+Pending Action = ClickCharging
+```
+
+Dashingが正常終了した時点でClickChargingの開始条件を再確認し、条件を満たしている場合に開始します。
+
+```text
+Dashing正常終了
+↓
+ActionState = None
+↓
+ClickCharging開始条件確認
+↓
+ClickCharging
+```
+
+### DragChargingの先行入力
+
+Dashing中にCharge入力をPressし、Drag条件が成立した場合、DragChargingの先行入力として登録します。
+
+```text
+Dashing
+↓
+Charge Press
+↓
+Drag条件成立
+↓
+Pending Action = DragCharging
+```
+
+Dashingが正常終了した時点でDragChargingの開始条件を再確認し、条件を満たしている場合に開始します。
+
+### Drag先行入力中にCharge入力を離した場合
+
+DragChargingはCharge入力をHoldして継続するActionです。
+
+そのため、DragChargingを先行入力として保持した後、Dashing終了前にCharge入力をReleaseした場合は、保持しているDragCharging開始要求を破棄します。
+
+```text
+Dashing
+↓
+Drag条件成立
+↓
+Pending Action = DragCharging
+↓
+Dashing終了前にCharge Release
+↓
+Pending Actionを破棄
+```
+
+この処理は`miss`として扱いません。
+
+Dashing終了後に自動的にDragChargingを開始することもありません。
+
+### 先行入力として登録するタイミング
+
+Charge入力Pressの時点では、まだClickChargingとDragChargingのどちらであるか決まっていません。
+
+そのため、Action先行入力へ登録するのは、Click / Drag判定が確定した時点とします。
+
+```text
+Charge Press
+↓
+入力判定中
+↓
+Click / Drag確定
+↓
+Pending Actionへ登録
+```
+
+Action先行入力の保持数や上書きルールは「Playerアクション遷移」を正とします。
+
+### Dashingが強制・特殊終了した場合
+
+Dashingが以下の理由で正常終了以外の形で終了した場合、Chargeに関する情報も破棄します。
+
+* Jump
+* 接地喪失
+* `SmallHit`
+* `BigHit`
+* `Conversation`
+* `Interacting`
+* `Dead`
+
+対象には以下の両方を含みます。
+
+* まだClick / Dragが確定していない入力判定
+* すでに確定しているClickCharging / DragChargingの先行入力
+
+```text
+Dashing
+↓
+Charge入力判定中
+または
+Charge先行入力保持中
+↓
+Dashing強制・特殊終了
+↓
+Charge入力情報を破棄
+```
+
+その後、自動的にChargeを開始しません。
+
 ## ClickCharging
 
-## ClickChargingとは
+### ClickChargingとは
 
 ClickChargingは、1つのシャオンダマを選択する短時間Actionです。
 
@@ -197,9 +526,11 @@ ClickCharging
 
 ClickCharging中はチャージモーションを再生し、その途中でチャージ結果を確定します。
 
-## ClickCharging開始
+### ClickCharging開始
 
 Click判定が成立し、ClickChargingの開始条件を満たしている場合、`ActionState`を`ClickCharging`へ変更します。
+
+通常開始の場合は、
 
 ```text
 ActionState = None
@@ -210,6 +541,10 @@ ClickCharging開始条件確認
 ↓
 ActionState = ClickCharging
 ```
+
+となります。
+
+Dashing中にClickChargingが先行入力されている場合は、Dashing正常終了後に開始条件を確認して開始します。
 
 ClickCharging開始時に、レティクルが示しているチャージ対象を取得して保持します。
 
@@ -223,7 +558,7 @@ ClickCharging開始
 
 保持した対象は、ClickCharging中にカメラが動いても変更しません。
 
-## ClickCharging内部Phase
+### ClickCharging内部Phase
 
 ClickChargingは、以下の内部Phaseを持ちます。
 
@@ -239,7 +574,7 @@ Phaseは別のPlayer Stateではありません。
 
 `ActionState`はClickCharging開始から終了まで`ClickCharging`のままです。
 
-### 判定前・キャンセル不可Phase
+#### 判定前・キャンセル不可Phase
 
 ClickCharging開始からCharge判定EventまでのPhaseです。
 
@@ -259,7 +594,7 @@ ClickCharging開始
 Charge判定Event
 ```
 
-### 判定後・Dashキャンセル可能Phase
+#### 判定後・Dashキャンセル可能Phase
 
 Charge判定Eventによって結果が確定した後から、ClickCharging正常終了までのPhaseです。
 
@@ -282,7 +617,7 @@ Dashキャンセル受付開始
 ClickCharging終了
 ```
 
-## ClickChargingの判定
+### ClickChargingの判定
 
 Charge判定Eventが発生した時点で、ClickCharging開始時に保持した対象を判定します。
 
@@ -296,7 +631,7 @@ Charge判定Event
 成功 / miss
 ```
 
-### 成功
+#### 成功
 
 保持していた対象が現在のAttackEventに対して有効な場合、チャージに成功します。
 
@@ -306,7 +641,7 @@ Charge判定Event
 * 対象のシャオンダマをパレットブレット化する
 * 成功に応じたコンボ処理を行う
 
-### miss
+#### miss
 
 保持していた対象がAttackEventの要求に一致しない場合は`miss`となります。
 
@@ -315,7 +650,7 @@ Charge判定Event
 * 対象をチャージしない
 * 継続中のコンボを中断する
 
-## ClickCharging中の移動
+### ClickCharging中の移動
 
 ClickCharging中は通常移動を制限しません。
 
@@ -333,7 +668,7 @@ Aimingも同時成立している場合は、Aiming側の移動速度補正が�
 
 移動速度の最終決定については「Player基本移動」を正とします。
 
-## ClickChargingとDashing
+### ClickChargingとDashing
 
 `ClickCharging → Dashing`はキャンセル遷移です。
 
@@ -353,7 +688,7 @@ Charge判定Event
 Dashキャンセル受付開始
 ```
 
-### 判定前のDash入力
+#### 判定前のDash入力
 
 判定前・キャンセル不可PhaseでDash入力が行われた場合は、入力を無視します。
 
@@ -371,7 +706,7 @@ Dash入力
 ClickCharging継続
 ```
 
-### 判定後のDash入力
+#### 判定後のDash入力
 
 判定後にDash入力が行われ、Dashingの開始条件を満たしている場合はClickChargingを終了してDashingへ遷移します。
 
@@ -393,25 +728,27 @@ Dashing
 
 Dashを開始できない場合はClickChargingを継続します。
 
-## ClickCharging再入力
+### ClickCharging再入力
 
-ClickCharging中に再度ClickCharging入力が成立しても、その入力は無視します。
+ClickCharging中に再度Charge入力をPressしても、その入力は無視します。
+
+Click / Drag入力判定も開始しません。
 
 先行入力として保持しません。
 
 ```text
 ClickCharging
 ↓
-ClickCharging再入力
+Charge Press
 ↓
 無視
 ```
 
-## ClickChargingと被弾
+### ClickChargingと被弾
 
 `SmallHit`または`BigHit`が成立した場合、ClickChargingを強制終了します。
 
-### 判定前に被弾した場合
+#### 判定前に被弾した場合
 
 ```text
 ClickCharging
@@ -427,7 +764,7 @@ ClickCharging終了
 
 この中断自体は`miss`として扱いません。
 
-### 判定後に被弾した場合
+#### 判定後に被弾した場合
 
 ```text
 ClickCharging
@@ -441,17 +778,17 @@ ClickCharging終了
 
 すでに確定したチャージ結果は取り消しません。
 
-## ClickChargingの終了
+### ClickChargingの終了
 
 ClickChargingの主な終了条件を以下に示します。
 
-| 終了原因        | 結果                      |
-| ----------- | ----------------------- |
-| モーション正常終了   | `ActionState = None`    |
-| Dashキャンセル   | `ActionState = Dashing` |
-| `SmallHit`  | `ActionState = None`    |
-| `BigHit`    | `ActionState = None`    |
-| RootState変更 | Gameplay内部Actionを終了     |
+| 終了原因 | 結果 |
+| --- | --- |
+| モーション正常終了 | `ActionState = None` |
+| Dashキャンセル | `ActionState = Dashing` |
+| `SmallHit` | `ActionState = None` |
+| `BigHit` | `ActionState = None` |
+| RootState変更 | Gameplay内部Actionを終了 |
 
 正常終了した場合は、
 
@@ -467,7 +804,7 @@ ActionState = None
 
 ## DragCharging
 
-## DragChargingとは
+### DragChargingとは
 
 DragChargingは、複数のシャオンダマを連続して選択する継続Actionです。
 
@@ -484,9 +821,11 @@ DragCharging
 
 DragCharging中はCharge入力を押し続けながらカメラを動かし、レティクルが通過したシャオンダマを選択します。
 
-## DragCharging開始
+### DragCharging開始
 
 Drag入力判定が成立し、DragChargingの開始条件を満たしている場合、`ActionState`を`DragCharging`へ変更します。
+
+通常開始の場合は、
 
 ```text
 ActionState = None
@@ -498,9 +837,18 @@ DragCharging開始条件確認
 ActionState = DragCharging
 ```
 
+となります。
+
+Dashing中にDragChargingが先行入力された場合は、Dashing正常終了時に以下を確認します。
+
+* DragChargingの開始条件を満たしている
+* Charge入力が現在もHoldされている
+
+両方を満たしている場合のみDragChargingを開始します。
+
 DragCharging開始時に、そのDrag操作用の選択リストを初期化します。
 
-## DragCharging中の選択
+### DragCharging中の選択
 
 DragCharging中は、レティクルがチャージ可能な対象を通過した場合、そのシャオンダマを選択リストへ追加します。
 
@@ -514,7 +862,7 @@ DragCharging
 選択リストへ追加
 ```
 
-### 同じシャオンダマを再び通過した場合
+#### 同じシャオンダマを再び通過した場合
 
 同じDragCharging中に、一度選択したシャオンダマを再びレティクルが通過しても追加しません。
 
@@ -532,7 +880,7 @@ DragCharging
 
 1回のDragChargingにつき、同一シャオンダマは1回だけ選択できます。
 
-## DragChargingのRelease
+### DragChargingのRelease
 
 DragCharging中にCharge入力を離すと、その時点までに選択した内容を確定します。
 
@@ -552,11 +900,11 @@ ActionState = None
 
 Charge入力Releaseによる判定は、DragChargingの正常終了として扱います。
 
-## DragChargingの判定
+### DragChargingの判定
 
 Release時に、選択リスト内のシャオンダマを現在のAttackEventに対して判定します。
 
-### 成功
+#### 成功
 
 選択内容が有効な場合、選択されたシャオンダマをチャージします。
 
@@ -566,7 +914,7 @@ Release時に、選択リスト内のシャオンダマを現在のAttackEvent�
 * シャオンダマをパレットブレット化する
 * 成功に応じたコンボ処理を行う
 
-### miss
+#### miss
 
 選択した内容にAttackEventが要求していないシャオンダマが含まれているなど、選択結果が不正解だった場合は`miss`となります。
 
@@ -574,7 +922,7 @@ Release時に、選択リスト内のシャオンダマを現在のAttackEvent�
 
 DragChargingにおける`miss`は、**PlayerがReleaseして選択内容を確定した結果が不正解だった場合**に発生します。
 
-## DragCharging中の移動
+### DragCharging中の移動
 
 DragCharging中もMove入力による移動は可能です。
 
@@ -592,7 +940,7 @@ Aimingも同時成立している場合は、AimingとDragChargingの両方に�
 
 複数の補正が同時成立した場合は乗算せず、「Player基本移動」のルールに従って最も強い制限を使用します。
 
-## DragChargingとDashing
+### DragChargingとDashing
 
 `DragCharging → Dashing`は即時遷移です。
 
@@ -612,7 +960,7 @@ DragCharging終了
 Dashing
 ```
 
-### Dash開始条件を満たさない場合
+#### Dash開始条件を満たさない場合
 
 スタミナ不足などによってDashingを開始できない場合は、DragChargingを終了しません。
 
@@ -626,7 +974,7 @@ Dash開始条件不成立
 DragCharging継続
 ```
 
-### Dashキャンセル時の選択内容
+#### Dash遷移時の選択内容
 
 Dashingへの遷移が成立した場合、DragCharging中に保持していた選択内容はすべて破棄します。
 
@@ -646,7 +994,7 @@ Dashing
 
 コンボも中断しません。
 
-## DragChargingとSmallHit
+### DragChargingとSmallHit
 
 `SmallHit`が成立してもDragChargingは継続します。
 
@@ -666,7 +1014,11 @@ SmallHit中も、すでに選択したシャオンダマの選択内容は維持
 
 移動制限については「Player基本移動」を正とします。
 
-### Aiming中にSmallHitを受けた場合
+この仕様は、**SmallHit成立前からDragChargingが開始済みである場合のみ**適用します。
+
+Click / Drag入力判定中にSmallHitが成立した場合は、入力判定を破棄します。
+
+#### Aiming中にSmallHitを受けた場合
 
 Aiming + DragCharging中にSmallHitが成立した場合は、Aimのみ解除します。
 
@@ -684,7 +1036,7 @@ ReactionState = SmallHit
 
 DragCharging自体と、それまでの選択内容は継続します。
 
-## DragChargingとBigHit
+### DragChargingとBigHit
 
 `BigHit`が成立した場合、DragChargingを強制終了します。
 
@@ -702,18 +1054,18 @@ BigHitによる中断自体は`miss`として扱いません。
 
 コンボも中断しません。
 
-## DragChargingの終了
+### DragChargingの終了
 
 DragChargingの主な終了条件を以下に示します。
 
-| 終了原因         | 選択内容  | miss | 結果                   |
-| ------------ | ----- | ---- | -------------------- |
-| Releaseして正解  | 判定・確定 | なし   | `ActionState = None` |
-| Releaseして不正解 | 判定    | 発生   | `ActionState = None` |
-| Dash         | 破棄    | なし   | `Dashing`            |
-| `SmallHit`   | 維持    | なし   | DragCharging継続       |
-| `BigHit`     | 破棄    | なし   | `ActionState = None` |
-| RootState変更  | 破棄    | なし   | Gameplay内部Action終了   |
+| 終了原因 | 選択内容 | miss | 結果 |
+| --- | --- | --- | --- |
+| Releaseして正解 | 判定・確定 | なし | `ActionState = None` |
+| Releaseして不正解 | 判定 | 発生 | `ActionState = None` |
+| Dash | 破棄 | なし | `Dashing` |
+| `SmallHit` | 維持 | なし | DragCharging継続 |
+| `BigHit` | 破棄 | なし | `ActionState = None` |
+| RootState変更 | 破棄 | なし | Gameplay内部Action終了 |
 
 ## Aimingとの関係
 
@@ -761,10 +1113,10 @@ Aiming中のカメラ・Player向き・移動補正については「Playerア�
 
 ClickChargingとDragChargingは、どちらもGrounded / Airborneの両方で開始できます。
 
-| ActionState     | Grounded | Airborne |
-| --------------- | -------- | -------- |
-| `ClickCharging` | ○        | ○        |
-| `DragCharging`  | ○        | ○        |
+| ActionState | Grounded | Airborne |
+| --- | --- | --- |
+| `ClickCharging` | ○ | ○ |
+| `DragCharging` | ○ | ○ |
 
 Charge実行中に`Grounded → Airborne`へ移行しても、Chargeを終了しません。
 
@@ -792,6 +1144,8 @@ DragCharging中は空中制御にもDragChargingの低速補正を適用しま�
 
 ClickCharging中は通常の空中制御を使用します。
 
+ただし、Dashing中のCharge入力判定またはCharge先行入力を保持した状態で、Jumpや接地喪失によってDashingが終了した場合は、Dashing側の先行入力破棄ルールを優先します。
+
 ## Parryingとの関係
 
 ClickChargingおよびDragChargingからParryingへ遷移することはできません。
@@ -803,7 +1157,17 @@ DragCharging  → Parrying = ×
 
 Charge中にParry入力が行われた場合は入力を無視し、現在のChargeを継続します。
 
-「チャージ中にパリィへ移行できるか」は未決事項ではなく、**開始不可として確定**します。
+Parrying中にCharge入力をPressした場合も、Click / Drag入力判定自体を開始しません。
+
+```text
+Parrying
+↓
+Charge Press
+↓
+入力を無視
+```
+
+その入力をParrying終了後の先行入力として保持しません。
 
 ## MarkerFiringとの関係
 
@@ -831,9 +1195,13 @@ Marker入力
 DragCharging継続
 ```
 
+MarkerFiring中にCharge入力をPressした場合も、Click / Drag入力判定を開始しません。
+
 ## RootStateによる強制終了
 
 ClickChargingまたはDragCharging中にGameplayから別のRootStateへ遷移する場合、Chargeを強制終了します。
+
+また、Click / Drag入力判定中の場合も入力判定を破棄します。
 
 対象となる主なRootStateは以下です。
 
@@ -869,8 +1237,6 @@ DragCharging終了
 
 ## チャージ成功とmiss
 
-チャージ結果の基本ルールを以下に示します。
-
 ### 成功
 
 AttackEventの要求に対して有効なシャオンダマを選択結果として確定した場合、チャージ成功とします。
@@ -896,13 +1262,16 @@ AttackEventのすべてのスロットを埋める必要はありません。
 
 `miss`が発生した場合はコンボを中断します。
 
-### missにしない終了
+### missにしない処理
 
-以下の終了自体は`miss`として扱いません。
+以下の処理自体は`miss`として扱いません。
 
-* Dashキャンセル
-* `SmallHit`
-* `BigHit`
+* Click / Drag入力判定の破棄
+* DragCharging先行入力の破棄
+* ClickChargingのDashキャンセル
+* DragChargingのDashによる終了
+* ClickChargingの`SmallHit / BigHit`による中断
+* DragChargingの`BigHit`による中断
 * `Conversation`
 * `Interacting`
 * `Dead`
@@ -914,14 +1283,14 @@ AttackEventのすべてのスロットを埋める必要はありません。
 
 Charge固有の主な調整項目を以下に示します。
 
-| パラメータ                             | 内容                               | 値         |
-| --------------------------------- | -------------------------------- | --------- |
-| `ChargeMaxDistance`               | シャオンダマを選択可能な最大距離                 | 未定        |
-| `DragStartThreshold`              | Click / Dragを判定するためのDrag開始閾値     | 未定        |
-| `ClickChargingDuration`           | ClickCharging全体の継続時間             | 未定        |
-| `ClickChargeJudgeTiming`          | ClickChargingの判定タイミング            | 未定        |
-| `ClickDashCancelTiming`           | ClickChargingのDashキャンセル受付開始タイミング | 判定後を基準に調整 |
-| `DragChargingMoveSpeedMultiplier` | DragCharging中の移動速度補正             | 未定        |
+| パラメータ | 内容 | 値 |
+| --- | --- | --- |
+| `ChargeMaxDistance` | シャオンダマを選択可能な最大距離 | 未定 |
+| `DragStartThreshold` | Click / Dragを判定するためのDrag開始閾値 | 未定 |
+| `ClickChargingDuration` | ClickCharging全体の継続時間 | 未定 |
+| `ClickChargeJudgeTiming` | ClickChargingの判定タイミング | 未定 |
+| `ClickDashCancelTiming` | ClickChargingのDashキャンセル受付開始タイミング | 判定後を基準に調整 |
+| `DragChargingMoveSpeedMultiplier` | DragCharging中の移動速度補正 | 未定 |
 
 ClickCharging中の移動速度は通常速度とします。
 
@@ -931,30 +1300,33 @@ Aimingなど他Stateによる移動補正との組み合わせについては「
 
 Chargeに関係する仕様は、以下のように管理します。
 
-| 内容                             | 管理ページ              |
-| ------------------------------ | ------------------ |
-| `ClickCharging`の開始・判定・終了       | 本ページ               |
-| `DragCharging`の開始・選択・終了        | 本ページ               |
-| Click / Drag入力の意味              | 本ページ / Player入力と操作 |
-| Click / Drag判定閾値               | 本ページ               |
-| チャージ対象の判定                      | 本ページ               |
-| Chargeによる`miss`                | 本ページ               |
-| ClickChargingのDashキャンセル受付タイミング | 本ページ               |
-| DragChargingのDash中断結果          | 本ページ               |
-| ActionState間の遷移可否              | Playerアクション遷移      |
-| Aiming中のカメラ・Player向き           | Playerアクション｜照準     |
-| 移動速度の最終決定                      | Player基本移動         |
-| AttackEventのスロット処理             | AttackEvent側の仕様    |
-| シャオンダマ自体の仕様                    | シャオンダマ側の仕様         |
-| パレットブレット化後の挙動                  | パレットブレット側の仕様       |
+| 内容 | 管理ページ |
+| --- | --- |
+| `ClickCharging`の開始・判定・終了 | 本ページ |
+| `DragCharging`の開始・選択・終了 | 本ページ |
+| Click / Drag入力判定 | 本ページ |
+| Click / Drag入力判定の開始・破棄条件 | 本ページ |
+| Dashing中のCharge入力判定 | 本ページ |
+| DragCharging先行入力中のRelease処理 | 本ページ |
+| Click / Drag判定閾値 | 本ページ |
+| チャージ対象の判定 | 本ページ |
+| Chargeによる`miss` | 本ページ |
+| ClickChargingのDashキャンセル受付タイミング | 本ページ |
+| DragChargingのDash中断結果 | 本ページ |
+| ActionState間の遷移可否 | Playerアクション遷移 |
+| `B→`の共通保持・上書き・評価ルール | Playerアクション遷移 |
+| Aiming中のカメラ・Player向き | Playerアクション｜照準 |
+| Reaction中の入力制限 | Playerリアクション｜被弾 |
+| 移動速度の最終決定 | Player基本移動 |
+| AttackEventのスロット処理 | AttackEvent側の仕様 |
+| シャオンダマ自体の仕様 | シャオンダマ側の仕様 |
+| パレットブレット化後の挙動 | パレットブレット側の仕様 |
 
 ## 未決事項
 
-* DragChargingを正式採用するか
 * Click / Dragを判定する`DragStartThreshold`の具体値
 * ClickChargingのモーション時間
 * ClickChargingの判定タイミング
 * DragCharging中に複数の音程を選択する場合、選択順もAttackEventの要求順と一致させる必要があるか
-* DragChargingを採用しない場合、複数シャオンダマをまとめて選択する操作をどのように置き換えるか
 
 <PageRelations />
