@@ -249,7 +249,7 @@ Action固有の移動
 * `Interacting`
 * `Dead`
 
-例えば、`DragCharging + SmallHit`ではDragCharging自体は継続しますが、SmallHitによる移動禁止を優先するため通常移動は行いません。
+通常移動は不可。ただしBigHit固有のノックバック移動はReaction仕様として発生する
 
 ### Action固有の移動
 
