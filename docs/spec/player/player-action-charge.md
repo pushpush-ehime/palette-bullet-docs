@@ -1,5 +1,4 @@
 ---
-
 title: "Playerアクション｜チャージ"
 description: Palette BulletにおけるPlayerのシャオンダマ選択・チャージ仕様
 pageType: spec
@@ -44,13 +43,37 @@ ActionState間の遷移可否、キャンセル、Action先行入力、Dashキ�
 
 Aiming中のカメラ・Playerの向き・Aim固有の移動補正については「Playerアクション｜照準」を正とします。
 
-シャオンダマ自体の仕様、AttackEventのスロット仕様、パレットブレット化した後の挙動については、それぞれの仕様ページを正とします。
+現在Charge対象となるAttackEventの決定、Slot構造、Slot割り当て、割り当て優先順位、重複Charge、万能シャオンダマのSlot解決については`docs/spec/draw-system/charge-allocation.md`を正とします。
+
+AttackEvent発火時の完全成立・不完全完成、使用するCharge済みシャオンダマ実体、Chord / Arpeggioの発射処理については`docs/spec/bgm/bgm-attack-judgement.md`を正とします。
+
+AttackEventの必要音、Chord / Arpeggio、音楽的順序・タイミングなどの音楽情報については`docs/spec/bgm/bgm-attack-event.md`を正とします。
 
 ## チャージとは
 
-チャージとは、Playerがシャオンダマを選択し、AttackEventが要求しているSlotへ登録するPlayerアクションです。
+チャージとは、Playerがシャオンダマを選択し、現在Charge対象となっているAttackEventのSlotへ対応付けるPlayerアクションです。
 
-チャージに成功したシャオンダマはパレットブレット化され、対応するAttackEventのSlotへ登録されます。
+Chargeに成功したシャオンダマは、Charge成功時点で即座に攻撃用Palette Bulletとして発射されません。
+
+```text
+世界上のシャオンダマ
+↓
+Charge成功
+↓
+AttackEvent / Slotへ対応付け
+↓
+世界上でその場に停止
+↓
+AttackEvent発火待ち
+↓
+AttackEvent発火
+↓
+Palette Bullet化
+↓
+攻撃
+```
+
+Charge成功後も、実際に攻撃へ使用されるシャオンダマ実体は世界上に存在します。
 
 チャージには以下の2種類があります。
 
@@ -70,6 +93,8 @@ ClickChargingおよびDragChargingを開始する場合は、以下の条件を�
 * チャージ可能なAttackEventが存在する
 * 戦闘BGMが再生されている
 * 現在の`ActionState`から対象Chargeへの遷移が許可されている
+
+現在どのAttackEventがCharge対象であるかは、`docs/spec/draw-system/charge-allocation.md`の規則を正とします。
 
 ClickChargingとDragChargingは、`Grounded`と`Airborne`のどちらでも開始できます。
 
@@ -120,15 +145,21 @@ ClickCharging または DragChargingを先行入力
 
 通常のシャオンダマは、それぞれ音程を持ちます。
 
-チャージ判定時に、そのシャオンダマを要求している有効なSlotが存在する場合はチャージに成功します。
+Charge判定時に、現在Charge対象となっているAttackEventへ有効に割り当てられる場合はCharge成功となります。
 
-要求しているSlotが存在しない場合は`miss`となります。
+現在Charge対象となっているAttackEventがその通常シャオンダマの音を要求しておらず、有効なSlotへ割り当てられない場合は`miss`となります。
+
+後続AttackEventに同じ要求音が存在していても、現在のAttackEventを飛び越えて後続AttackEventへChargeしません。
+
+音名照合、オクターブ、同音Slot、未充填Slot、重複Chargeを含む具体的なSlot割り当て規則については`docs/spec/draw-system/charge-allocation.md`を正とします。
 
 ### 万能シャオンダマ
 
-万能シャオンダマは、通常のシャオンダマとは異なり、音程による制限を受けずチャージできます。
+万能シャオンダマは、通常のシャオンダマとは異なり、音程による制限を受けずChargeできます。
 
-万能シャオンダマの具体的なSlot割り当てルールについては、AttackEvent側の仕様を正とします。
+ただし、万能シャオンダマも現在Charge対象となっているAttackEventを対象とします。
+
+具体的にどのSlotへ割り当てるかは本ページでは定義せず、`docs/spec/draw-system/charge-allocation.md`を正とします。
 
 ## 対象選択
 
@@ -595,7 +626,7 @@ ClickCharging終了
 
 Charge判定Eventが発生した時点で、ClickCharging開始時に保持したシャオンダマを判定します。
 
-重要なのは、AttackEventをClick判定時やClickCharging開始時には固定せず、Charge判定Event発生時に決定することです。
+重要なのは、AttackEventやSlotをClick判定時やClickCharging開始時には固定せず、Charge判定Event発生時点の状態を使用することです。
 
 基本的な処理は以下です。
 
@@ -610,20 +641,18 @@ ClickCharging開始
 ↓
 Charge判定Event
 ↓
-その時点でチャージ可能なAttackEventを確認
-↓
-保持しているシャオンダマを要求するSlotを検索
+現在Charge対象となっているAttackEvent / Slotの解決を要求
 │
-├─ 存在する
-│   ↓
-│   対象Slotへ自動割り当て
+├─ 有効なSlotへ割り当て可能
 │   ↓
 │   success
 │
-└─ 存在しない
+└─ 有効なSlotへ割り当て不可
     ↓
     miss
 ```
+
+現在Charge対象となっているAttackEventの決定およびSlot割り当ての詳細は`docs/spec/draw-system/charge-allocation.md`を正とします。
 
 つまり、ClickChargingで固定するタイミングは以下のように分かれます。
 
@@ -634,28 +663,36 @@ Charge判定Event
 | AttackEvent  | Charge判定Event時   |
 | Slot         | Charge判定Event時   |
 
-ClickCharging開始後からCharge判定Eventまでの間にチャージ可能なAttackEventが変化した場合は、Charge判定Event発生時点の状態を使用します。
+ClickCharging開始後からCharge判定Eventまでの間にCharge対象AttackEventが変化した場合は、Charge判定Event発生時点の状態を使用します。
 
 ### success
 
-Charge判定Event時点で、保持しているシャオンダマを要求している有効なSlotが存在する場合はチャージ成功とします。
+Charge判定Event時点で、保持しているシャオンダマを現在Charge対象となっているAttackEventの有効なSlotへ割り当てられた場合はCharge成功とします。
 
 成功時は以下の処理を行います。
 
-* 対象Slotへシャオンダマを自動割り当てする
-* シャオンダマをパレットブレット化する
+* `docs/spec/draw-system/charge-allocation.md`に従ってAttackEvent / Slotへ対応付ける
+* Charge成功したシャオンダマ実体を世界上でその場に停止させる
+* 対応するAttackEventの発火待ち状態にする
 * 成功に応じたコンボ処理を行う
 
-複数のAttackEventまたはSlotが候補になる場合の割り当て優先ルールについては、AttackEvent側の仕様を正とします。
+この時点では、Charge成功したシャオンダマを攻撃用Palette Bulletとして発射しません。
+
+AttackEvent発火時のPalette Bullet化および攻撃への使用については`docs/spec/bgm/bgm-attack-judgement.md`を正とします。
 
 ### miss
 
-Charge判定Event時点で、保持しているシャオンダマを要求する有効なSlotが存在しない場合は`miss`となります。
+Charge判定Event時点で、保持しているシャオンダマを現在Charge対象となっているAttackEventの有効なSlotへ割り当てられない場合は`miss`となります。
+
+通常シャオンダマについて、現在Charge対象となっているAttackEventがその音を要求していない場合も`miss`です。
+
+後続AttackEventに同じ要求音が存在していても、後続へ回しません。
 
 `miss`時は以下の処理を行います。
 
-* シャオンダマをチャージしない
+* シャオンダマをChargeしない
 * Slotへ登録しない
+* AttackEvent発火待ち状態へ移行しない
 * 継続中のコンボを中断する
 
 ## ClickCharging中の移動
@@ -966,6 +1003,30 @@ DragCharging
 
 1回のDragChargingにつき、同一シャオンダマは1回だけ選択できます。
 
+### Drag選択順
+
+DragChargingでシャオンダマを選択した順序は、AttackEventのArpeggio要求順と一致する必要はありません。
+
+例えばAttackEventが、
+
+```text
+C → E → G
+```
+
+というArpeggioでも、
+
+```text
+G → C → E
+```
+
+の順でPlayerが選択して問題ありません。
+
+Drag選択順そのものを理由に`miss`にはしません。
+
+Arpeggioの発射時にはPlayerの選択順ではなく、AttackEvent側に設定された音楽的順序・タイミングを使用します。
+
+Arpeggioの音楽情報は`docs/spec/bgm/bgm-attack-event.md`、発火時の発射処理は`docs/spec/bgm/bgm-attack-judgement.md`を正とします。
+
 ## DragChargingのRelease
 
 DragCharging中にCharge入力を離すと、その時点までに選択した内容を確定します。
@@ -977,7 +1038,7 @@ Charge入力Release
 ↓
 選択内容確定
 ↓
-まとめて判定
+Charge判定
 ↓
 success / miss
 ↓
@@ -988,23 +1049,32 @@ Charge入力Releaseによる判定は、DragChargingの正常終了として扱�
 
 ## DragChargingの判定
 
-Release時に、選択リスト内のシャオンダマをAttackEventに対して判定します。
+Release時に、選択リスト内のシャオンダマを現在Charge対象となっているAttackEventに対して判定します。
+
+現在Charge対象となっているAttackEventの決定および各シャオンダマのSlot割り当てについては`docs/spec/draw-system/charge-allocation.md`を正とします。
 
 ### success
 
-選択内容が有効な場合、選択されたシャオンダマをチャージします。
+有効なSlotへ割り当てられたシャオンダマはCharge成功となります。
 
 成功した対象について以下の処理を行います。
 
-* 対応するAttackEventのSlotへ登録する
-* シャオンダマをパレットブレット化する
+* AttackEvent / Slotへ対応付ける
+* Charge成功したシャオンダマ実体を世界上でその場に停止させる
+* 対応するAttackEventの発火待ち状態にする
 * 成功に応じたコンボ処理を行う
 
-AttackEvent側の具体的なSlot割り当て処理については、AttackEvent側の仕様を正とします。
+この時点では、Charge成功したシャオンダマを攻撃用Palette Bulletとして発射しません。
+
+AttackEvent発火時のPalette Bullet化および攻撃への使用については`docs/spec/bgm/bgm-attack-judgement.md`を正とします。
 
 ### miss
 
-選択結果がAttackEventの要求に対して不正解だった場合は`miss`となります。
+選択結果が現在Charge対象となっているAttackEventの要求に対して不正解だった場合は`miss`となります。
+
+通常シャオンダマについて、現在Charge対象となっているAttackEventがその音を要求しておらず、有効なSlotへ割り当てられない場合も`miss`です。
+
+後続AttackEventに同じ要求音が存在していても、現在のAttackEventを飛び越えて後続へChargeしません。
 
 `miss`時はコンボを中断します。
 
@@ -1309,26 +1379,29 @@ DragCharging終了
 
 ### success
 
-Playerが選択したシャオンダマを有効なAttackEventのSlotへ登録できた場合、チャージ成功とします。
+Playerが選択したシャオンダマを、現在Charge対象となっているAttackEventの有効なSlotへ割り当てられた場合、Charge成功とします。
 
 成功したシャオンダマについて以下を行います。
 
-* AttackEventの対象Slotへ登録
-* パレットブレット化
-* コンボ加算などの成功処理
+* AttackEvent / Slotへ対応付ける
+* 世界上でその場に停止させる
+* 対応するAttackEventの発火待ち状態にする
+* コンボ加算などの成功処理を行う
 
-AttackEventのすべてのSlotを埋める必要はありません。
+Charge成功時点では攻撃用Palette Bulletとして発射しません。
 
-一部のSlotのみ埋まっている場合のAttackEventの処理については、AttackEvent側の仕様を正とします。
+AttackEvent発火時の成立判定、使用するCharge済み実体、Palette Bullet化、Chord / Arpeggioの発射については`docs/spec/bgm/bgm-attack-judgement.md`を正とします。
 
 ### miss
 
-`miss`は、Playerが選択結果を確定し、その内容がAttackEventの要求に対して不正解だった場合に発生します。
+`miss`は、Playerが選択結果を確定し、その内容を現在Charge対象となっているAttackEventの有効なSlotへ割り当てられなかった場合に発生します。
 
 主な例は以下です。
 
-* ClickChargingのCharge判定Event時に、保持しているシャオンダマを要求するSlotが存在しない
-* DragChargingのRelease時に、選択結果がAttackEventの要求に対して不正解だった
+* ClickChargingのCharge判定Event時に、保持している通常シャオンダマの音を現在Charge対象AttackEventが要求していない
+* DragChargingのRelease時に、選択結果が現在Charge対象AttackEventの要求に対して不正解だった
+
+後続AttackEventに同じ要求音が存在していても、現在のAttackEventを飛び越えて後続へChargeしません。
 
 `miss`が発生した場合はコンボを中断します。
 
@@ -1370,40 +1443,45 @@ Aimingなど他Stateによる移動補正との組み合わせについては「
 
 Chargeに関係する仕様は、以下のように管理します。
 
-| 内容                               | 管理ページ           |
-| -------------------------------- | --------------- |
-| `ClickCharging`の開始・対象保持・判定・終了    | 本ページ            |
-| `DragCharging`の開始・選択・判定・終了       | 本ページ            |
-| Click / Drag入力判定                 | 本ページ            |
-| Click / Drag入力判定の開始・破棄条件         | 本ページ            |
-| Dashing中のCharge入力判定              | 本ページ            |
-| DragCharging先行入力中のRelease処理      | 本ページ            |
-| Click / Drag判定閾値                 | 本ページ            |
-| ClickChargingの対象シャオンダマ保持タイミング    | 本ページ            |
-| ClickChargingのAttackEvent判定タイミング | 本ページ            |
-| Chargeによる`miss`                  | 本ページ            |
-| ClickChargingのDashキャンセル受付開始タイミング | 本ページ            |
-| Charge中Jump時のCharge固有処理          | 本ページ            |
-| DragCharging中断時の選択内容             | 本ページ            |
-| ActionState間の遷移可否                | Playerアクション遷移   |
-| `C→` / `B→`の定義                   | Playerアクション遷移   |
-| Action先行入力の保持・上書き・評価ルール          | Playerアクション遷移   |
-| Dashキャンセル入力バッファの共通ルール            | Playerアクション遷移   |
-| SmallHit / BigHitによるAction中断可否   | Playerアクション遷移   |
-| Grounded / AirborneによるAction開始制限 | Playerアクション遷移   |
-| Jump自体の処理                        | Player移動｜ジャンプ   |
-| Aiming中のカメラ・Player向き             | Playerアクション｜照準  |
-| Reaction自体の処理                    | Playerリアクション｜被弾 |
-| 移動速度の最終決定                        | Player基本移動      |
-| AttackEventのSlot構造・割り当て優先ルール     | AttackEvent側の仕様 |
-| シャオンダマ自体の仕様                      | シャオンダマ側の仕様      |
-| パレットブレット化後の挙動                    | パレットブレット側の仕様    |
+| 内容                                                | 管理ページ                                        |
+| ------------------------------------------------- | -------------------------------------------- |
+| `ClickCharging`の開始・対象保持・判定・終了                     | 本ページ                                         |
+| `DragCharging`の開始・選択・判定・終了                        | 本ページ                                         |
+| Click / Drag入力判定                                  | 本ページ                                         |
+| Click / Drag入力判定の開始・破棄条件                          | 本ページ                                         |
+| Dashing中のCharge入力判定                               | 本ページ                                         |
+| DragCharging先行入力中のRelease処理                       | 本ページ                                         |
+| Click / Drag判定閾値                                  | 本ページ                                         |
+| ClickChargingの対象シャオンダマ保持タイミング                     | 本ページ                                         |
+| ClickChargingのCharge判定Eventタイミング                  | 本ページ                                         |
+| DragChargingのRelease判定タイミング                       | 本ページ                                         |
+| Drag選択順がArpeggio順を拘束しないこと                         | 本ページ                                         |
+| Chargeによる`success / miss`                         | 本ページ                                         |
+| ClickChargingのDashキャンセル受付開始タイミング                  | 本ページ                                         |
+| Charge中Jump時のCharge固有処理                           | 本ページ                                         |
+| DragCharging中断時の選択内容                              | 本ページ                                         |
+| ActionState間の遷移可否                                 | Playerアクション遷移                                |
+| `C→` / `B→`の定義                                    | Playerアクション遷移                                |
+| Action先行入力の保持・上書き・評価ルール                           | Playerアクション遷移                                |
+| Dashキャンセル入力バッファの共通ルール                             | Playerアクション遷移                                |
+| SmallHit / BigHitによるAction中断可否                    | Playerアクション遷移                                |
+| Grounded / AirborneによるAction開始制限                  | Playerアクション遷移                                |
+| Jump自体の処理                                         | Player移動｜ジャンプ                                |
+| Aiming中のカメラ・Player向き                              | Playerアクション｜照準                               |
+| Reaction自体の処理                                     | Playerリアクション｜被弾                              |
+| 移動速度の最終決定                                         | Player基本移動                                   |
+| 現在Charge対象となるAttackEventの決定                       | `docs/spec/draw-system/charge-allocation.md` |
+| Slot構造・Slot割り当て・割り当て優先順位                          | `docs/spec/draw-system/charge-allocation.md` |
+| 重複Charge・万能シャオンダマのSlot解決                          | `docs/spec/draw-system/charge-allocation.md` |
+| AttackEventの必要音・Chord / Arpeggio・音楽的順序            | `docs/spec/bgm/bgm-attack-event.md`          |
+| AttackEvent発火時の完全成立・不完全完成                         | `docs/spec/bgm/bgm-attack-judgement.md`      |
+| AttackEvent発火時の使用シャオンダマ実体決定                       | `docs/spec/bgm/bgm-attack-judgement.md`      |
+| AttackEvent発火時のPalette Bullet化・Chord / Arpeggio発射 | `docs/spec/bgm/bgm-attack-judgement.md`      |
 
 ## 未決事項
 
 * Click / Dragを判定する`DragStartThreshold`の具体値
 * ClickChargingのモーション時間
 * ClickChargingのCharge判定Eventタイミング
-* DragCharging中に複数の音程を選択する場合、選択順もAttackEventの要求順と一致させる必要があるか
 
 <PageRelations />
