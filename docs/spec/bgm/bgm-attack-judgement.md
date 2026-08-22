@@ -5,8 +5,8 @@ pageType: spec
 category: "BGM"
 status: 仮仕様
 relatedTasks:
-* /tasks/music-chart-scriptableobject/pb-task-0016
-* /tasks/music-chart-scriptableobject/pb-task-0017
+- /tasks/music-chart-scriptableobject/pb-task-0016
+- /tasks/music-chart-scriptableobject/pb-task-0017
 ---
 
 # BGM 攻撃イベント仕様
