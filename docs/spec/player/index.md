@@ -10,6 +10,7 @@ collapsed: false
 ---
 
 # Player概要
+
 ## 目的
 
 このページでは、Playerの概要を記載します。
@@ -48,12 +49,25 @@ Playerは、シャオンダマを弾丸化し、曲に合わせて敵へ発射�
 ### バトルサイクル
 
 1. 戦闘BGMが流れます。
-2. ラジクジラがシャオンダマを生成します。
+2. BGM / MusicChart側で決定された通常シャオンダマを、ラジクジラが生成し、世界内へ出現させます。
 3. AttackEventが発生し、チャージできる状態になります。
 4. Playerはシャオンダマを弾丸化し、AttackEventのスロットへチャージします。
 5. AttackEventの攻撃タイミングが来ると、チャージした弾丸が発射されます。
 6. マーカーがある場合はマーカーへ発射し、ない場合は近くの敵を自動で狙います。
 7. 攻撃を繰り返し、敵を倒します。
+
+通常シャオンダマについて、「何を・いつ・何個生成するか」はBGM / MusicChart側が管理します。ラジクジラは、その結果を受けてシャオンダマを世界内へ出現させます。出現後のシャオンダマの挙動はシャオンダマ側が管理し、Playerによる弾丸化・ChargeはPlayer側が管理します。
+
+詳細は以下を参照してください。
+
+- ラジクジラそのもの：[ラジクジラ概要](../radiowhale/index.md)
+- ラジクジラからのシャオンダマ出現：[ラジクジラ｜シャオンダマ生成](../radiowhale/shaondama-spawning.md)
+- シャオンダマの生成対象・タイミング・個数：[BGM→シャオンダマ生成仕様](../bgm/bgm-make-syaonndama.md)
+- MusicChart / NoteEvent：[MusicChart](../bgm/bgm-music-chart.md)
+- AttackEvent：[AttackEvent](../bgm/bgm-attack-event.md)
+- PlayerによるCharge：[Playerアクション｜チャージ](./player-action-charge.md)
+- 生成後のシャオンダマ：[シャオンダマ概要](../shaondama-music/index.md)
+- ラジクジラのGameplay上の存在・表示：[ラジクジラ｜Gameplayライフサイクル](../radiowhale/gameplay-lifecycle.md)
 
 ## Playerが行える主要行動
 
