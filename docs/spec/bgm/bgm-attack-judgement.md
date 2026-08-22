@@ -1,1248 +1,1029 @@
 ---
-title: "BGM 攻撃イベント仕様"
-description: Palette BulletにおけるAttackEventの音楽的設計・設定仕様
+title: "AttackEvent成立判定"
+description: Palette BulletにおけるAttackEvent発火時のGameplay成立判定・使用実体仕様
 pageType: spec
 category: "BGM"
 status: 仮仕様
 relatedTasks:
-- /tasks/music-chart-scriptableobject/pb-task-0016
-- /tasks/music-chart-scriptableobject/pb-task-0017
+  - /tasks/music-chart-scriptableobject/pb-task-0016
 ---
 
-# BGM 攻撃イベント仕様
+# AttackEvent成立判定
 
 ## 目的
 
-本ページでは、
+本ページでは、AttackEvent発火時に、
 
-> **AttackEventが持つ音楽情報と、BGM時間軸上の予告・発火タイミング**
-
-を定義します。
-
-通常AttackEventでは、BGMに対して、
-
-```text
-この音楽位置で
-↓
-この音を使って
-↓
-この音楽表現として
-↓
-Gameplayへ攻撃タイミングを渡す
-```
-
-ための情報を設定します。
-
-本ページでは主に、
-
-* AttackEventとして使用する音楽位置
-* 必要音
-* Chord / Arpeggio
-* Arpeggioの順序・音楽的タイミング
-* Harmony
-* 予告
-* Charge受付期間に関係する時間情報
-* 固定AttackEvent
-* Random Sectionで使用するAttackEvent候補
-* Weak AttackEventの音楽時間情報
-* Gameplayへ渡す音楽情報
-* サウンド班からUnityへの受け渡し
-
-を扱います。
-
-一方、以下は本ページでは定義しません。
-
-* 現在Charge対象となるAttackEventの決定
-* Slot構造
-* Slot割り当て
-* Slot優先順位
-* 重複Charge
-* 万能シャオンダマのSlot解決
-* AttackEvent発火時の完全成立 / 不完全完成
-* AttackEvent発火時に使用するCharge済みシャオンダマ実体
-* Palette Bullet化・発射対象のGameplay判定
-
-Charge対象AttackEventおよびSlot割り当てについては、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
-
-AttackEvent発火時のGameplay成立判定・使用実体・攻撃処理については、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
-
----
-
-## AttackEventとは
-
-`AttackEvent`は、音楽上のタイミングとPlayerの攻撃を接続するための音楽Gameplay用イベントです。
-
-本ゲームでは大きく、
-
-```text
-AttackEvent
-├─ 通常AttackEvent
-│  ├─ 固定AttackEvent
-│  └─ Random Sectionから選択されるAttackEvent
-│
-└─ Weak AttackEvent
-```
-
-として扱います。
-
-通常AttackEventは、BGM上の特定の演奏位置へ事前に設定するAttackEventです。
-
-例えば、BGMの8小節目に、
-
-```text
-C
-E
-G
-```
-
-というコードが存在し、そのコードをPlayerの攻撃へ利用したい場合、
-
-```text
-8小節目 1拍目
-C / E / G
-Type = Chord
-```
-
-という通常AttackEventを設定できます。
-
-```text
-BGM
-↓
-8小節目 1拍目
-↓
-AttackEvent
-↓
-Gameplayへ通知
-```
-
-通常AttackEventはMIDIには記録しません。
-
-サウンド班が音楽的な内容を決め、Gameplayとして使用する内容をプランナーが確認したうえで、Unityの`MusicChart`へ設定します。
-
-```text
-サウンド班
-↓
-音楽的AttackEvent候補を設計
-↓
-プランナー
-↓
-Gameplayとして確認
-↓
-プログラマー
-↓
-MusicChartへ設定
-```
-
-MusicChart上でのデータ構造・入力責務については、[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)を正とします。
-
-Weak AttackEventはこれとは異なり、MusicChartへ通常AttackEventとして事前配置するものではありません。
-
-Weak AttackEventについては後述します。
-
----
-
-## AttackEventの責務
-
-本ページが正本として持つAttackEventの責務は、
-
-> **BGM上の音楽的位置・要求音・音楽表現・発火に必要な時間情報をGameplayへ伝えること**
-
-です。
-
-通常AttackEventでは、
-
-```text
-AttackEvent
-├─ いつ
-├─ どの音を
-└─ どの音楽表現で使うか
-```
+> **各SlotへCharge済みの結果をどのようにGameplay上の成立状態として判定し、どのシャオンダマ実体を攻撃へ使用するか**
 
 を定義します。
 
-一方、
+本ページを、
+
+- 通常AttackEvent発火時の完全成立 / 不完全完成判定
+- 発火時に使用するCharge済みシャオンダマ実体
+- Chord / Arpeggioの発射対象
+- 重複Chargeされた実体の扱い
+- Weak AttackEvent発火時の使用実体・終了処理
+
+の正本とします。
+
+一方、本ページでは、
+
+- どのAttackEventを現在Charge対象とするか
+- どのSlotへChargeするか
+- Slot優先順位
+- 重複Charge先
+- 万能シャオンダマのSlot決定
+
+を行いません。
+
+これらは、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
+
+AttackEventの、
+
+- 必要音
+- Chord / Arpeggio
+- Arpeggio順序
+- 音楽的タイミング
+- Harmony
+- 予告
+- 発火タイミング
+- Weak AttackEventの生成元NoteEventとの音楽的対応
+
+については、[BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)を正とします。
+
+---
+
+## 責務の全体構造
+
+Critical-01に関係する責務は、以下のように分離します。
 
 ```text
-どのAttackEventへChargeするか
-↓
-どのSlotへ入るか
-↓
-各Slotへ何個Chargeされているか
-↓
-発火時に完全成立 / 不完全完成のどちらか
-↓
-どのシャオンダマ実体を攻撃へ使用するか
-```
+Click / Drag Charge Action
+→ player/player-action-charge.md
 
-は、本ページの責務ではありません。
-
-責務は以下のように分離します。
-
-```text
-AttackEvent音楽情報・時間情報
-→ bgm-attack-event.md
-
-Charge対象AttackEvent・Slot割り当て
+現在Charge対象AttackEvent・Slot割り当て
 → draw-system/charge-allocation.md
 
-AttackEvent発火時のGameplay判定・使用実体
-→ bgm-attack-judgement.md
+AttackEvent音楽情報・発火タイミング
+→ bgm/bgm-attack-event.md
+
+AttackEvent発火時の成立判定・使用実体
+→ bgm/bgm-attack-judgement.md
 ```
 
-同じGameplay規則を本ページへ複製しません。
+本ページでは、他ページの詳細仕様を再定義しません。
 
 ---
 
-## 通常AttackEventが持つ情報
+# 判定対象
 
-MusicChartへ設定する通常AttackEventは、基本的に以下の情報を持ちます。
+## 発火時は割り当て済み結果を使用する
 
-```text
-通常AttackEvent
-├─ 発生位置
-├─ 必要音
-├─ Type
-│  ├─ Chord
-│  └─ Arpeggio
-├─ Arpeggio情報
-│  ├─ 順序
-│  └─ 音楽的タイミング
-├─ 予告時間
-├─ Charge受付期間に関係する時間情報
-└─ Harmony
-   ├─ Root
-   └─ Quality
-```
+AttackEvent発火時には、
 
-`Arpeggio情報`は`Type = Arpeggio`の場合に使用します。
+> **そのAttackEventへ既に割り当てられているSlotとCharge済みシャオンダマ実体**
 
-`Harmony`は必要に応じて設定します。
+を参照します。
 
-Charge受付期間の具体値・データ構造については、確定している範囲のみ本ページで扱います。
+発火時に、
 
----
+* 別のAttackEventを検索する
+* Slotを再割り当てする
+* 音が一致する別Slotへ移動する
+* 万能シャオンダマの割り当てをやり直す
 
-## 作曲者が決める情報
-
-サウンド班の作曲者は、曲の音楽的内容をもとにAttackEvent候補を設計します。
-
-主に以下を決めます。
-
-| 項目                | サウンド班が決める内容            |
-| ----------------- | ---------------------- |
-| 発生位置              | 楽曲上のどこを攻撃タイミングとして使用するか |
-| 必要音               | その場所で使用する音             |
-| Type              | `Chord` / `Arpeggio`   |
-| Arpeggio順序        | どの順番で音を使用するか           |
-| Arpeggioの音楽的タイミング | 各音を楽曲上どの間隔で鳴らすか        |
-| Harmony           | Root / Qualityなどの音楽的意味 |
-
-サウンド班は、
+ことはありません。
 
 ```text
-このコードを攻撃に使いたい
-
-このアルペジオを攻撃に使いたい
-
-この音楽位置を攻撃タイミングにしたい
-```
-
-という音楽的意図をAttackEvent候補として提示します。
-
-### サウンド班が決めないもの
-
-以下のようなGameplay上の値・判定は、サウンド班が独自に決定しません。
-
-* AttackEventを最終的にGameplayへ採用するか
-* 予告時間などGameplay体験に関する値
-* Slot数・Slot構造
-* Slot割り当て
-* Slot優先順位
-* 必要音のGameplay成立判定方法
-* 完全成立 / 不完全完成の判定
-* 発火時に使用するシャオンダマ実体
-
-これらはプランナー・各Gameplay仕様を正とします。
-
----
-
-## 発生位置
-
-`発生位置`は、通常AttackEventの基準となるBGM上の演奏位置です。
-
-位置は、
-
-```text
-小節
-拍
-必要に応じてTick
-```
-
-で指定します。
-
-例：
-
-```text
-8小節目
-1拍目
-```
-
-より細かい位置が必要な場合は、
-
-```text
-8小節目
-1拍目
-240 Tick
-```
-
-のように指定します。
-
-### 実行時
-
-ゲーム実行時は、MusicChartの`TempoMap`を使用して音楽位置を実際のBGM再生位置へ変換します。
-
-```text
-小節 / 拍 / Tick
+Charge
 ↓
-TempoMap
+charge-allocation.md
 ↓
-BGM上の再生位置
+AttackEvent / Slotへ割り当て
+↓
+世界上で待機
+↓
+AttackEvent発火
+↓
+本ページの判定
+```
+
+発火時の判定は、Charge時点で確定した割り当て結果を使用します。
+
+---
+
+## Charge済みシャオンダマ実体
+
+Charge成功したシャオンダマは、Slot内部の数値だけに置き換えられるわけではありません。
+
+```text
+世界上のシャオンダマ
+↓
+Charge成功
+↓
+AttackEvent / Slotへ対応付け
+↓
+世界上で待機
 ↓
 AttackEvent発火
 ```
 
-BGMとGameplayの同期基準については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。
+という状態になります。
+
+したがって発火時に攻撃へ使用する対象は、
+
+> **そのAttackEventへCharge成功し、世界上で待機しているシャオンダマ実体**
+
+です。
+
+SlotのCharge数を見て新しいPalette Bulletを生成する構造にはしません。
 
 ---
 
-## 必要音
+# 通常AttackEventの成立判定
 
-`必要音`は、その通常AttackEventがGameplayへ要求する音を表します。
+通常AttackEventは、発火時に各要求SlotのCharge状態を確認します。
 
-例：
+判定の基本は以下です。
 
-```text
-C Major
+| 状態       | 条件                          | 攻撃             |
+| -------- | --------------------------- | -------------- |
+| 完全成立     | すべての要求Slotに1発以上Charge済み     | Charge済み全実体を使用 |
+| 不完全完成    | 1発以上Charge済みだが、未充填要求Slotが存在 | Charge済み全実体を使用 |
+| 0 Charge | Charge済み実体が存在しない            | 発射対象なし         |
 
-必要音
-C
-E
-G
-```
-
-または、
-
-```text
-Power Chord
-
-必要音
-C
-G
-```
-
-AttackEventは、この必要音情報をGameplayへ渡します。
-
-```text
-AttackEvent
-↓
-必要音
-C / E / G
-↓
-Gameplay
-```
-
-必要音から、
-
-* どのSlotへChargeするか
-* 同じ音を複数要求する場合にどのSlotを先に使用するか
-* オクターブをSlot照合上どのように扱うか
-* 重複Chargeをどう扱うか
-
-については、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
-
-必要音が発火時にどのように完全成立 / 不完全完成として扱われるかについては、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
+「0 Charge」の状態に対する最終的な失敗名称・演出については未決です。
 
 ---
 
-## Chord
+# 完全成立
 
-`Type = Chord`は、複数の音を同じ音楽位置で扱う通常AttackEventです。
+AttackEventのすべての要求Slotに、1発以上のシャオンダマがChargeされている場合を**完全成立**とします。
 
-例：
+例えば、
 
 ```text
-AttackEvent
-
-発生位置
-8小節目 1拍目
-
 必要音
 C / E / G
 
-Type
+Slot
+C = 1発以上
+E = 1発以上
+G = 1発以上
+```
+
+の場合、
+
+```text
+全要求Slot充填
+↓
+完全成立
+```
+
+です。
+
+---
+
+## 重複数は完全成立条件へ影響しない
+
+完全成立の判定では、
+
+> **各要求Slotに1発以上存在するか**
+
+を確認します。
+
+例えば、
+
+```text
+C = 4
+E = 2
+G = 1
+```
+
+の場合でも、
+
+```text
+Cあり
+Eあり
+Gあり
+↓
+完全成立
+```
+
+です。
+
+Cへ4発Chargeされていることによって、C Slotが4つ成立したと判定するわけではありません。
+
+ただし、重複している追加3発は失われません。
+
+発火時の攻撃には、後述する通り**7実体すべて**を使用します。
+
+---
+
+# 不完全完成
+
+AttackEventへ1発以上Chargeされているものの、すべての要求Slotは充填されていない場合を**不完全完成**とします。
+
+例えば、
+
+```text
+必要音
+C / E / G
+
+C = 1
+E = 0
+G = 0
+```
+
+の場合、
+
+```text
+Charge済み実体あり
++
+未充填要求Slotあり
+↓
+不完全完成
+```
+
+です。
+
+不完全完成でも、Charge済みシャオンダマによる攻撃は行います。
+
+```text
+Cシャオンダマ
+↓
+AttackEvent発火
+↓
+Palette Bullet化
+↓
+攻撃
+```
+
+不足しているE / Gのために、存在しないPalette Bulletを生成することはありません。
+
+---
+
+## 不完全完成は攻撃キャンセルではない
+
+以下の仕様にはしません。
+
+```text
+全要求Slotが揃っていない
+↓
+AttackEvent全体をキャンセル
+```
+
+正しくは、
+
+```text
+全要求Slotが揃っていない
+↓
+不完全完成
+↓
+Charge済み実体だけを攻撃へ使用
+```
+
+です。
+
+---
+
+# 0 Charge時
+
+AttackEvent発火時に、そのAttackEventへCharge成功したシャオンダマ実体が1つも存在しない場合、
+
+```text
+Charge済み実体 = 0
+↓
+発射対象なし
+```
+
+となります。
+
+AttackEvent自体の音楽上の発火は発生しますが、使用できるPalette Bullet対象が存在しないため、シャオンダマによる攻撃は発生しません。
+
+この状態について、
+
+* 正式な失敗名称
+* UI表示
+* VFX
+* SE
+* その他の失敗演出
+
+は現時点では未決です。
+
+本ページでは推測で決定しません。
+
+---
+
+# Chordの成立判定
+
+`Type = Chord`では、通常AttackEventと同じ成立条件を使用します。
+
+## 完全成立
+
+すべての要求Slotに1発以上Chargeされていれば完全成立です。
+
+```text
 Chord
+C / E / G
+
+C = 4
+E = 2
+G = 1
+↓
+完全成立
 ```
 
-音楽的には、
+この場合、発火時には、
 
 ```text
-C + E + G
+C × 4
+E × 2
+G × 1
+↓
+Charge済み7実体
+↓
+Palette Bullet化
+↓
+同時発射
 ```
 
-として扱います。
+します。
 
-Chordの必要音・音楽的位置は本ページで定義します。
-
-発火時に、
-
-* どのSlotが成立しているか
-* どのシャオンダマ実体を使用するか
-* 完全成立 / 不完全完成をどう扱うか
-* 何発をPalette Bullet化するか
-
-については、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
-
-成立したPalette Bulletの発射・発音とBGM同期については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を参照します。
+各Slotから1発だけ選択して3発に減らしません。
 
 ---
 
-## Arpeggio
-
-`Type = Arpeggio`は、複数の音を楽曲上の順序・タイミングに従って扱う通常AttackEventです。
+## Chordの不完全完成
 
 例えば、
 
 ```text
-C
-↓
-E
-↓
-G
+Chord
+C / E / G
+
+C = 2
+E = 1
+G = 0
 ```
 
-というアルペジオをAttackEventへ使用する場合、
+の場合、
 
 ```text
-AttackEvent
-├─ 必要音
-│  ├─ C
-│  ├─ E
-│  └─ G
-│
-├─ 順序
-│  ├─ 1 : C
-│  ├─ 2 : E
-│  └─ 3 : G
-│
-└─ 音楽的タイミング
-   ├─ C : AttackEvent開始位置
-   ├─ E : 楽曲上の次の演奏位置
-   └─ G : 楽曲上の次の演奏位置
+G Slot未充填
+↓
+不完全完成
 ```
 
-として扱います。
+です。
 
-### 順序
+ただし、
 
-Arpeggioでは必要音の集合だけでなく、演奏順序を保持します。
+```text
+C × 2
+E × 1
+↓
+3実体すべてPalette Bullet化
+↓
+同時発射
+```
+
+します。
+
+---
+
+## 完全成立バフ
+
+Chordが完全成立した場合は、完全Chord成立に対応するバフの発生条件を満たします。
+
+```text
+Chord完全成立
+↓
+攻撃
++
+完全成立バフ
+```
+
+不完全完成の場合、
+
+```text
+Chord不完全完成
+↓
+攻撃
++
+完全成立バフなし
+```
+
+となります。
+
+本ページが定義するのは、
+
+> **完全成立バフを発生させるかどうか**
+
+までです。
+
+バフの、
+
+* 具体的効果
+* 数値
+* 継続時間
+* 重複仕様
+* UI
+
+は本ページでは定義しません。
+
+---
+
+# Arpeggioの成立判定
+
+`Type = Arpeggio`でも、完全成立 / 不完全完成の条件自体は通常AttackEventと同じです。
+
+## 完全成立
+
+```text
+Arpeggio
+C → E → G
+
+C = 1発以上
+E = 1発以上
+G = 1発以上
+↓
+完全成立
+```
+
+となります。
+
+---
+
+## Arpeggioの不完全完成
 
 例えば、
+
+```text
+Arpeggio
+C → E → G
+
+C = 1
+E = 0
+G = 2
+```
+
+の場合、
+
+```text
+E Slot未充填
+↓
+不完全完成
+```
+
+です。
+
+この場合でも、CとGへCharge済みのシャオンダマは攻撃へ使用します。
+
+Eについて架空のPalette Bulletを生成しません。
+
+---
+
+# Arpeggioの発射順
+
+Arpeggioでは、PlayerがChargeした順番を使用しません。
+
+発射順は、`bgm-attack-event.md` に設定されている、
+
+* Arpeggio順序
+* 音楽的タイミング
+
+を使用します。
+
+例えばAttackEventが、
 
 ```text
 C → E → G
 ```
 
-と、
+で、PlayerがDragChargingによって、
 
 ```text
-G → E → C
+G → C → E
 ```
 
-は異なるArpeggioとして扱います。
+の順に選択していても、
 
-### 音楽的タイミング
-
-Arpeggioの各音の間隔には、ゲーム全体で共通の固定秒数を使用しません。
-
-そのAttackEventが元にしている楽曲上の演奏に合わせて、**AttackEventごとに音楽的タイミングを設定します。**
+発射順は、
 
 ```text
-元楽曲
+C
+↓
+E
+↓
+G
+```
 
-C ─── E ─ G
+です。
+
+Playerの選択順によってAttackEventの音楽構造を変更しません。
+
+---
+
+# Arpeggioの発射タイミング
+
+各SlotへChargeされているシャオンダマ実体は、そのSlotに対応するArpeggioの音楽的タイミングで使用します。
+
+例えば、
+
+```text
+C Slot
+C × 3
+
+E Slot
+E × 2
+
+G Slot
+G × 1
+```
+
+の場合、
+
+```text
+Cの音楽タイミング
+↓
+C × 3をPalette Bullet化・同時発射
+
+Eの音楽タイミング
+↓
+E × 2をPalette Bullet化・同時発射
+
+Gの音楽タイミング
+↓
+G × 1をPalette Bullet化・発射
+```
+
+します。
+
+未充填Slotの音楽タイミングでは、対応する発射対象が存在しないため何も発射しません。
+
+---
+
+# 同音Slot
+
+AttackEvent内に同じ音を要求するSlotが複数存在する場合、本ページではSlot割り当てをやり直しません。
+
+どのシャオンダマがどの同音Slotへ属するかは、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)によってCharge時に決定済みです。
+
+例えば、
+
+```text
+Arpeggio
+C → C → E
+```
+
+のようにC Slotが複数存在する場合でも、
+
+発火時には、
+
+> **各シャオンダマがCharge時に割り当てられたSlot**
+
+を使用します。
+
+各C Slotに異なる音楽的タイミングが設定されている場合は、それぞれのSlotに対応するタイミングを使用します。
+
+---
+
+# 重複Charge
+
+同一Slotへ複数のシャオンダマがChargeされている場合、発火時にはすべて使用します。
+
+例えば、
+
+```text
+C Slot
+├─ C1
+├─ C2
+├─ C3
+└─ C4
 ```
 
 であれば、
 
 ```text
-AttackEvent
-
-C ─── E ─ G
+C1
+C2
+C3
+C4
 ```
 
-の関係を維持します。
+の4実体すべてが発射対象です。
 
-各音の位置は、BGMの時間軸に対応できる音楽的位置として扱います。
+以下のように、
 
-実際の秒数への変換には`TempoMap`を使用します。
+```text
+Slot C = 4
+↓
+1発だけ選択
+↓
+残り3発を破棄
+```
 
-### 発射・発音
-
-Arpeggioの、
-
-* 音楽上の順序
-* 各音の音楽的タイミング
-
-は本ページを正とします。
-
-Playerがどの順番でChargeしたかによって、この音楽的順序を変更しません。
-
-発火時にどのCharge済みシャオンダマ実体を各音の発射対象とするかは、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
-
-実際の音響処理については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を参照します。
+することはありません。
 
 ---
 
-## Harmony
+# 発火時に使用する実体
 
-AttackEventには、必要に応じて`Harmony`情報を設定します。
+通常AttackEvent発火時に使用する対象は、
 
-```text
-Harmony
-├─ Root
-└─ Quality
-```
+> **そのAttackEventへCharge成功し、各Slotへ対応付けられた世界上のシャオンダマ実体すべて**
 
-例：
-
-```text
-Root    : C
-Quality : Major
-```
-
-別の例：
-
-```text
-Root    : A
-Quality : Minor
-```
-
-Harmonyは、そのAttackEventが音楽上どのような和声として設計されたかを示す情報です。
-
-HarmonyをGameplay効果や成立判定へどのように利用するかは本ページでは定義しません。
-
-本ページでは、音楽的意味を保持するためのAttackEvent情報として扱います。
-
----
-
-## 予告
-
-通常AttackEventは、発生位置へ到達する前にGameplayへ予告情報を渡します。
-
-```text
-AttackEvent
-↓
-予告
-↓
-発生位置
-↓
-発火
-```
-
-予告時には、Gameplay側がAttackEventを事前に認識できるようにします。
-
-主に以下の情報を取得できる状態にします。
-
-```text
-AttackEvent
-├─ 必要音
-├─ Type
-├─ Harmony
-└─ AttackEvent発生までの情報
-```
-
-Arpeggioの場合は、必要に応じて順序などAttackEventの識別に必要な情報も利用できます。
-
-### 予告時間
-
-予告時間はGameplay体験に関係する値であるため、プランナーが決定します。
-
-サウンド班は、
-
-* 楽曲上の自然な区切り
-* コード進行
-* 拍
-* フレーズ
-
-などの音楽的観点から候補を提示できます。
-
-ただし、最終的なGameplay値はプランナーが決定します。
-
-### UI
-
-予告情報を、
-
-* どのUIに表示するか
-* どのような見た目にするか
-* どのようにアニメーションさせるか
-
-はUI側の仕様を正とします。
-
-Weak AttackEventは通常AttackEvent用UIには表示しません。
-
-Weak AttackEventに専用の視覚表現を追加するかどうかは、本ページでは定義しません。
-
----
-
-## Charge受付期間
-
-通常AttackEventには、PlayerがそのAttackEventへChargeできる期間の終了地点を設けます。
-
-概念上は、
-
-```text
-通常AttackEventがCharge対象として現れる
-↓
-Charge受付期間
-↓
-Charge受付期間終了
-↓
-その後
-↓
-AttackEventの発生位置
-↓
-AttackEvent発火
-```
-
-となります。
-
-つまり、通常AttackEventは発生位置へ到達する直前まで無制限にChargeを受け付ける前提にはしません。
-
-Charge受付期間に関係する**音楽時間情報**は、本ページおよびMusicChart側のデータとして扱います。
-
-一方、
-
-```text
-Charge受付期間終了
-↓
-次にどのAttackEventをCharge対象とするか
-```
-
-というGameplay上のCharge対象切り替えについては、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
-
-### 現在未決の内容
-
-以下は現時点では固定しません。
-
-* Charge受付期間の具体的な長さ
-* 何秒前とするか
-* 何拍前とするか
-* 小節単位とするか
-* AttackEventごとに個別設定するか
-* Charge受付開始地点・終了地点の最終的な正式名称
-
-既存の「予告」「発生位置」「発火」という用語を別の意味へ勝手に再定義しません。
-
----
-
-## 固定AttackEvent
-
-Random Sectionによる抽選を行わず、そのBGMの該当位置で使用する通常AttackEventを`固定AttackEvent`として扱います。
-
-例：
-
-```text
-8小節目 1拍目
-
-C / E / G
-Chord
-```
-
-↓
-
-```text
-固定AttackEvent
-↓
-予告
-↓
-8小節目 1拍目
-↓
-発火
-```
-
-固定AttackEventは、そのBGM再生で該当位置へ到達した場合、Random Sectionの抽選結果に関係なくAttackEventとして使用します。
-
-::: info
-**「固定AttackEventが使用される」ことと、「Gameplay上の攻撃が完全成立する」ことは別です。**
-
-固定AttackEventで保証するのは、AttackEventの音楽情報・予告・発火までです。
-
-発火時のGameplay成立判定は、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
-:::
----
-
-## Weak AttackEvent
-
-### 概要
-
-`Weak AttackEvent`は、現在Charge対象となる通常AttackEventが存在しない期間に使用する、**単音弱攻撃用の動的AttackEvent**です。
-
-Weak AttackEventを生成する条件、および対象シャオンダマをWeak AttackEventへ割り当てる処理については、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
-
-本ページでは、Weak AttackEventが持つ**音楽上の意味と発火タイミング**を定義します。
-
-### 基本的な音楽構造
-
-Weak AttackEventは、
-
-* 要求Slotを必ず1つだけ持つ
-* Chordを構成しない
-* Arpeggioを構成しない
-* 複数音の完全成立を前提としない
-* Harmony等による通常AttackEventの完全成立バフの対象としない
-
-単音弱攻撃として扱います。
-
-通常AttackEventのように、
-
-```text
-C / E / G
-Type = Chord
-```
-
-や、
-
-```text
-C → E → G
-Type = Arpeggio
-```
-
-といった複数音の音楽表現を構成しません。
-
-### 生成元NoteEvent
-
-Weak AttackEventは、Chargeされたシャオンダマの**生成元NoteEvent**との対応を保持します。
-
-シャオンダマは、BGMでそのNoteEventが演奏されるより前に世界上へ生成されているため、
-
-```text
-NoteEvent
-↓
-シャオンダマ生成
-↓
-曲がNoteEvent位置へ到達する前に世界上へ存在
-↓
-PlayerがWeak Charge
-↓
-Weak AttackEvent
-```
-
-という関係になります。
-
-### 発火タイミング
-
-Weak AttackEventの発火タイミングは、
-
-> **Chargeされたシャオンダマ自身の生成元NoteEventの発音タイミング**
-
-とします。
+です。
 
 例えば、
 
 ```text
-NoteEvent C4
-発音タイミング = T
+C Slot = 4
+E Slot = 2
+G Slot = 1
+```
+
+の場合、
+
+```text
+4 + 2 + 1
+= 7実体
+```
+
+を使用します。
+
+各SlotのCharge数だけを見て新しいPalette Bulletを生成するのではありません。
+
+---
+
+# Palette Bullet化
+
+Charge成功時点では、シャオンダマを攻撃用Palette Bulletとして即時発射しません。
+
+基本フローは、
+
+```text
+Charge成功
 ↓
-C4シャオンダマ生成
+AttackEvent / Slotへ対応付け
 ↓
-PlayerがWeak Charge
+シャオンダマ実体が世界上で待機
 ↓
-Weak AttackEvent生成
+AttackEvent発火
 ↓
-発火タイミング = T
+発射対象になったシャオンダマ実体をPalette Bullet化
+↓
+攻撃
+```
+
+です。
+
+Palette Bullet化は、AttackEvent発火に伴う攻撃処理と接続して行います。
+
+---
+
+# オクターブ
+
+Slotへの音名照合ではオクターブを区別しないことが、`charge-allocation.md` の正本仕様です。
+
+したがって本ページでは、発火時にオクターブを使ってSlot成立を再判定しません。
+
+例えば、
+
+```text
+C3
+C4
+C5
+```
+
+のいずれかがC Slotへ正常に割り当て済みであれば、
+
+本ページではそのC Slotを通常のCharge済みSlotとして扱います。
+
+各シャオンダマが保持している元のオクターブ情報そのものを消去・変更するという意味ではありません。
+
+---
+
+# 万能シャオンダマ
+
+万能シャオンダマのSlot決定は、本ページでは行いません。
+
+[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)によって、万能シャオンダマが特定のAttackEvent / SlotへCharge成功した後は、
+
+通常シャオンダマと同様に、
+
+> **そのSlotへ割り当て済みのCharge実体**
+
+として扱います。
+
+例えば、
+
+```text
+万能シャオンダマ
+↓
+Charge時にE Slotへ割り当て
+↓
+E Slot所属として待機
+↓
+AttackEvent発火
+↓
+E Slotの発射対象として使用
 ```
 
 となります。
 
-曲が`T`へ到達した時点で、そのWeak AttackEventの発火タイミングとなります。
-
-別の、
-
-* 次に鳴る同名音
-* 最も近い同名音
-* 後続の同名NoteEvent
-
-を検索して発火タイミングへ使用しません。
-
-Weak AttackEventは、**そのシャオンダマ自身の生成元NoteEvent**へ一意に紐づきます。
-
-BGM時間軸とNoteEventの同期については、[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)および[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を参照します。
-
-### 通常AttackEventが後から表示された場合
-
-Weak AttackEvent生成後、発火前に通常AttackEventが新しくCharge対象として表示されても、
-
-**既存Weak AttackEventの音楽的対応関係は変更しません。**
-
-```text
-Weak AttackEvent生成
-↓
-元NoteEventの発音タイミング待機
-↓
-通常AttackEventが新しく表示
-↓
-Weak AttackEventは維持
-↓
-元NoteEventの発音タイミングで発火
-```
-
-Weak AttackEventを、後から表示された通常AttackEventの音楽位置へ付け替えません。
-
-既存Weak AttackEventから通常AttackEventへのSlot再割り当てを行わないことについては、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
-
-### 通常AttackEventとの管理上の違い
-
-Weak AttackEventは、
-
-* 通常AttackEventの最大蓄積数には含めない
-* 通常AttackEvent用UIには表示しない
-* 1つのシャオンダマのWeak Chargeにつき1つ生成する
-* 発火後は破棄する
-
-仕様です。
-
-これらのうち、生成・割り当てについては[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
-
-発火後にどのシャオンダマ実体をPalette Bullet化し、どのように攻撃へ使用してWeak AttackEventを終了するかについては、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
+発火時に万能シャオンダマのSlotを再解決しません。
 
 ---
 
-## AttackEvent候補の受け渡し
+# Charge時のsuccess / missとの分離
 
-サウンド班が設計する通常AttackEventはMIDIへ記録しません。
+Player Charge Actionで発生する、
 
-そのため、MIDIとは別の設定情報として受け渡します。
+* `success`
+* `miss`
 
-```text
-サウンド班
-↓
-AttackEvent候補を整理
-↓
-プランナー
-↓
-Gameplayとして確認
-↓
-プログラマー
-↓
-MusicChartへ入力
-```
-
-### サウンド班が渡す情報
-
-通常AttackEvent候補ごとに、少なくとも以下を識別できる状態にします。
+と、本ページの発火時成立判定は別処理です。
 
 ```text
-AttackEvent候補
-├─ 発生位置
-├─ 必要音
-├─ Type
-├─ Arpeggioの場合
-│  ├─ 順序
-│  └─ 音楽的タイミング
-└─ Harmony
+Charge時
+↓
+選択したシャオンダマを
+現在Charge対象AttackEvent / Slotへ割り当て可能か
+↓
+success / miss
 ```
 
-予告時間などGameplay側で決定する情報は、サウンド班が独自に確定する必要はありません。
+に対して、
 
-Weak AttackEventはPlayerのChargeによって実行時生成されるため、サウンド班が個別のWeak AttackEvent候補を作成して受け渡す必要はありません。
+```text
+AttackEvent発火時
+↓
+最終的にどのSlotへ
+どの実体がCharge済みか
+↓
+完全成立 / 不完全完成 / 0 Charge
+```
 
-Weak AttackEventの音楽時間には、そのシャオンダマの生成元NoteEventを使用します。
+を判定します。
 
-### プランナー
+AttackEventが不完全完成だったことを理由に、過去のCharge Actionへ後から`miss`を発生させません。
 
-プランナーは、
-
-* AttackEventをGameplayとして採用するか
-* 予告時間などのGameplay値
-* Gameplay側の各正本と競合しないか
-
-を確認・決定します。
-
-### プログラマー
-
-プログラマーは、確定した通常AttackEvent情報をUnityのMusicChartへ入力します。
-
-また、Gameplay側から参照できるよう、
-
-* 通常AttackEventの音楽情報
-* 予告・発火時間
-* Charge受付期間に関係する時間情報
-* Weak AttackEventが参照する元NoteEventの時間情報
-
-を一意に扱える状態にします。
-
-プログラマーが音楽的内容やGameplayルールを独自判断で変更しません。
-
-### 受け渡し方法
-
-具体的な、
-
-* ツール
-* ファイル形式
-* 管理画面
-* 共有方法
-
-は本ページでは固定しません。
-
-AttackEvent情報の受け渡し工程全体については、[サウンド班制作フロー](/spec/bgm/sound-production-workflow)を正とします。
+また、Charge時に`miss`だった入力をAttackEvent発火時に再評価しません。
 
 ---
 
-## 発火
+# Weak AttackEvent
 
-### 通常AttackEvent
+## 概要
 
-BGMが通常AttackEventの発生位置まで到達したら、そのAttackEventを発火します。
+Weak AttackEventは、通常AttackEventがCharge対象として存在しない期間に使用する単音弱攻撃用AttackEventです。
 
-```text
-BGM再生
-↓
-AttackEvent予告
-↓
-発生位置
-↓
-AttackEvent発火
-```
+Weak AttackEventの、
 
-通常AttackEventの発火は、
-
-> **「この音楽位置に対応するAttackEventのGameplay評価タイミングになった」**
-
-ことをGameplayへ通知するものです。
-
-発火そのものは、
-
-* 完全成立
-* 不完全完成
-* 攻撃失敗
-* Palette Bullet発射
-
-のいずれかを意味するものではありません。
-
-```text
-AttackEvent発火
-≠
-Gameplay上の完全成立
-```
-
-発火後のGameplay判定は、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
-
-### Weak AttackEvent
-
-Weak AttackEventは、そのWeak AttackEventへ対応付けられたシャオンダマの**生成元NoteEventの発音タイミング**へBGMが到達した時点で発火します。
-
-```text
-生成元NoteEvent
-↓
-発音タイミング
-↓
-Weak AttackEvent発火
-```
-
-発火後の、
-
-* 対応シャオンダマ実体の使用
-* Palette Bullet化
-* 単音弱攻撃
-* Weak AttackEventの終了
-
-については、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
-
----
-
-## Gameplayへの出力
-
-AttackEventは、Gameplay側が必要な音楽情報・時間情報を参照できる状態にします。
-
-### 通常AttackEvent
-
-概念上は、
-
-```text
-通常AttackEvent
-↓
-Gameplay
-├─ 発生位置
-├─ 必要音
-├─ Type
-├─ Arpeggio情報
-├─ Harmony
-├─ 予告に必要な情報
-└─ Charge受付期間に関係する時間情報
-```
-
-という関係になります。
-
-この情報を受け取った後の、
-
-```text
-どのAttackEventをCharge対象とするか
-↓
-どのSlotへ割り当てるか
-```
+* 生成条件
+* 1 Chargeにつき1 Weak AttackEventを生成すること
+* 単一Slotへの割り当て
+* 通常AttackEventが後から表示されても再割り当てしないこと
 
 については、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
 
-発火後の、
+Weak AttackEventの、
+
+* 生成元NoteEvent
+* 発火タイミング
+
+については、[BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)を正とします。
+
+本ページでは、**Weak AttackEvent発火時に何を攻撃へ使用するか**を定義します。
+
+---
+
+## Weak AttackEventの成立構造
+
+Weak AttackEventは、
+
+* 要求Slotを必ず1つだけ持つ
+* 1つのWeak AttackEventに1つのCharge済みシャオンダマが対応する
+* Chordを構成しない
+* Arpeggioを構成しない
+* Harmony等による完全成立バフを持たない
+
+単音弱攻撃です。
+
+そのため通常AttackEventのような、
 
 ```text
-各SlotのCharge状態を参照
+複数Slot
 ↓
-完全成立 / 不完全完成を判定
-↓
-使用するCharge済みシャオンダマ実体を決定
-↓
-攻撃処理
+完全成立 / 不完全完成
 ```
 
-については、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
+を目的としたAttackEventではありません。
 
-### Weak AttackEvent
+---
 
-Weak AttackEventでは、少なくとも、
+## Weak AttackEvent発火時
+
+BGMが、対象シャオンダマの生成元NoteEventの発音タイミングへ到達するとWeak AttackEventが発火します。
+
+発火時には、
+
+> **そのWeak AttackEventへ対応付けられて待機している1つのシャオンダマ実体**
+
+を使用します。
+
+```text
+Weak AttackEvent発火
+↓
+対応シャオンダマ実体
+↓
+Palette Bullet化
+↓
+単音弱攻撃として発射
+```
+
+別のシャオンダマを検索して使用しません。
+
+通常AttackEventのSlotからシャオンダマを取得しません。
+
+---
+
+## 通常AttackEventが途中で表示された場合
+
+Weak AttackEvent発火前に通常AttackEventが表示されても、
+
+既存Weak AttackEventへ割り当て済みのシャオンダマはそのままWeak AttackEventで使用します。
+
+```text
+Weak Charge済み
+↓
+Weak AttackEvent待機
+↓
+通常AttackEvent B表示
+↓
+Weakへの割り当て維持
+↓
+元NoteEventのタイミング
+↓
+Weak AttackEvent発火
+↓
+単音弱攻撃
+```
+
+通常AttackEvent Bへ再割り当てしません。
+
+---
+
+## Weak AttackEvent発火後
+
+Weak AttackEventは発火し、対応シャオンダマを単音弱攻撃へ使用した後に破棄します。
 
 ```text
 Weak AttackEvent
 ↓
-Gameplay
-├─ 対象となる単一要求音
-├─ 生成元NoteEventとの対応
-└─ 生成元NoteEventの発音タイミング
-```
-
-を扱える状態にします。
-
-Weak AttackEventの生成・割り当て条件は、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
-
-Weak AttackEvent発火時の使用実体・Palette Bullet化・攻撃処理は、[BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)を正とします。
-
-### 発射・発音
-
-AttackEvent発火後のGameplay判定によって攻撃対象が確定した後の、
-
-```text
-Palette Bullet発射
-+
-音程音
-+
-Gameplay SE
-```
-
-とBGM同期については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を参照します。
-
----
-
-## Random Sectionとの関係
-
-すべての通常AttackEventを固定で使用する必要はありません。
-
-曲中の複数のAttackEvent候補から、その周回で使用するものを選択する場合は`Random Section`を使用します。
-
-```text
-Random Section
-
-START
-│
-├─ Candidate A
-├─ Candidate B
-├─ Candidate C
-│
-END
-```
-
-各Candidateは、本ページで定義する通常AttackEventと同じ音楽情報を持ちます。
-
-```text
-Candidate
-├─ 発生位置
-├─ 必要音
-├─ Type
-├─ Arpeggio情報
-└─ Harmony
-```
-
-Random Sectionによって選ばれたAttackEventは、固定AttackEventと同じ予告・発火処理を使用します。
-
-```text
-Random Section
-↓
-AttackEventを選択
-↓
-通常AttackEventとして扱う
-↓
-予告
-↓
 発火
+↓
+対応シャオンダマをPalette Bullet化
+↓
+単音弱攻撃
+↓
+Weak AttackEvent破棄
 ```
 
-Random Section専用のAttackEvent形式は作りません。
+Weak AttackEventを発火後も通常AttackEventとして蓄積し続けません。
 
-Weak AttackEventはPlayerのChargeにより実行時生成されるため、Random SectionのCandidateとして扱いません。
-
-以下については、[BGM Random Section仕様](/spec/bgm/bgm-random-section)を正とします。
-
-* Random Sectionの開始位置・終了位置
-* Candidate条件
-* 選択数
-* 抽選タイミング
-* 再抽選
-* 固定AttackEventとの競合
+Weak AttackEventは通常AttackEventの最大蓄積枠にも含めません。
 
 ---
 
-## 責務境界
+# 発射後の責務
 
-本ページは、
+AttackEventから発射対象となったシャオンダマ実体は、
 
-> **AttackEventの音楽情報・時間情報**
+```text
+待機中シャオンダマ
+↓
+Palette Bullet化
+↓
+攻撃へ使用
+```
 
-を正とします。
+となります。
 
-| 内容                                     | 正とする仕様                                                  |
-| -------------------------------------- | ------------------------------------------------------- |
-| 通常AttackEventの発生位置・必要音・Type・Harmony    | **本ページ**                                                |
-| Arpeggioの順序・音楽的タイミング                   | **本ページ**                                                |
-| 通常AttackEventの予告・発火に必要な時間情報            | **本ページ**                                                |
-| Charge受付期間に関係するAttackEvent時間情報         | **本ページ**                                                |
-| Weak AttackEventの生成元NoteEventとの音楽的対応   | **本ページ**                                                |
-| Weak AttackEventの発火タイミング               | **本ページ**                                                |
-| AttackEvent候補の音楽的設計                    | **本ページ**                                                |
-| AttackEvent情報の制作・受け渡し工程                | [サウンド班制作フロー](/spec/bgm/sound-production-workflow)       |
-| MusicChart上のデータ構造・入力者                  | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart)           |
-| DAW / FLAC / MIDI                      | [BGM MIDIファイルの設定](/spec/bgm/bgm-midi-settings)          |
-| Random候補・抽選ルール                         | [BGM Random Section仕様](/spec/bgm/bgm-random-section)    |
-| 現在Charge対象となるAttackEventの決定            | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
-| Slot構造・Slot割り当て・優先順位                   | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
-| 重複Charge・万能シャオンダマのSlot解決               | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
-| Weak AttackEventの生成・Charge先解決          | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
-| AttackEvent発火時の完全成立 / 不完全完成            | [BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)   |
-| AttackEvent発火時に使用するCharge済み実体          | [BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)   |
-| Weak AttackEvent発火後の使用実体・終了処理          | [BGM AttackEvent判定仕様](/spec/bgm/bgm-attack-judgement)   |
-| Palette Bullet発射・音程音・Gameplay SEとBGM同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)    |
-| 予告UIの見た目・表示方法                          | UI側の仕様                                                  |
+その時点で、その実体を同じAttackEventの待機対象として再利用しません。
 
-### Player Chargeとの境界
+ただしPalette Bullet化後の、
 
-ClickCharging / DragChargingの、
+* 飛翔
+* 命中
+* ダメージ
+* 消滅
+* VFX
+* 最終的なObject Lifecycle
 
-* 入力
-* ActionState
-* 対象選択
-* Charge判定タイミング
-* キャンセル
-* 中断
-* Weak AttackEvent利用時のCharge Action制限
+は本ページでは定義しません。
 
-については、`player/player-action-charge.md`を正とします。
-
-本ページではPlayer Actionの詳細を定義しません。
-
-### サウンド班
-
-サウンド班は、
-
-* 通常AttackEventとして使用したい音楽位置
-* 必要音
-* Chord / Arpeggio
-* Arpeggioの順序
-* Arpeggioの音楽的タイミング
-* Harmony
-
-を音楽的観点から設計・提示します。
-
-Weak AttackEventそのものを個別に作曲・配置する必要はありません。
-
-### プランナー
-
-プランナーは、
-
-* 通常AttackEventをGameplayとして採用するか
-* 予告時間などのGameplay値
-* Charge受付期間などのGameplay値
-* Gameplay側との整合性
-
-を決定・確認します。
-
-### プログラマー
-
-プログラマーは、
-
-* 確定した通常AttackEventをMusicChartへ入力する
-* AttackEventを指定されたBGM位置で予告・発火できる状態にする
-* Gameplayへ必要な音楽情報・時間情報を渡せる状態にする
-* Weak AttackEventが生成元NoteEventの発音タイミングを参照できる状態にする
-
-ことを担当します。
-
-プログラマーはAttackEventの音楽的内容・Slot規則・Gameplay成立判定を独自に変更しません。
+BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を参照します。
 
 ---
 
-## 基本ルール
+# 責務境界
 
-* 本ページはAttackEventの音楽情報・時間情報の正本とする
-* 通常AttackEventはBGM上のコード・アルペジオなどの音楽表現に合わせて設定する
-* 通常AttackEventはMIDIには記録しない
-* サウンド班が通常AttackEventの音楽的内容を設計・提示する
-* プランナーがGameplayとしての採用・Gameplay値を決定する
-* プログラマーが確定した通常AttackEventをMusicChartへ入力する
-* 通常AttackEventの発生位置は小節・拍・必要に応じてTickで指定する
-* 通常AttackEventには必要音を設定する
-* 通常AttackEventのTypeは`Chord`または`Arpeggio`とする
-* Arpeggioは順序とAttackEventごとの音楽的タイミングを持つ
-* 必要に応じてHarmonyを保持する
-* 通常AttackEvent発生前にGameplayへ予告できる状態にする
-* 通常AttackEventにはCharge受付期間の終了地点を設ける
-* BGMが通常AttackEventの発生位置へ到達したらAttackEventを発火する
-* Charge対象AttackEvent・Slot割り当ては`charge-allocation.md`を正とする
-* AttackEvent発火時の完全成立 / 不完全完成・使用実体は`bgm-attack-judgement.md`を正とする
+| 内容                                    | 正本                                                      |
+| ------------------------------------- | ------------------------------------------------------- |
+| Click / Drag Charge入力・ActionState     | `player/player-action-charge.md`                        |
+| Charge Actionのsuccess / miss          | `player/player-action-charge.md`                        |
+| 現在Charge対象となる通常AttackEvent            | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
+| Slot構造・Slot割り当て                       | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
+| 同音Slot優先順位・重複Charge                   | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
+| 万能シャオンダマのSlot解決                       | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
+| Weak AttackEventの生成・Charge先解決         | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
+| AttackEventの必要音・Type・Harmony          | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)              |
+| Arpeggio順序・音楽的タイミング                   | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)              |
+| AttackEventの予告・発火タイミング                | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)              |
+| Weak AttackEventの生成元NoteEvent・発火タイミング | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)              |
+| 通常AttackEventの完全成立 / 不完全完成            | **本ページ**                                                |
+| 0 Charge時の発射対象有無                      | **本ページ**                                                |
+| 発火時に使用するCharge済みシャオンダマ実体              | **本ページ**                                                |
+| Chordの発射対象                            | **本ページ**                                                |
+| Arpeggioの発射対象                         | **本ページ**                                                |
+| 重複Chargeされた全実体の使用                     | **本ページ**                                                |
+| Weak AttackEvent発火時の使用実体              | **本ページ**                                                |
+| Weak AttackEvent発火後の破棄                | **本ページ**                                                |
+| 完全Chord成立バフの発生可否                      | **本ページ**                                                |
+| 完全成立バフの具体効果                           | バフシステム側                                                 |
+| BGM / 音程音 / Gameplay SE同期             | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)    |
+| Palette Bullet発射後の詳細Lifecycle         | Palette Bullet側                                         |
+
+---
+
+# 基本ルール
+
+* 本ページをAttackEvent発火時のGameplay成立判定・使用実体決定の正本とする
+* 発火時には`charge-allocation.md`で既に割り当て済みの結果を使用する
 * 発火時にSlotを再割り当てしない
-* Random Sectionで選ばれたAttackEventも通常AttackEventと同じ予告・発火処理を使用する
-* Weak AttackEventは通常AttackEventがCharge対象として存在しない期間の単音弱攻撃に使用する
-* Weak AttackEventは1つの要求Slotのみを使用し、Chord / Arpeggioを構成しない
-* Weak AttackEventは通常AttackEventの完全成立バフの対象としない
-* Weak AttackEventの発火タイミングは、対象シャオンダマの生成元NoteEventの発音タイミングとする
-* Weak AttackEventの発火タイミングとして別の同名NoteEventを検索しない
-* Weak AttackEvent待機中に通常AttackEventが表示されても、生成元NoteEventとの対応を変更しない
-* Weak AttackEventは通常AttackEventの最大蓄積枠には含めない
-* Weak AttackEventは通常AttackEvent用UIには表示しない
-* Weak AttackEventの生成・Slot割り当て詳細は`charge-allocation.md`を正とする
-* Weak AttackEvent発火後の使用実体・攻撃・終了処理は`bgm-attack-judgement.md`を正とする
+* すべての要求Slotへ1発以上Charge済みなら完全成立とする
+* 1発以上Charge済みで未充填要求Slotが存在する場合は不完全完成とする
+* 不完全完成でもCharge済みシャオンダマによる攻撃を行う
+* Charge済み実体が0の場合は発射対象なしとする
+* 0 Charge時の正式な失敗名称・演出は未決とする
+* 同一Slotへ複数Chargeされている場合は全実体を使用する
+* 各Slotから1発だけを選択しない
+* 不足Slotのために架空のPalette Bulletを生成しない
+* ChordはCharge済み全実体を同一のChord発火タイミングで使用する
+* Chord不完全完成でも存在するCharge済み実体をすべて使用する
+* 完全Chord成立時のみ完全成立バフの発生条件を満たす
+* ArpeggioはAttackEvent側の音楽的順序・タイミングを使用する
+* DragChargingの選択順をArpeggio発射順として使用しない
+* Arpeggioの未充填Slotでは何も発射しない
+* 同じSlotへ複数Chargeされた実体は、そのSlotのタイミングですべて使用する
+* オクターブによって発火時にSlot成立を再判定しない
+* 万能シャオンダマはCharge時に割り当て済みのSlot所属として扱う
+* Charge時の`success / miss`とAttackEvent発火時の成立判定を分離する
+* Charge成功したシャオンダマはAttackEvent発火まで世界上で待機する
+* AttackEvent発火時に発射対象実体をPalette Bullet化する
+* Weak AttackEventは対応する1つのシャオンダマ実体を単音弱攻撃として使用する
+* Weak AttackEvent待機中に通常AttackEventが表示されても割り当てを変更しない
+* Weak AttackEventは発火・攻撃処理後に破棄する
 
 ---
 
-## 未決事項
+# 未決事項
 
-### Charge受付期間
+以下は現時点では本ページで確定しません。
 
-以下は未決です。
+## 0 Charge時
 
-* Charge受付期間の具体値
-* 設定単位
-* Charge受付開始地点・終了地点の正式名称
+* 正式な失敗状態の名称
+* 失敗UI
+* VFX
+* SE
+* その他の演出
 
-### Weak AttackEvent
+## 完全成立バフ
 
-Weak AttackEventについて、本ページで必要な音楽時間上の基本仕様は確定しています。
+* バフの具体的な効果
+* 数値
+* 継続時間
+* 重複仕様
+* UI
 
-一方、以下は本ページでは決定しません。
+## Arpeggio
 
-* Weak AttackEvent利用時にClickChargingのみとするか
-* DragChargingをどのように制限するか
-* 万能シャオンダマをWeak AttackEventへ使用できるか
-* Weak AttackEvent専用UI・VFX・SEを設けるか
+Arpeggio側に追加の完全成立効果・バフを持たせる場合の詳細は未決です。
 
-Player Actionに関する内容は`player/player-action-charge.md`、万能シャオンダマのCharge先解決は`draw-system/charge-allocation.md`を正とします。
+本ページでは推測で追加しません。
+
+## 発火後
+
+* AttackEvent / Slot UIを正確にいつ消去するか
+* Palette Bullet化後の詳細Object Lifecycle
+
+は別仕様または今後の仕様確定へ委ねます。
 
 ---
 
