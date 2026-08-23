@@ -41,7 +41,7 @@ status: 仮仕様
 
 ## 他システムとの接続
 
-- **攻撃対象**：敵はパレットブレットの攻撃対象であり、マーカーの付着対象になる（[Playerアクション｜マーカー](/spec/player/player-action-marker)）。発射後の飛翔・ターゲット決定・命中処理の正本ページは未整備（作成予定）
+- **攻撃対象**：敵はパレットブレットの攻撃対象であり、マーカーの付着対象になる（[Playerアクション｜マーカー](/spec/player/player-action-marker)）。発射後の飛翔・ターゲット決定・命中処理のページは未整備（作成予定）
 - **パリィ**：敵の攻撃（邪音玉）はプレイヤーのパリィで無効化される。無効化された邪音玉がその後どうなるかは未決（[Playerアクション｜パリィ](/spec/player/player-action-parry)）
 - **プレイヤーへのダメージ**：邪音玉がプレイヤーに命中するとダメージを与える（被弾処理は[Player｜被弾](/spec/player/player-reaction-damaged)、HP・ダメージ量は[Playerステータス](/spec/player/player-status)）
 - **シャオンダマ生成**：シャオンダマの散布先・浮遊範囲と敵位置の関係は未決（[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、[浮遊挙動](/spec/shaondama-music/floating-behavior)側の配置方法の決定に従う）
