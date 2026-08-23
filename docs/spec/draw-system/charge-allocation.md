@@ -12,66 +12,79 @@ relatedTasks: []
 
 本ページでは、PlayerがシャオンダマをChargeした際に、
 
-* 現在どのAttackEventをCharge対象とするか
-* どのSlotへ割り当てるか
-* 複数のAttackEventが存在する場合にどれを優先するか
-* 同一音のSlotが複数存在する場合にどこへ入れるか
+* 現在どの通常AttackEventをCharge対象とするか
+* 複数の通常AttackEventが存在する場合に、どの論理順でCurrent AttackEventを一意に決定するか
+* Click ChargeでどのSlotへ割り当てるか
+* Drag Chargeで複数Shaondamaをどのように一括判定・一括commitするか
+* 同一音のSlotが複数存在する場合にどう扱うか
 * 対応する未充填Slotが存在しない場合にどう扱うか
-* 万能シャオンダマをどのSlotへ割り当てるか
+* 万能シャオンダマを通常AttackEventのどのSlotへ割り当てるか
 * Weak Attackを使用できる状態へいつ移行するか
-* 通常AttackEventが存在しない場合にどう扱うか
+* 通常Shaondama / 万能ShaondamaをWeak AttackEventへどう割り当てるか
+* Charge成功後のShaondama実体をどの状態でAttackEvent発火まで保持するか
 
 を定義します。
 
-本ページを、**Charge対象AttackEventの決定およびSlot割り当て規則の正本**とします。
+本ページを、**Current AttackEventの決定、通常AttackEventのSlot割り当て、Weak AttackEventへの割り当て、Charge成功後の予約関係の正本**とします。
 
-Click / Dragそのものの入力・ActionState・キャンセル等は、`player/player-action-charge.md` を正とします。
+Click / Dragそのものの入力、ActionState、対象選択、Release検出、キャンセル、Actionとしてのsuccess / miss通知等は、`player/player-action-charge.md` を正とします。
 
-AttackEventの音楽情報・時間情報は、`bgm/bgm-attack-event.md` を正とします。
+通常AttackEventの音楽情報、Charge受付期間、音楽時間上のCharge対象順、発火時刻等は、`bgm/bgm-attack-event.md` を正とします。
 
 AttackEvent発火時の、
 
-* 完全成立
-* 不完全完成
-* Chord / Arpeggioの発射
-* 使用するPalette Bullet
+* Complete / Incomplete / Zero Chargeの結果
+* Chord / Arpeggioの発射処理
+* 使用するCharge済みShaondama実体の確定
+* Palette Bullet化
+* Palette Bulletの発射
 
 については、`bgm/bgm-attack-judgement.md` を正とします。
 
-本ページでは、発火時のGameplay判定を再定義しません。
+通常Shaondamaが自身のsource NoteEvent occurrenceを保持するためのruntime dataは、`shaondama-music/orb-data.md` を正とします。
+
+未使用の通常Shaondamaがsource NoteEvent発音時刻へ到達した場合の破裂・弱い範囲攻撃・消滅、および通常Lifetimeは、`shaondama-music/floating-behavior.md` を正とします。
+
+本ページでは、これら他ページの責務を再定義しません。
 
 ---
 
 # 基本原則
 
-Charge先の決定では、常に、
+Charge先の決定では、各Charge判定Eventごとに最初に、
 
-**現在Charge対象となる通常AttackEventが存在するか**
+**その時点でCurrentとなる通常AttackEventが存在するか**
 
-を最初に判定します。
+を判定します。
 
 ```text
-Charge判定
+Charge判定Event
 ↓
-現在Charge対象となる通常AttackEventが存在する？
+Current Normal AttackEventが存在する？
 │
 ├─ Yes
 │   ↓
-│   現在AttackEventだけを対象としてSlot割り当て
+│   そのCurrent AttackEventだけを対象として通常Slot割り当て
 │
 └─ No
     ↓
-    Weak Attackとして処理
+    Weak Attackとして割り当て
 ```
 
-現在Charge対象となる通常AttackEventが存在する場合は、必ずそのAttackEventだけを対象としてSlot割り当てを行います。
+Current Normal AttackEventが存在する場合は、必ずそのAttackEventだけを対象とします。
 
-選択したシャオンダマが現在AttackEventに適合しない場合でも、
+選択したShaondamaがCurrent AttackEventに適合しない場合でも、
 
 * 後続AttackEventを検索する
+* 別の通常AttackEventへ送る
 * Weak Attackへ切り替える
 
 ことはありません。
+
+ClickとDragではSlotへのcommit方法が異なります。
+
+* **Click**：Charge判定Event時点のCurrent AttackEventに対して、1 Shaondamaを判定する
+* **Drag**：Drag中にはSlotを書き換えず、Release時点のCurrent AttackEvent 1つに対して選択Shaondama群を一括検証し、成功した場合のみ一括commitする
 
 ---
 
@@ -79,23 +92,27 @@ Charge判定
 
 ## 通常AttackEvent
 
-曲進行に合わせて表示・蓄積され、通常のAttackEvent UI上で扱われるAttackEventを、本ページでは便宜上**通常AttackEvent**と呼びます。
+曲進行に合わせて通常AttackEvent UI上で扱われるAttackEventを、本ページでは便宜上**通常AttackEvent**と呼びます。
 
 通常AttackEventには1つ以上の要求Slotが存在し、Chord / Arpeggio等の攻撃を構成できます。
 
 ---
 
-## 現在Charge対象の通常AttackEvent
+## Current Normal AttackEvent
 
-表示・蓄積されている通常AttackEventのうち、現在シャオンダマを割り当てる対象となっている1つのAttackEventです。
+現在Shaondamaを通常Chargeする対象として選ばれている、**ただ1つの通常AttackEvent**です。
 
-同時に複数の通常AttackEventをCharge対象にはしません。
+同時に複数の通常AttackEventをCurrentにはしません。
+
+本ページでは「Current AttackEvent」と記載した場合、特記がない限りこのCurrent Normal AttackEventを指します。
 
 ---
 
 ## Weak AttackEvent
 
-現在Charge対象となる通常AttackEventが存在しない場合に、単音弱攻撃を成立させるため実行時に動的生成するAttackEventです。
+Current Normal AttackEventが存在しない場合に、単音弱攻撃を成立させるため**Charge判定時に動的生成できるAttackEvent**です。
+
+Weak Chargeを開始するために、Weak AttackEventが事前に表示・生成・蓄積されている必要はありません。
 
 Weak AttackEventは通常AttackEventとは別枠で管理します。
 
@@ -124,7 +141,7 @@ Slot G
 Slotは、
 
 * どの要求音が満たされているか
-* どのシャオンダマ実体がどのAttackEvent / Slotへ対応しているか
+* どのShaondama実体がどのAttackEvent / Slotへ対応しているか
 
 を管理するために使用します。
 
@@ -134,9 +151,9 @@ Slotは、
 
 を保持します。
 
-1つのSlotへ複数のShaondamaを重複してChargeすることはありません。
+1つのSlotへ複数Shaondamaを重複してChargeすることはありません。
 
-Slotの中に物理的な弾丸オブジェクトそのものを格納し、Slotから新しい弾丸を生成するわけではありません。
+Slotの中に物理的なPalette Bulletを格納するわけではなく、SlotからCharge時点でPalette Bulletを新規生成することもありません。
 
 ---
 
@@ -147,7 +164,7 @@ Slotの中に物理的な弾丸オブジェクトそのものを格納し、Slot
 例えば、
 
 ```text
-C / C / G
+C / C / E
 ```
 
 であれば、
@@ -155,24 +172,14 @@ C / C / G
 ```text
 C Slot 1
 C Slot 2
-G Slot
+E Slot
 ```
 
 という3つの別々のSlotを持ちます。
 
-この場合にCを2つChargeすることは可能ですが、1つのSlotへの重複Chargeではありません。
+この場合にCを2つChargeすることは可能ですが、1 Slotへの重複Chargeではありません。
 
-```text
-C Shaondama
-↓
-C Slot 1
-
-C Shaondama
-↓
-C Slot 2
-```
-
-のように、異なる要求Slotを1つずつ充填します。
+Drag判定でも、同音Slotを単なる集合としてまとめず、**必要個数を含む独立Slot群**として扱います。
 
 ---
 
@@ -180,50 +187,58 @@ C Slot 2
 
 本ページでいう**先頭Slot**とは、AttackEventが保持している要求Slot順のうち最も先頭にあるSlotを指します。
 
-同じ条件を満たす未充填Slotが複数存在する場合は、この順序を使用して一意に解決します。
+同じ条件を満たす未充填Slotが複数存在する場合は、このSlot順を使用して一意に解決します。
 
 ---
 
-# Charge対象となる通常AttackEventの決定
+## source NoteEvent occurrence
 
-## AttackEventは表示順で処理する
+通常Shaondamaを生成した元となる、MusicChart上の**特定周回に属する特定NoteEvent実体**を指します。
 
-複数の通常AttackEventが表示・蓄積されている場合、Charge対象は**表示順**で決定します。
+単なるNote名や時刻だけではなく、Loop中のどの周回のNoteEventであるかまで区別します。
 
-例えば、
-
-```text
-AttackEvent A
-AttackEvent B
-AttackEvent C
-```
-
-の順で表示されている場合、
-
-```text
-A
-↓
-B
-↓
-C
-```
-
-の順でCharge対象とします。
-
-現在Charge対象のAttackEventが処理中である間は、後続AttackEventをCharge対象にしません。
-
-以下の条件によって後続AttackEventを優先することもありません。
-
-* 選択したシャオンダマと音が一致する
-* 発火タイミングが近い
-* Playerから見て扱いやすい
-* 任意に選択した
+Weak Attackでは、別周回の同名NoteEventへ自動的に付け替えません。
 
 ---
 
-# 前のAttackEventを飛ばさない
+## Reserved
 
-現在Charge対象となっているAttackEventがCharge受付中かつ未完成である場合、後続AttackEventを先に埋めることはできません。
+Charge成功したShaondama実体がAttackEvent / Slotへ対応付けられ、AttackEventの解決を待っている状態です。
+
+Reserved中のShaondamaは世界上の対応実体として保持され、通常Lifetimeの進行を停止します。
+
+---
+
+# Current AttackEventの決定
+
+## UI表示順を使用しない
+
+複数の通常AttackEventが同時にCharge対象候補となり得る場合、**UI上の表示順をゲームロジックの根拠にしません**。
+
+Current AttackEventは、以下の論理順で一意に決定します。
+
+1. **音楽時間上のCharge対象順**
+2. 1が完全同時の場合、**MusicChart定義順**
+
+```text
+Charge対象候補を抽出
+↓
+音楽時間上のCharge対象順で整列
+↓
+完全同時の候補はMusicChart定義順で整列
+↓
+先頭のAttackEventをCurrentにする
+```
+
+「音楽時間上のCharge対象順」を決定するための時間情報そのものは、`bgm/bgm-attack-event.md` を正とします。
+
+UIはこの論理順を視覚化しても構いませんが、UI表示結果からCurrent AttackEventを逆算してはいけません。
+
+---
+
+## 前のAttackEventを飛ばさない
+
+Current AttackEventがCharge受付中かつCharge対象として有効である間、後続AttackEventを先に埋めることはできません。
 
 例えば、
 
@@ -235,9 +250,7 @@ AttackEvent B
 A / C / E
 ```
 
-で、現在Charge対象がAの場合を考えます。
-
-PlayerがCをChargeした場合は、
+でCurrentがAの場合、CをChargeすると、
 
 ```text
 AttackEvent A
@@ -246,19 +259,25 @@ C Slot
 
 だけを対象とします。
 
-AttackEvent Aが現在Charge対象である限り、AttackEvent BのC Slotは検索しません。
+AttackEvent AがCurrentである限り、AttackEvent BのC Slotは検索しません。
+
+以下の理由で後続AttackEventを優先することもありません。
+
+* 選択したShaondamaと音が一致する
+* 後続AttackEventの発火タイミングが近い
+* Playerから見て扱いやすい
+* UI上で近く表示されている
+* Playerが任意に選択した
 
 ---
 
 # 完全充填
 
-現在Charge対象の通常AttackEventについて、
+Current AttackEventについて、
 
 **すべての要求SlotにShaondamaが1つずつ割り当てられた状態**
 
 を完全充填とします。
-
-例えば、
 
 ```text
 C [●]
@@ -267,8 +286,6 @@ G [●]
 ```
 
 であれば完全充填です。
-
-一方、
 
 ```text
 C [●]
@@ -284,36 +301,36 @@ Slotは1 Slotにつき最大1 Shaondamaであるため、完全充填後に同�
 
 # 次のAttackEventへ進む条件
 
-現在Charge対象のAttackEventから次の通常AttackEventへ進む条件は、以下です。
+Current AttackEventから次の通常AttackEventへ進む条件は、以下です。
 
 ## 全要求Slotが完全充填された場合
 
-現在AttackEventのすべての要求SlotにShaondamaが1つずつ割り当てられた場合、そのAttackEventは完全充填となります。
+Current AttackEventの全要求Slotが完全充填された時点で、そのAttackEventへの追加Charge受付を終了します。
 
-完全充填した時点で、そのAttackEvent自体がまだ音楽上で発火していなくても、そのAttackEventへの追加Chargeは終了します。
+AttackEvent自体がまだ音楽上で発火していなくても構いません。
 
-既に次の通常AttackEventが表示され、Charge対象となれる状態であれば、Charge対象を次へ進めます。
+次のCharge判定Eventでは、再度論理順を評価し、次にCurrentとなる通常AttackEventを決定します。
 
 ```text
 AttackEvent A
 全要求Slot完全充填
 ↓
-AttackEvent AへのCharge終了
+AttackEvent Aへの追加Charge終了
 ↓
-AttackEvent BがCharge対象として存在
+次のCharge判定Event
 ↓
-AttackEvent Bへ進む
+論理順からCurrent AttackEventを再決定
 ```
 
-完全充填済みのAttackEventを再びCharge対象へ戻すことはありません。
+完全充填済みのAttackEventを再びCurrentへ戻しません。
 
 ---
 
 ## Charge受付期間が終了した場合
 
-現在AttackEventが未完成のままCharge受付期間を終了した場合、そのAttackEventへのChargeを終了します。
+Current AttackEventが未完成のままCharge受付期間を終了した場合、そのAttackEventへのChargeを終了します。
 
-AttackEvent自体の実際の発火を待ってから切り替える必要はありません。
+AttackEvent自体の実際の発火を待ってからCurrentを切り替える必要はありません。
 
 ```text
 AttackEvent A
@@ -324,39 +341,28 @@ AttackEvent Aは未完成
 ↓
 AttackEvent AへのCharge終了
 ↓
-次の通常AttackEventへ進む
+次のCharge判定EventでCurrentを再決定
 ```
 
-Charge受付期間を終了した過去のAttackEventは、その後再びCharge対象にはしません。
+Charge受付期間を終了した過去のAttackEventは、その後再びCurrentにはしません。
 
-そのAttackEventに未充填Slotが残っていても、後からChargeして補完することはありません。
+そのAttackEventに未充填Slotが残っていても、後からChargeして補完しません。
 
 Charge受付期間そのものの時間情報は、`bgm/bgm-attack-event.md` を正とします。
 
 ---
 
-## 次の通常AttackEventが存在しない場合
+## Currentとなる通常AttackEventが存在しない場合
 
-現在AttackEventが、
+完全充填やCharge受付期間終了等により、Charge判定Event時点でCurrentとなる通常AttackEventが存在しない場合は、
 
-* 完全充填
-* Charge受付期間終了
-
-のいずれかによってCharge対象から外れ、次にCharge対象となる通常AttackEventが存在しない場合は、
-
-**現在Charge対象となる通常AttackEventなし**
+**Current Normal AttackEventなし**
 
 として扱います。
 
-この状態ではWeak Attackを使用できます。
+この場合にWeak Attack割り当てを使用できます。
 
-過去に未完成のAttackEventが存在しているかどうかは、Weak Attackの可否判定には使用しません。
-
-Weak Attackの可否は、
-
-**現在Charge対象となる通常AttackEventが存在するか**
-
-だけで判定します。
+過去に未完成のAttackEventが存在しているかどうかは、Weak Attackの可否判定に使用しません。
 
 ---
 
@@ -376,73 +382,31 @@ Weak AttackEventは、この通常AttackEventの最大蓄積数には含めま�
 
 ---
 
-# 通常シャオンダマのSlot割り当て
+# Click ChargeのSlot割り当て
 
-## 音名で照合する
+## 判定対象
 
-通常シャオンダマは、自身が持つ音名と現在Charge対象AttackEventの**未充填要求Slot**を照合します。
+Click Chargeは、`player/player-action-charge.md` が発生させる**Charge判定Event時点**のCurrent AttackEventだけを対象とします。
 
-例えばシャオンダマがCの場合、
-
-```text
-C Slot
-```
-
-のみが対応候補となります。
+判定開始後に後続AttackEventを検索しません。
 
 ---
 
-## オクターブは区別しない
+## 通常Shaondama
 
-Slot照合ではオクターブを区別しません。
+通常Shaondamaは、自身が持つ音名とCurrent AttackEventの**未充填要求Slot**を照合します。
 
-```text
-C3
-C4
-C5
-```
+対応する未充填Slotが1つ以上存在する場合は、**先頭の未充填同音Slot**へ割り当てます。
 
-はいずれも、
-
-```text
-C
-```
-
-として扱います。
-
-したがって要求SlotがCであれば、オクターブに関係なくCの通常シャオンダマを使用できます。
-
----
-
-# 同音Slotが複数存在する場合
-
-例えばAttackEventが、
-
-```text
-C / C / E
-```
-
-を要求する場合、C Slotが複数存在します。
-
-通常シャオンダマCをChargeした場合は、未充填のC Slotだけを候補として検索します。
-
----
-
-## 先頭の未充填同音Slotへ割り当てる
-
-未充填の同音Slotが複数存在する場合は、
-
-**先頭の未充填Slot**
-
-へ割り当てます。
+例えば、
 
 ```text
 C Slot 1 = 未充填
 C Slot 2 = 未充填
 
-CをCharge
+C ShaondamaをClick Charge
 ↓
-C Slot 1
+C Slot 1へ割り当て
 ```
 
 次にCをChargeした場合は、
@@ -451,176 +415,386 @@ C Slot 1
 C Slot 1 = 充填済み
 C Slot 2 = 未充填
 
-CをCharge
+C ShaondamaをClick Charge
 ↓
-C Slot 2
+C Slot 2へ割り当て
 ```
 
 となります。
 
 ---
 
-## 充填済みSlotは候補にしない
+## Slot照合ではオクターブを区別しない
 
-既にShaondamaが割り当てられているSlotへ追加Chargeすることはありません。
-
-例えば、
+通常AttackEventのSlot照合ではオクターブを区別しません。
 
 ```text
-C Slot 1 = 充填済み
-C Slot 2 = 未充填
-
-CをCharge
+C3
+C4
+C5
 ```
 
-の場合は、
+はいずれも要求Slot上は、
 
 ```text
-C Slot 2
+C
 ```
 
-へ割り当てます。
+として扱います。
 
-```text
-C Slot 1
-```
-
-へ重複Chargeしてはいけません。
+したがって要求SlotがCであれば、オクターブに関係なくCの通常Shaondamaを使用できます。
 
 ---
 
-# 対応する未充填Slotが存在しない場合
+## 対応する未充填Slotがない場合
 
-現在Charge対象となる通常AttackEventが存在している状態では、通常シャオンダマは、
+Current AttackEventに、選択した通常Shaondamaの音名に対応する未充填Slotが存在しない場合、割り当ては失敗します。
 
-**選択した音名に対応する未充填Slotが現在AttackEventに存在する場合のみ**
+```text
+Current AttackEvent
+C [●]
+E [ ]
+G [ ]
 
-Slot割り当てに成功します。
+C ShaondamaをCharge
+↓
+Cの未充填Slotなし
+↓
+Charge失敗
+```
+
+この場合、
+
+* 充填済みC Slotへ重複Chargeする
+* 後続AttackEventのC Slotを検索する
+* Weak Attackへ変換する
+
+ことはありません。
+
+---
+
+## 万能Shaondama
+
+万能Shaondamaは音名によるSlot制限を受けません。
+
+Current AttackEventの未充填要求Slotだけを候補とし、**先頭の未充填Slot**へ割り当てます。
+
+```text
+C Slot = 未充填
+E Slot = 未充填
+G Slot = 未充填
+
+万能ShaondamaをClick Charge
+↓
+C Slotへ割り当て
+```
+
+C Slotが充填済みなら、
+
+```text
+C Slot = 充填済み
+E Slot = 未充填
+G Slot = 未充填
+
+万能ShaondamaをClick Charge
+↓
+E Slotへ割り当て
+```
+
+となります。
+
+万能Shaondamaであっても、
+
+* 充填済みSlotへ追加Chargeする
+* Current AttackEventを飛び越えて後続AttackEventへ入る
+
+ことはありません。
+
+---
+
+# Drag Chargeのatomic判定
+
+## 基本方針
+
+Drag Chargeは、**複数の単体Click Chargeを順番に実行する処理ではありません**。
+
+Drag中はShaondamaの選択状態だけを保持し、Slot状態を書き換えません。
+
+Releaseした瞬間に、その時点で選択されているShaondama群を1つのbatchとして判定します。
+
+```text
+DragCharging
+↓
+Shaondamaを複数選択
+↓
+Release
+↓
+Release時点のCurrent AttackEventを1つ確定
+↓
+選択Shaondama群と未充填要求Slot群を一括照合
+│
+├─ 全体として過不足なく割り当て可能
+│   ↓
+│   各Slotへの対応を一括確定
+│   ↓
+│   一括commit
+│   ↓
+│   success
+│
+└─ 過剰 / 不足 / 不適合
+    ↓
+    Slot変更なし
+    ↓
+    Drag全体miss
+```
+
+---
+
+## Release時点のCurrent AttackEvent 1つだけを見る
+
+Drag batchの判定対象は、**Release時点のCurrent AttackEvent 1つだけ**です。
+
+Drag開始時点のCurrent AttackEventに固定するわけではありません。
+
+一方、Release後にbatch判定を開始した後は、判定対象AttackEventを途中で変更しません。
+
+```text
+Release
+↓
+Current AttackEvent Aを確定
+↓
+Aだけに対してbatch判定
+↓
+途中でAがFull相当になっても
+残りShaondamaをBへ送らない
+```
+
+1回のDragで複数AttackEventをまたぐことはありません。
+
+---
+
+## 成立条件
+
+Dragがsuccessとなるのは、Release時点のCurrent AttackEventが持つ**未充填要求Slot群すべて**に対して、選択Shaondama群を**過不足なく有効に割り当て可能な場合だけ**です。
+
+判定では、
+
+* 通常Shaondamaは同音の未充填Slotだけを満たせる
+* 万能Shaondamaは任意の未充填Slotを満たせる
+* 1 Shaondamaは1 Slotだけを満たす
+* 1 Slotには最大1 Shaondamaだけを割り当てる
+* 同音Slotは必要個数まで含めて独立に数える
+
+ものとします。
+
+成立可否の判定では、ShaondamaのDrag選択順を要求Slot順と一致させる必要はありません。
+
+---
+
+## 過剰なShaondamaがある場合
+
+Current AttackEventの未充填要求Slot群より、選択Shaondama群に余分なShaondamaが含まれる場合はDrag全体をmissとします。
 
 例えば、
 
 ```text
-要求
-C / E / G
+Current AttackEvent
+C / E
 
-現在状態
-C [●]
-E [ ]
-G [ ]
+Drag
+C / E / G
 ```
 
 の場合、
 
 ```text
-E → Charge成功
-G → Charge成功
-A → Charge失敗
-C → Charge失敗
+Gが余分
+↓
+全体不成立
+↓
+Drag全体miss
+↓
+C / EもChargeされない
 ```
 
 となります。
 
-C Slot自体は存在しますが、対応するC Slotは既にすべて充填済みであるため、追加のCはChargeできません。
+C / Eだけを部分成功させません。
 
 ---
 
-## 要求されていない音
+## 不足する場合
 
-例えば、
+Current AttackEventの未充填要求Slot群をすべて満たせない場合もDrag全体をmissとします。
 
 ```text
-現在Charge対象
-AttackEvent A
+Current AttackEvent
 C / E / G
 
-後続
-AttackEvent B
-A / B / D
+Drag
+C / E
+↓
+G Slotを満たせない
+↓
+Drag全体miss
 ```
 
-でPlayerがAの通常シャオンダマをChargeした場合、AttackEvent AにはAの未充填Slotが存在しないため割り当てに失敗します。
-
-```text
-AttackEvent AにAの未充填Slotなし
-↓
-AttackEvent Bは検索しない
-↓
-割り当て失敗
-```
+C / Eだけを先にcommitしません。
 
 ---
 
-## 対応Slotがすべて充填済みの音
+## 音が不適合な場合
+
+選択数が未充填Slot数と一致していても、通常Shaondamaを有効に割り当てられない場合はDrag全体をmissとします。
+
+```text
+Current AttackEvent
+C / E
+
+Drag
+C / G
+↓
+GをE Slotへ割り当てられない
+↓
+Drag全体miss
+```
+
+後続AttackEventにG Slotが存在していても検索しません。
+
+Weak Attackへも逃がしません。
+
+---
+
+## 同音Slotはmultisetとして照合する
+
+同音要求は個数まで一致させます。
+
+```text
+Current AttackEvent
+C / C / E
+```
+
+がすべて未充填の場合、
+
+```text
+Drag
+C / C / E
+```
+
+は成立できます。
+
+一方、
+
+```text
+Drag
+C / E / E
+```
+
+は、Cが1個不足しEが1個余るため成立しません。
+
+単なる`{C, E}`という集合比較にはしません。
+
+---
+
+## 選択順は成立条件にしない
+
+要求が、
+
+```text
+C / E / G
+```
+
+である場合、
+
+```text
+Drag
+G → C → E
+```
+
+の順に選択しても、各要求Slotへ過不足なく割り当て可能であればsuccessです。
+
+Drag選択順をChord / Arpeggioの発射順には使用しません。
+
+Arpeggioを含むAttackEventの発射順は、`bgm/bgm-attack-event.md` が定義するAttackEvent側の音楽的順序を使用します。
+
+---
+
+## 万能Shaondamaを含むDrag
+
+万能Shaondamaは、通常Shaondamaだけでは満たせない残りの未充填Slotを満たすワイルドカードとして扱えます。
 
 例えば、
 
 ```text
-AttackEvent A
+Current AttackEvent
+C / E / G
 
-C [●]
-E [ ]
-G [ ]
+Drag
+C / E / 万能
 ```
 
-の状態でCをChargeした場合も、
+であれば、
 
 ```text
-Cの未充填Slotなし
-↓
-割り当て失敗
+C → C Slot
+E → E Slot
+万能 → G Slot
 ```
 
-となります。
+として全体を成立させられます。
 
-既存のC Slotへ追加Chargeすることはありません。
+万能Shaondamaが複数のSlotを満たせる場合は、通常の万能Shaondama規則と同様に、残っている未充填Slotの**先頭Slotから**対応させます。
 
 ---
 
-## Weak Attackへ変換しない
+## commitは全体判定成功後に一度だけ行う
 
-現在Charge対象となる通常AttackEventが存在する限り、
-
-* 要求されていない音
-* 対応する同音Slotがすべて充填済みの音
-
-をWeak Attackへ送ることはありません。
+Drag判定中にSlotを逐次書き換えません。
 
 ```text
-現在Charge対象の通常AttackEventあり
+判定前Slot状態
 ↓
-対応する未充填Slotなし
+仮の対応関係を構築
 ↓
-Charge失敗
+batch全体の成立可否を確定
+│
+├─ success
+│   ↓
+│   対応関係を一括commit
+│
+└─ miss
+    ↓
+    commitしない
+    ↓
+    判定前Slot状態を維持
 ```
 
-です。
+そのため、途中まで有効なShaondamaが存在しても、後半で不成立が判明した場合に部分成功状態は残りません。
 
-```text
-現在Charge対象の通常AttackEventあり
-↓
-対応する未充填Slotなし
-↓
-Weak Attack
-```
+---
 
-とはしません。
+## commit後にCurrentを再評価する
 
-Charge Actionとしての`miss`判定については、`player/player-action-charge.md` を正とします。
+Drag batchの一括commitによってCurrent AttackEventが完全充填した場合、そのbatch処理を完了した後にCurrentから外れます。
+
+そのDrag中の残りShaondamaを次AttackEventへ送る処理は存在しません。
+
+次のAttackEventへのChargeは、**次回以降の別Charge判定Event**で行います。
 
 ---
 
 # 後続AttackEvent検索の禁止
 
-Slot割り当て時に検索対象としてよい通常AttackEventは、
+Click / Dragのどちらでも、通常Slot割り当て時に検索対象としてよい通常AttackEventは、
 
-**現在Charge対象となっている1つのAttackEventだけ**
+**その判定で確定したCurrent AttackEvent 1つだけ**
 
 です。
 
 例えば、
 
 ```text
-現在AttackEvent
+Current AttackEvent
 C / E / G
 
 後続AttackEvent
@@ -637,201 +811,83 @@ A Slot
 へ割り当ててはいけません。
 
 ```text
-現在AttackEvent
+Current AttackEventにAの未充填Slotなし
 ↓
-Aの未充填Slotなし
-↓
-Charge失敗
+Charge失敗 / Drag全体miss
 ```
 
 とします。
 
-後続AttackEventへのChargeが可能になるのは、そのAttackEventが正式に現在Charge対象へ切り替わった後です。
+後続AttackEventへのChargeが可能になるのは、そのAttackEventが正式にCurrentへ切り替わった後です。
 
 ---
 
 # 完全充填後の追加Charge禁止
 
-通常AttackEventが完全充填された時点で、そのAttackEventへのCharge処理は終了します。
-
-例えば、
-
-```text
-AttackEvent A
-
-C [●]
-E [●]
-G [●]
-```
-
-となった場合、その後にC / E / GのShaondamaをChargeしてもAttackEvent Aへ追加しません。
-
-```text
-AttackEvent A 完全充填
-↓
-AttackEvent AへのCharge終了
-↓
-次の通常AttackEventへ移行
-```
-
-とします。
+通常AttackEventが完全充填した時点で、そのAttackEventへの追加Charge処理は終了します。
 
 完全充填済みAttackEventに対して、
 
 * 同じ音を追加Chargeする
-* 要求音だけ追加で保持する
+* 要求音だけを追加で保持する
 * 既存Slotへ複数Shaondamaを保持する
 
 といった処理は行いません。
 
 ---
 
-# 万能シャオンダマのSlot割り当て
-
-## 基本
-
-万能シャオンダマは音名によるSlot制限を受けません。
-
-ただし、通常シャオンダマと同様に、
-
-**現在Charge対象となっている通常AttackEventのみ**
-
-を対象とします。
-
-後続AttackEventを飛び越えて自由なSlotへ入れることはできません。
-
----
-
-## 未充填Slotだけを対象にする
-
-万能シャオンダマは、現在AttackEventの未充填要求Slotだけを候補とします。
-
-既に充填済みのSlotへ追加Chargeすることはありません。
-
----
-
-## 未充填Slotが複数ある場合
-
-未充填Slotが複数存在する場合は、
-
-**先頭の未充填Slot**
-
-へ割り当てます。
-
-例えば、
-
-```text
-C Slot = 未充填
-E Slot = 未充填
-G Slot = 未充填
-```
-
-の場合、
-
-```text
-万能シャオンダマ
-↓
-C Slot
-```
-
-となります。
-
-その後、
-
-```text
-C Slot = 充填済み
-E Slot = 未充填
-G Slot = 未充填
-```
-
-で万能シャオンダマをChargeした場合は、
-
-```text
-E Slot
-```
-
-へ割り当てます。
-
-万能シャオンダマだからといって、未完成の現在AttackEventを飛び越え、後続AttackEventへ割り当てることはありません。
-
----
-
 # Weak Attackを使用できる条件
 
-Weak Attackを使用できる基本条件は、
+Weak Attack割り当てを使用できる条件は、
 
-**現在Charge対象となる通常AttackEventが存在しないこと**
+**Charge判定Event時点でCurrent Normal AttackEventが存在しないこと**
 
 です。
 
-これは例えば、
+例えば、
 
 * Charge可能な通常AttackEventが最初から存在しない
-* 存在していた通常AttackEventをすべて完全充填した
-* Charge受付期間終了によって現在Charge対象となる通常AttackEventがなくなった
-* 次の通常AttackEventがまだ表示されていない
+* それまでの通常AttackEventがすべて完全充填済みでCurrent候補から外れている
+* Charge受付期間終了によってCurrent候補が存在しない
+* 次の通常AttackEventがまだCharge対象時刻へ到達していない
 
 といった状態を含みます。
 
-過去に未完成のAttackEventが残っていること自体は、Weak Attackを禁止する理由にはなりません。
+Weak AttackEventが事前に存在していることは条件ではありません。
+
+Current Normal AttackEventが存在する場合、Slot不一致をWeakへfallbackしません。
 
 ---
 
-# 通常AttackEventが存在しない場合
+# 通常ShaondamaのWeak割り当て
 
-現在Charge対象となる通常AttackEventが存在しない期間でも、Playerは通常シャオンダマを使ったWeak Attackを行えます。
+## source NoteEvent occurrenceを使用する
 
-この場合、通常AttackEventの要求音との照合は行いません。
-
-通常シャオンダマの音名に関係なくWeak Attackとして扱います。
-
-例えば、
+通常ShaondamaをWeakへ割り当てる場合、そのShaondama自身が保持する**source NoteEvent occurrence**を使用します。
 
 ```text
-C → Weak Attack
-D → Weak Attack
-E → Weak Attack
-F → Weak Attack
-G → Weak Attack
-A → Weak Attack
-B → Weak Attack
+通常Shaondama
+↓
+自身のsource NoteEvent occurrenceを取得
+↓
+そのoccurrenceに対応するWeak AttackEventを動的生成
+↓
+ShaondamaをWeak AttackEvent / Slotへ割り当て
+↓
+source NoteEvent発音時刻で発火
 ```
 
-となります。
-
----
-
-# Weak AttackEventへの割り当て
-
-## 生成条件
-
-現在Charge対象となる通常AttackEventが存在しない状態で、通常シャオンダマ1個をWeak AttackとしてChargeするたびに、
-
-**そのシャオンダマ専用のWeak AttackEventを1つ動的生成**
-
-します。
-
-```text
-現在Charge対象の通常AttackEventなし
-↓
-通常シャオンダマ1個をCharge
-↓
-Weak AttackEventを1つ生成
-```
+Weak AttackEventは、通常Shaondama 1個につき1つ生成します。
 
 1つのWeak AttackEventを複数回のWeak Chargeで共有しません。
 
 ---
 
-## 要求Slot
+## Weak AttackEventのSlot
 
-Weak AttackEventが持つ要求Slotは、
+通常Shaondamaから生成するWeak AttackEventは、対象Shaondamaに対応する**単音Slot 1つ**を持ちます。
 
-**1つ**
-
-です。
-
-対象となる通常シャオンダマ1個に対応する単音Slotを持ちます。
+例えばCの通常Shaondamaであれば、
 
 ```text
 C Shaondama
@@ -840,29 +896,152 @@ Weak AttackEvent
 └─ C Slot × 1
 ```
 
-Weak AttackEventの目的は、通常AttackEventの複数Slot攻撃を構成することではなく、通常AttackEventがCharge対象として存在しない期間の単音弱攻撃を扱うことです。
+とします。
 
-Weak AttackEventの発火時Gameplay処理やPalette Bullet化・発射の詳細については、本ページでは再定義しません。
+Weak AttackEventは通常AttackEventの複数Slot攻撃を構成するためのものではありません。
 
 ---
 
-# Weak Charge後に通常AttackEventが表示された場合
+## 過去source NoteEvent用の例外分岐を設けない
 
-一度Weak AttackEventへ割り当てられた通常シャオンダマは、その後に通常AttackEventが表示されても再割り当てしません。
-
-例えば、
+通常Shaondamaについて、Weak Charge判定時に、
 
 ```text
-現在Charge対象の通常AttackEventなし
-↓
-C ShaondamaをWeak Attackへ割り当て
-↓
-Weak AttackEvent C生成
-↓
-その後、通常AttackEvent Bが表示
+source NoteEvent発音時刻がすでに過去か？
 ```
 
-となった場合でも、既にWeak AttackEventへ割り当て済みのC Shaondamaを、
+という例外分岐は設けません。
+
+通常Shaondamaは、未使用のまま自身のsource NoteEvent発音時刻へ到達した場合、その時点で割れて弱い範囲攻撃を行い消滅することを前提とします。
+
+したがって、**過去のsource NoteEvent occurrenceを持つ未使用の通常Shaondamaは世界上に存在しない**ものとして扱います。
+
+この自然破裂・弱範囲攻撃・消滅の正本は、`shaondama-music/floating-behavior.md` とします。
+
+---
+
+## Loop時は特定occurrenceを維持する
+
+BGMがLoopしている場合でも、通常ShaondamaのWeak割り当ては自身が属する**特定周回のsource NoteEvent occurrence**を使用します。
+
+例えば第2周回のNoteEventから生成されたShaondamaを、第3周回の同名NoteEventへ自動的に付け替えません。
+
+source NoteEventの識別・保持に必要なruntime dataは、`shaondama-music/orb-data.md` を正とします。
+
+---
+
+# 万能ShaondamaのWeak割り当て
+
+## Weakで使用可能
+
+万能Shaondamaも、Current Normal AttackEventが存在しない場合はWeak Attackへ使用できます。
+
+ただし、万能Shaondama自身には通常Shaondamaのような固定source NoteEvent occurrenceを持たせません。
+
+Weak Charge判定時に、その場で使用するNoteEventを解決します。
+
+---
+
+## 次に発音するNoteEventへ解決する
+
+万能ShaondamaをWeakへ割り当てる場合、Weak Charge判定時点より**後で最初に発音するNoteEvent**をMusicChartから検索します。
+
+```text
+万能Shaondama
+↓
+Weak Charge判定
+↓
+判定時点より後のNoteEventを検索
+↓
+最初に発音するNoteEventを選択
+↓
+そのNoteEventへ一時的に解決
+↓
+Weak AttackEventを生成
+↓
+そのNoteEvent発音時刻で発火
+```
+
+別の通常AttackEventや待機コードの不足音を検索して割り当てる方式にはしません。
+
+---
+
+## 同時NoteEventのtie-break
+
+「次に発音するNoteEvent」が完全同時に複数存在する場合は、
+
+**MusicChart定義順の先頭**
+
+を使用します。
+
+```text
+次の発音時刻 = T
+
+NoteEvent A @ T
+NoteEvent B @ T
+NoteEvent C @ T
+↓
+MusicChart定義順の先頭を採用
+```
+
+これにより万能Weakの解決結果を決定的にします。
+
+---
+
+## 実効Pitch / octave / RGB等
+
+万能Shaondamaは、Weak用に解決したNoteEventから、Weak Attackに必要な、
+
+* 実効Pitch
+* octave
+* RGB
+* その他NoteEvent由来でWeak Attackに必要な値
+
+を取得します。
+
+これは、そのWeak AttackEventで使用する**実効値の解決**です。
+
+万能Shaondama自身へ恒久的な固有音程を付与・書き換える処理ではありません。
+
+---
+
+## Weak AttackEventの生成
+
+NoteEventを解決した後は、通常ShaondamaのWeak処理と同様に、対象万能Shaondama専用のWeak AttackEventを1つ動的生成し、単音Slotへ割り当てます。
+
+```text
+万能Shaondama
+↓
+次NoteEventへ解決
+↓
+実効値確定
+↓
+Weak AttackEvent生成
+↓
+単音Slotへ割り当て
+↓
+Resolved NoteEvent発音時刻で発火
+```
+
+通常Shaondamaと万能Shaondamaは、**Weakで使用するNoteEventの決定方法だけが異なる**ものとし、それ以降のWeak AttackEvent処理は可能な限り共通化します。
+
+---
+
+# Weak Charge後に通常AttackEventがCurrentになった場合
+
+一度Weak AttackEventへ割り当てられたShaondamaは、その後に通常AttackEventがCurrentになっても再割り当てしません。
+
+```text
+Current Normal AttackEventなし
+↓
+ShaondamaをWeakへ割り当て
+↓
+Weak AttackEvent生成
+↓
+その後、通常AttackEvent BがCurrentになる
+```
+
+となった場合でも、既にWeak AttackEventへ割り当て済みのShaondamaを、
 
 ```text
 Weak AttackEvent
@@ -870,9 +1049,9 @@ Weak AttackEvent
 通常AttackEvent BのSlot
 ```
 
-へ付け替えることはありません。
+へ付け替えません。
 
-AttackEvent Bが現在Charge対象となった後に新しく行われるChargeから、通常AttackEvent BのSlot割り当て規則を使用します。
+AttackEvent BがCurrentになった後に新しく発生するCharge判定Eventから、通常AttackEventのSlot割り当て規則を使用します。
 
 ---
 
@@ -880,23 +1059,17 @@ AttackEvent Bが現在Charge対象となった後に新しく行われるCharge�
 
 Weak AttackEventは、通常AttackEventの最大蓄積数とは別管理です。
 
-そのため、
-
-```text
-通常AttackEvent最大蓄積数
-```
-
-の計算にはWeak AttackEventを含めません。
-
 Weak AttackEventが待機中であっても、通常AttackEventの表示・蓄積可能数を消費しません。
 
 ---
 
-# Charge後のシャオンダマ実体
+# Charge成功後のShaondama実体
 
-通常AttackEvent / Weak AttackEventのどちらであっても、Charge成功した瞬間に攻撃用Palette Bulletを新規生成して即時発射する構造にはしません。
+## Reservedへ移行する
 
-通常AttackEventへChargeされたシャオンダマは、
+通常AttackEvent / Weak AttackEventのどちらであっても、Charge成功したShaondama実体は、対応するAttackEvent / Slotへ対応付けられ、**Reserved**として発火待ちします。
+
+通常AttackEventの場合、
 
 ```text
 Shaondama
@@ -904,259 +1077,255 @@ Shaondama
 Charge成功
 ↓
 AttackEvent / Slotへ対応付け
+↓
+Reserved
 ```
-
-されます。
 
 Weak AttackEventの場合も、
 
 ```text
 Shaondama
 ↓
-Weak AttackとしてCharge
+Weak割り当て成功
 ↓
 Weak AttackEvent / Slotへ対応付け
+↓
+Reserved
 ```
 
-されます。
+となります。
 
-Slotは対応関係を管理するためのものであり、物理オブジェクトそのものをSlot内部へ移動・格納するという意味ではありません。
+Dragの場合は、batch全体がsuccessと判定された後の一括commitで、対象Shaondama群を同時にReservedへ移行させます。
 
-AttackEvent発火時のPalette Bullet化・発射処理については、発火時処理の正本を参照します。
+Drag全体がmissの場合、どのShaondamaもそのbatchによってReservedへ移行しません。
+
+---
+
+## Reserved中は通常Lifetimeを停止する
+
+ReservedになったShaondamaは、通常の世界上Lifetimeの進行を停止します。
+
+ReservedはすでにCharge先が確定した使用予約状態であるため、未使用Shaondamaに適用されるsource NoteEvent到達時の自然破裂・消滅の対象からも外れます。
+
+対応AttackEventが解決する前に通常Lifetime切れや未使用時の自然破裂によって消滅しないよう、**対応AttackEventが解決するまで存在を保証**します。
+
+```text
+Charge成功
+↓
+Reserved
+↓
+通常Lifetime停止
+↓
+対応AttackEventの解決まで保持
+```
+
+Reserved解除後やAttackEvent解決後の詳細ライフサイクルは、発火時処理およびShaondama lifecycle側の正本へ委譲します。
+
+---
+
+## Charge成功時にはPalette Bullet化しない
+
+Charge成功時点ではPalette Bulletを生成しません。
+
+```text
+Shaondama
+↓
+Charge成功
+↓
+AttackEvent / Slotへ対応付け
+↓
+Reserved
+↓
+AttackEvent発火
+↓
+発火時処理でPalette Bullet化
+```
+
+AttackEvent発火時にどのReserved Shaondamaを使用し、どのようにPalette Bullet化・発射するかは、`bgm/bgm-attack-judgement.md` を正とします。
+
+本ページでは発火時の使用Bullet決定を再定義しません。
 
 ---
 
 # 割り当てアルゴリズム
 
-Charge入力に対する割り当ては、以下の順序で処理します。
+## 共通入口
 
 ```text
-Charge入力
+Charge判定Event
 ↓
-現在Charge対象の通常AttackEventが存在する？
-│
-├─ No
-│   ↓
-│   Weak Attackとして処理
-│
-└─ Yes
-    ↓
-    選択したShaondamaを判定
-    │
-    ├─ 通常Shaondama
-    │   ↓
-    │   選択した音名に対応する
-    │   未充填Slotが現在AttackEventに存在する？
-    │   │
-    │   ├─ Yes
-    │   │   ↓
-    │   │   先頭の対応未充填SlotへCharge
-    │   │   ↓
-    │   │   AttackEventが完全充填された？
-    │   │       │
-    │   │       ├─ Yes
-    │   │       │   ↓
-    │   │       │   現在AttackEventへのCharge終了
-    │   │       │   ↓
-    │   │       │   次の通常AttackEventへ進む
-    │   │       │
-    │   │       └─ No
-    │   │           ↓
-    │   │           現在AttackEventを継続
-    │   │
-    │   └─ No
-    │       ↓
-    │       Charge失敗
-    │       ※後続AttackEventを検索しない
-    │       ※Weak Attackへ変換しない
-    │
-    └─ 万能Shaondama
-        ↓
-        現在AttackEventの未充填Slotを抽出
-        ↓
-        先頭の未充填SlotへCharge
-        ↓
-        AttackEventが完全充填された？
-            │
-            ├─ Yes
-            │   ↓
-            │   現在AttackEventへのCharge終了
-            │   ↓
-            │   次の通常AttackEventへ進む
-            │
-            └─ No
-                ↓
-                現在AttackEventを継続
-```
-
-現在AttackEventのCharge受付期間が終了した場合は、完全充填しているかどうかにかかわらず、そのAttackEventへのChargeを終了して次の対象へ進みます。
-
-```text
-現在AttackEvent
+Current Normal AttackEventを論理順で決定
 ↓
-Charge受付期間終了
-↓
-現在AttackEventをCharge対象から外す
-↓
-次の通常AttackEventが存在する？
+Currentが存在する？
 │
 ├─ Yes
 │   ↓
-│   次の通常AttackEventをCharge対象にする
+│   通常Slot割り当てへ
 │
 └─ No
     ↓
-    現在Charge対象の通常AttackEventなし
-    ↓
-    Weak Attack使用可能
+    Weak割り当てへ
 ```
 
-過去の未完成AttackEventへ戻る処理は行いません。
+---
+
+## Click Charge
+
+```text
+Click Charge判定Event
+↓
+Current Normal AttackEventあり
+↓
+選択Shaondamaは？
+│
+├─ 通常Shaondama
+│   ↓
+│   同音の未充填Slotあり？
+│   │
+│   ├─ Yes → 先頭の未充填同音Slotへcommit → Reserved
+│   └─ No  → Charge失敗
+│
+└─ 万能Shaondama
+    ↓
+    未充填Slotあり？
+    │
+    ├─ Yes → 先頭の未充填Slotへcommit → Reserved
+    └─ No  → Charge失敗
+
+※失敗時に後続AttackEventを検索しない
+※失敗時にWeakへfallbackしない
+```
+
+---
+
+## Drag Charge
+
+```text
+Drag中
+↓
+Shaondama選択だけを更新
+↓
+Release
+↓
+Release時点のCurrent AttackEventを1つ確定
+↓
+未充填要求Slot群をsnapshot
+↓
+選択Shaondama群を全体検証
+│
+├─ 過不足なく割り当て可能
+│   ↓
+│   仮対応を確定
+│   ↓
+│   一括commit
+│   ↓
+│   全対象ShaondamaをReserved
+│   ↓
+│   success
+│
+└─ 過剰 / 不足 / 不適合
+    ↓
+    commitなし
+    ↓
+    Slot状態不変
+    ↓
+    Drag全体miss
+
+※batch途中でCurrentを切り替えない
+※残りShaondamaを後続Eventへ送らない
+```
+
+---
+
+## Weak：通常Shaondama
+
+```text
+Current Normal AttackEventなし
+↓
+通常ShaondamaをWeakへ割り当て
+↓
+自身のsource NoteEvent occurrenceを使用
+↓
+専用Weak AttackEvent生成
+↓
+単音Slotへcommit
+↓
+Reserved
+↓
+source NoteEvent発音時刻で発火
+```
+
+---
+
+## Weak：万能Shaondama
+
+```text
+Current Normal AttackEventなし
+↓
+万能ShaondamaをWeakへ割り当て
+↓
+判定時点より後で最初に発音するNoteEventを検索
+↓
+完全同時ならMusicChart定義順の先頭
+↓
+実効Pitch / octave / RGB等を解決
+↓
+専用Weak AttackEvent生成
+↓
+単音Slotへcommit
+↓
+Reserved
+↓
+Resolved NoteEvent発音時刻で発火
+```
 
 ---
 
 # 割り当て例
 
-## 例1：複数AttackEvent
+## 例1：AttackEvent論理順
 
 ```text
-AttackEvent 1
-C / E / G
-
-AttackEvent 2
-A / C / E
-
-AttackEvent 3
-G / B / D
+Charge対象候補
+AttackEvent A：音楽時間上 2番目
+AttackEvent B：音楽時間上 1番目
+AttackEvent C：音楽時間上 3番目
 ```
 
-AttackEvent 1が現在Charge対象の場合、CをChargeすると、
+UI表示が、
 
 ```text
-AttackEvent 1
-C Slot
+A / B / C
 ```
 
-へ入ります。
-
-その後、
+であっても、CurrentはUI順では決めません。
 
 ```text
-AttackEvent 1
-
-C [●]
-E [ ]
-G [ ]
-```
-
-の状態でさらにCをChargeした場合は、
-
-```text
-Cの未充填Slotなし
+音楽時間上のCharge対象順
+B
 ↓
-Charge失敗
+A
+↓
+C
 ```
 
-となります。
+として決定します。
 
-AttackEvent 2のC Slotは検索しません。
+AとBが完全同時であれば、MusicChart定義順の先頭をCurrentにします。
 
 ---
 
-## 例2：同音Slot
+## 例2：Clickで後続AttackEventへ送らない
 
 ```text
-AttackEvent
-C / C / E
-```
-
-すべて未充填の状態で最初のCをChargeすると、
-
-```text
-C Slot 1
-```
-
-へ入ります。
-
-次のCは、
-
-```text
-C Slot 2
-```
-
-へ入ります。
-
-その後、
-
-```text
-C Slot 1 = 充填済み
-C Slot 2 = 充填済み
-E Slot   = 未充填
-```
-
-の状態でさらにCをChargeした場合は、
-
-```text
-Cの未充填Slotなし
-↓
-Charge失敗
-```
-
-となります。
-
-C Slot 1またはC Slot 2へ重複Chargeすることはありません。
-
----
-
-## 例3：万能シャオンダマ
-
-```text
-AttackEvent
-C / E / G
-```
-
-がすべて未充填の場合、
-
-```text
-万能シャオンダマ
-↓
-C Slot
-```
-
-となります。
-
-Cが充填済みなら、
-
-```text
-万能シャオンダマ
-↓
-E Slot
-```
-
-となります。
-
-既に充填済みのC Slotへ追加Chargeすることはありません。
-
----
-
-## 例4：現在Eventに対応音がない
-
-```text
-AttackEvent 1
+Current AttackEvent 1
 C / E / G
 
-AttackEvent 2
+後続AttackEvent 2
 A / B / D
 ```
 
-現在Charge対象がAttackEvent 1のときにAをChargeしても、
-
-```text
-AttackEvent 2
-A Slot
-```
-
-へは送りません。
+CurrentがAttackEvent 1のときにAをClick Chargeしても、AttackEvent 2のA Slotへは送りません。
 
 ```text
 AttackEvent 1にAの未充填Slotなし
@@ -1164,131 +1333,218 @@ AttackEvent 1にAの未充填Slotなし
 Charge失敗
 ```
 
-です。
-
 Weak Attackにも変換しません。
 
 ---
 
-## 例5：完全充填後に次へ進む
+## 例3：同音Slot
 
 ```text
-AttackEvent 1
-C [●]
-E [●]
-G [ ]
-
-AttackEvent 2
-D [ ]
-F [ ]
-A [ ]
+AttackEvent
+C / C / E
 ```
 
-ここでGをChargeすると、
+最初のCは、
 
 ```text
-AttackEvent 1
-C [●]
-E [●]
-G [●]
+C Slot 1
 ```
 
-となり、AttackEvent 1が完全充填します。
-
-その時点で、
+次のCは、
 
 ```text
-AttackEvent 1へのCharge終了
+C Slot 2
+```
+
+へ割り当てます。
+
+2つとも充填済みなら、さらにCをChargeしても既存C Slotへ重複Chargeしません。
+
+---
+
+## 例4：Dragの選択順が異なってもsuccess
+
+```text
+Current AttackEvent
+C / E / G
+
+Drag選択順
+G → C → E
+```
+
+選択順ではなく全体の割り当て可能性を見るため、
+
+```text
+C → C Slot
+E → E Slot
+G → G Slot
+```
+
+と対応可能ならsuccessです。
+
+発射順はDrag選択順ではなくAttackEvent側の音楽的順序を使用します。
+
+---
+
+## 例5：Dragに余分な音がある
+
+```text
+Current AttackEvent
+C / E
+
+Drag
+C / E / G
+```
+
+は、
+
+```text
+Gが余分
 ↓
-AttackEvent 2を現在Charge対象にする
+Drag全体miss
+↓
+C / Eもcommitされない
 ```
 
 となります。
 
-以降のChargeはAttackEvent 1ではなくAttackEvent 2に対して判定します。
-
 ---
 
-## 例6：すべての通常AttackEventを処理した後
+## 例6：Dragが不足する
 
 ```text
-AttackEvent 1 完全充填
-AttackEvent 2 完全充填
-AttackEvent 3 完全充填
-↓
-現在Charge対象の通常AttackEventなし
+Current AttackEvent
+C / E / G
+
+Drag
+C / E
 ```
 
-となった場合、以降の通常シャオンダマはWeak Attackとして使用できます。
+は、
 
 ```text
-C → Weak Attack
-D → Weak Attack
-E → Weak Attack
-F → Weak Attack
-G → Weak Attack
-A → Weak Attack
-B → Weak Attack
-```
-
-通常AttackEventで要求されていた音名かどうかによってWeak Attackの可否を変更しません。
-
----
-
-## 例7：受付終了した未完成AttackEvent
-
-```text
-AttackEvent 1
-C [●]
-E [ ]
-G [ ]
-
+Gが不足
 ↓
-Charge受付期間終了
-```
-
-この場合、AttackEvent 1は未完成ですがCharge対象から外れます。
-
-```text
-AttackEvent 1
-Charge受付終了
+Drag全体miss
 ↓
-過去のAttackEventとして処理
-↓
-再Charge不可
-```
-
-次の通常AttackEventが存在する場合は、そのAttackEventへ進みます。
-
-存在しない場合は、
-
-```text
-現在Charge対象の通常AttackEventなし
-↓
-Weak Attack使用可能
+C / Eもcommitされない
 ```
 
 となります。
 
-AttackEvent 1に未充填のE / G Slotが残っていることを理由にWeak Attackを禁止しません。
+---
+
+## 例7：Dragと同音Slot
+
+```text
+Current AttackEvent
+C / C / E
+
+Drag
+E / C / C
+```
+
+は、Cを2個・Eを1個持つため成立できます。
+
+```text
+Drag
+E / C / E
+```
+
+はCが1個不足しEが1個余るためmissです。
 
 ---
 
-## 例8：通常AttackEventが最初から存在しない
-
-現在Charge対象となる通常AttackEventが最初から存在しない場合、
+## 例8：Drag中に次Eventへまたがない
 
 ```text
-現在Charge対象の通常AttackEventなし
+Current AttackEvent 1
+C / E
+
+後続AttackEvent 2
+G / B
+
+Drag
+C / E / G
+```
+
+C / EでAttackEvent 1を満たし、GだけをAttackEvent 2へ送る処理は行いません。
+
+```text
+AttackEvent 1の未充填Slot = C / E
+Drag = C / E / G
 ↓
-通常ShaondamaをCharge
+Gが余分
 ↓
-Weak Attackとして処理
+Drag全体miss
 ```
 
 となります。
 
-この場合も通常AttackEvent用の音名照合は行いません。
+---
+
+## 例9：万能Shaondamaを含むDrag
+
+```text
+Current AttackEvent
+C / E / G
+
+Drag
+C / E / 万能
+```
+
+は、万能Shaondamaを残りのG Slotへ対応させられるためsuccessです。
+
+---
+
+## 例10：通常ShaondamaのWeak
+
+```text
+Current Normal AttackEventなし
+↓
+C ShaondamaをWeak Charge
+↓
+そのShaondama自身のsource NoteEvent occurrenceを取得
+↓
+Weak AttackEvent Cを生成
+↓
+Reserved
+↓
+source NoteEvent発音時刻で発火
+```
+
+別周回のC NoteEventへ付け替えません。
+
+---
+
+## 例11：万能ShaondamaのWeak
+
+```text
+Weak Charge判定時刻 = T0
+
+次のNoteEvent
+E4 @ T1
+G4 @ T2
+```
+
+`T1 > T0`かつT1が最初の発音時刻であれば、万能ShaondamaはE4のNoteEventへ解決します。
+
+そのNoteEventから実効Pitch / octave / RGB等を取得し、E4に対応するWeak AttackEventを生成します。
+
+---
+
+## 例12：万能Weakで次NoteEventが完全同時
+
+```text
+Weak Charge判定時刻 = T0
+
+MusicChart定義順
+1. C4 @ T1
+2. E4 @ T1
+3. G4 @ T1
+```
+
+3つが同時に次のNoteEventである場合、MusicChart定義順の先頭であるC4へ解決します。
 
 ---
 
@@ -1302,17 +1558,17 @@ Weak Attackとして処理
 * DragCharging
 * 入力判定
 * 対象選択
+* Drag中の選択状態
+* Release検出
+* Charge判定Eventを発生させるタイミング
 * ActionState
-* Charge判定を発生させるタイミング
 * キャンセル
-* Charge Actionとしてのsuccess / miss
+* Actionとしてのsuccess / miss通知
 * Charge中断処理
 
-本ページではこれらを再定義しません。
+本ページでは、Charge判定Eventを受け取った後の**Current決定・Slot割り当て・Weak割り当て・atomic commit**を定義します。
 
-Weak Attack用Charge時にClick / Dragをどのように制限するかも、Action側の仕様として扱います。
-
-本ページが定義するのは、現在Charge対象となる通常AttackEventが存在しない場合にWeak Attack側へ割り当てることです。
+Weak時にClick / Drag入力をどのように許可・制限するかはPlayer Action側の責務であり、本ページでは新しいActionStateや入力遷移を追加しません。
 
 ---
 
@@ -1326,10 +1582,11 @@ Weak Attack用Charge時にClick / Dragをどのように制限するかも、Act
 * Arpeggio順序
 * Harmony
 * 音楽上のタイミング
-* Charge受付期間に関係する時間情報
+* 音楽時間上のCharge対象順を決める時間情報
+* Charge受付期間
 * 発火タイミング
 
-本ページではこれらを再定義しません。
+本ページでは、これらの時間データ自体を再定義せず、Current決定時にその論理順を使用します。
 
 ---
 
@@ -1338,14 +1595,42 @@ Weak Attack用Charge時にClick / Dragをどのように制限するかも、Act
 以下を正とします。
 
 * AttackEvent発火時のGameplay判定
-* 全Slot成立
-* 不完全完成
+* Complete / Incomplete / Zero Chargeの結果
 * Chord / Arpeggioの攻撃処理
-* 使用するCharge済みシャオンダマ実体
+* 使用するReserved Shaondama実体
 * Palette Bullet化
-* 発射
+* Palette Bullet発射
 
 本ページでは、発火時にSlotを再割り当てしません。
+
+---
+
+## `shaondama-music/orb-data.md`
+
+通常ShaondamaがWeakへ割り当てられるために必要な、
+
+* source NoteEvent identity
+* source NoteEvent occurrence
+* Loop周回を区別する情報
+* その他NoteEvent由来runtime data
+
+のデータ契約を正とします。
+
+本ページでは、それらの値がShaondamaから取得可能であることを前提として割り当て規則を定義します。
+
+---
+
+## `shaondama-music/floating-behavior.md`
+
+以下を正とします。
+
+* 通常Lifetime
+* source NoteEvent発音時刻へ未使用で到達した場合の自然破裂
+* 自然破裂時の弱い範囲攻撃
+* 自然破裂後の消滅
+* Reservedとのlifecycle接続
+
+本ページでは、Weak割り当て時に過去source NoteEvent例外を作らないための前提として、このlifecycleを参照します。
 
 ---
 
@@ -1357,36 +1642,7 @@ Weak Attack用Charge時にClick / Dragをどのように制限するかも、Act
 
 ただし、最終値は通常AttackEvent UI設計後に決定します。
 
----
-
-## Weak AttackEvent時のCharge Action制限
-
-Weak AttackEventは通常シャオンダマ1個単位で生成します。
-
-ただし、通常AttackEventが存在しない場合に、
-
-* DragCharging自体を開始不可とする
-* Drag操作を別の方法で1個Chargeへ制限する
-
-など、Player Actionとしてどのように入力を制限するかは `player/player-action-charge.md` 側で確定します。
-
-本ページでは新しいActionStateや入力遷移を追加しません。
-
----
-
-## 万能シャオンダマとWeak AttackEvent
-
-万能シャオンダマは、通常AttackEvent内のSlot解決規則については本ページで確定しています。
-
-一方、現在Charge対象となる通常AttackEventが存在しない期間に、
-
-* 万能シャオンダマをWeak Attackへ使用できるか
-* 使用できる場合にどのようなWeak AttackEventへ割り当てるか
-* 使用する場合の発火タイミング
-
-は現時点では確定していません。
-
-そのため、通常シャオンダマのWeak Attack規則を万能シャオンダマへ自動的に適用しません。
+この未決値はCurrent AttackEventの論理順、Click / DragのSlot割り当て、Weak割り当ての成立規則には影響しません。
 
 ---
 
@@ -1394,22 +1650,38 @@ Weak AttackEventは通常シャオンダマ1個単位で生成します。
 
 以下の実装は行いません。
 
-* 1つの通常AttackEvent Slotへ複数のShaondamaをChargeする
+* UI表示順をCurrent AttackEvent決定の根拠にする
+* 音楽時間上のCharge対象順が完全同時の場合に、MusicChart定義順以外の実装依存順でCurrentを決める
+* 1つの通常AttackEvent Slotへ複数ShaondamaをChargeする
 * 充填済みSlotへ追加Chargeする
 * 対応する未充填Slotがない場合に先頭の同音Slotへ重複Chargeする
 * 通常AttackEventが完全充填した後も、そのAttackEventへ追加Chargeする
-* 完全充填後に要求音だけを同じAttackEventへ追加Chargeする
 * 未完成の先行AttackEventを飛ばして後続AttackEventへChargeする
 * 選択音が一致するという理由だけで後続AttackEventを検索する
-* 発火が近いAttackEventを優先する
+* 発火が近いという理由だけで別AttackEventを優先する
 * 同音未充填Slotが複数ある場合に実装依存でランダムに選択する
-* 万能シャオンダマを任意の後続AttackEventへ入れる
-* 現在Charge対象の通常AttackEventが存在する状態でSlot不一致をWeak Attackへ逃がす
-* 現在Charge対象の通常AttackEventが存在する状態で、対応する同音Slotがすべて充填済みであることを理由にWeak Attackへ逃がす
-* Charge受付期間を終了した過去の未完成AttackEventを再びCharge対象にする
+* 万能Shaondamaを任意の後続AttackEventへ入れる
+* Current Normal AttackEventが存在する状態でSlot不一致をWeak Attackへ逃がす
+* Current Normal AttackEventが存在する状態で、対応する同音Slotがすべて充填済みであることを理由にWeak Attackへ逃がす
+* Charge受付期間を終了した過去の未完成AttackEventを再びCurrentにする
 * 過去に未完成AttackEventが存在することだけを理由にWeak Attackを禁止する
-* Slotから物理弾丸を新規生成する
+* Drag中にSlotへ逐次commitする
+* Dragを複数の単体Chargeとして順番に処理する
+* Drag途中でCurrent AttackEventが完全充填したことを理由に、残りShaondamaを後続AttackEventへ送る
+* Dragの一部だけを成功として残す
+* Drag miss時に一部Slotだけを書き換えた状態を残す
+* Drag選択順をDrag成立条件にする
+* Drag選択順をArpeggio発射順にする
+* 同音Slotを集合として扱い、必要個数を無視する
+* 通常ShaondamaのWeakで別周回の同名NoteEventへsourceを付け替える
+* 通常ShaondamaのWeakで「source NoteEventが過去なら別NoteEventへ付け替える」という例外処理を追加する
+* 万能ShaondamaをWeakで使用不可とする
+* 万能ShaondamaのWeakを旧「待機コードの不足音」へ割り当てる
+* 万能ShaondamaのWeakで次NoteEventが同時の場合にランダム選択する
+* 万能ShaondamaへWeak解決結果のPitch / octave等を恒久的な固有値として書き込む
 * Weak AttackEventを通常AttackEventの蓄積上限へ含める
-* Weak Charge済みShaondamaを、後から表示された通常AttackEventへ再割り当てする
-* 本ページ内で発火時の成立判定・使用Bullet決定を再定義する
-
+* Weak Charge済みShaondamaを、後からCurrentになった通常AttackEventへ再割り当てする
+* Charge成功した瞬間にPalette Bullet化する
+* Reserved中も通常Lifetimeを進行させ、AttackEvent解決前にShaondamaを通常Lifetimeで消滅させる
+* Slotから物理Palette BulletをCharge時点で新規生成する
+* 本ページ内でAttackEvent発火時の成立判定・使用Bullet決定を再定義する
