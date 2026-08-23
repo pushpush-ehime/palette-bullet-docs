@@ -99,8 +99,7 @@ Aimingの開始・終了の成立条件そのものは [Playerアクション｜
 ## 未決事項
 
 - `AimFOV`・`AimCameraOffset`・`AimCameraTransitionDuration`・`AimLookSensitivityMultiplier` の数値（Player側パラメータと共通）
-- 肩越しズームでの拡大率の方向性（旧FPS案の「約1.6倍」をどこまで踏襲するか）
-- マーカーを付ける以外にエイムを使う場面があるか
+- 肩越しズームでの拡大率
 
 ## 関連タスク
 
