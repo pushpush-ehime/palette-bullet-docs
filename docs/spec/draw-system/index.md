@@ -56,32 +56,32 @@ Current Normal AttackEventが存在する？
 ├─ Yes
 │   ↓
 │   Current Normal AttackEvent / SlotへAllocationを試行
+│   ↓
+│   Allocation成立？
+│   ├─ Yes → Charge success
+│   └─ No  → miss → Charge終了
 │
 └─ No
+    ↓
+    Weak AttackEventを動的生成
     ↓
     Weak AttackEventへAllocationを試行
+    ↓
+    Allocation成立？
+    ├─ Yes → Charge success
+    └─ No  → miss → Charge終了
+        　
+Charge success
 ↓
-有効なAllocationが成立する？
-│
-├─ Yes
-│   ↓
-│   Charge success
-│   ↓
-│   ShaondamaをReservedとして保持
-│   ↓
-│   AttackEvent発火
-│   ↓
-│   Complete / Incomplete / Zero Chargeを解決
-│   ↓
-│   使用するReserved ShaondamaをPalette Bullet化
-│   ↓
-│   発射
-│
-└─ No
-    ↓
-    miss
-    ↓
-    Charge終了
+ShaondamaをReservedとして保持
+↓
+AttackEvent発火
+↓
+Complete / Incomplete / Zero Chargeを解決
+↓
+使用するReserved ShaondamaをPalette Bullet化
+↓
+発射
 ```
 
 このフローは、チャージシステム全体を把握するための概要です。
