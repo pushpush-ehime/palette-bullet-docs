@@ -78,7 +78,6 @@ status: 仮仕様
 本ページの値は「通常状態」のもの。以下の状態では別ページの定義が本ページの値を上書きする。
 
 - ダッシュ時: [カメラの基準配置（ダッシュ時）](/spec/camera/CameraBasicPosition-dash)
-- ドローモード中: [ドローモード時のカメラ](/spec/camera/draw-mode)
 - エイム（覗き込み）時: [エイム時のカメラ](/spec/camera/aim)
 - 障害物と干渉するとき: [カメラの障害物処理](/spec/camera/collision)
 
