@@ -9,7 +9,6 @@ team: プログラム
 priority: B
 milestone: プロトタイプ
 relatedSpecs:
-  - /spec/camera/draw-mode
 ---
 
 # PB-TASK-0005｜ドローモード時のFPSカメラを実装する
