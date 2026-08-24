@@ -5,7 +5,7 @@ pageType: spec
 category: ゲーム全体
 categoryOrder: 10
 order: 0
-status: 未決
+status: 確定
 ---
 
 # ゲーム全体
@@ -17,117 +17,275 @@ status: 未決
 
 ## 目的
 
-ゲーム開始から終了までの基本的な流れと、各システムの役割・接続関係を定義します。
+ゲーム開始からBattle終了、Retryまでの基本的な流れと、各システムの役割・接続関係を定義します。
 
-本ページでは、Player、BGM / MusicChart、ラジクジラ、シャオンダマ、Charge、AttackEventなどが、ゲーム全体としてどのようにつながるかを扱います。
+本ページは、ゲーム・ステージ・Battleの高レベルな進行、Clear／Game Overの条件と結果確定規則、Battle開始・終了時の通知順、Pauseを利用できる範囲、およびRetry時のシステム横断リセット契約の正本です。
 
-個別機能の詳しい挙動は、それぞれの仕様ページで定義します。
+Player State、Charge、Allocation、MusicChart、AttackEvent、シャオンダマ、Palette Bullet、Marker、Enemy Damageなどの内部処理は、それぞれの仕様ページを正本とします。
 
 ## プレイヤーから見た挙動
 
 | 項目 | 内容 | 状態 |
 |---|---|---|
 | ゲーム形式 | 色と音を使って敵を浄化する3Dアクション | 確定 |
-| プレイヤーの役割 | 戦場を移動し、シャオンダマを選択・Chargeして攻撃を構成する | 確定 |
+| Playerの役割 | 戦場を移動し、シャオンダマを選択・Chargeして攻撃を構成する | 確定 |
 | コア体験 | 色と音で世界をつなぐ爽快ドローアクション | 確定 |
-| 戦闘の目的 | 敵を浄化し、ステージのクリアを目指す | 確定 |
+| Battleの目的 | ステージ内の対象Enemyをすべて浄化し、Clearを目指す | 確定 |
+| Player死亡後 | その場では復活せず、Retryによってステージを最初から開始する | 確定 |
 
-## 詳細仕様
+## ゲーム全体の進行
+
+ゲーム全体は、以下の段階で進行します。
+
+```text
+ゲーム開始
+↓
+拠点
+↓
+ステージ選択・準備
+↓
+Battle開始
+↓
+通常Battle
+↓
+ClearまたはGame Over
+↓
+終了側の画面・演出
+↓
+次の進行またはRetry
+```
+
+各画面の構成、遷移演出、Fade、SE、およびリザルトの表示内容はUI／演出側の仕様を正本とします。
+
+## 基本戦闘フロー
 
 ゲーム全体における基本的な戦闘フローは、以下の通りです。
 
-1. 戦闘を開始する
-2. 戦闘BGMとMusicChartが進行する
-3. BGM / MusicChart側で生成対象となるシャオンダマが決定される
-4. 生成要求を受け、ラジクジラからシャオンダマが世界内へ出現する
-5. AttackEventが予告される
-6. Playerが世界内のシャオンダマから対象を選択する
-7. 選択したシャオンダマに対してChargeを行う
-8. Chargeした対象をパレットブレット化し、Slotへ登録する
-9. AttackEventが発火する
-10. 構成した攻撃を発射する
-11. 敵の状態とクリア条件を判定する
-12. クリアまたはゲームオーバーまで戦闘を繰り返す
+1. Stage、Player、Enemy、およびBattle参加対象を初期化する
+2. 戦闘BGMとMusicChartを開始する
+3. Combatを開始し、Playerの戦闘操作を受け付ける
+4. BGM／MusicChartが、生成するシャオンダマと生成タイミングを決定する
+5. 生成要求を受けたラジクジラが、シャオンダマを世界内へ出現させる
+6. AttackEventを予告する
+7. Playerが世界内のシャオンダマからCharge対象を選択する
+8. Charge判定を行い、Normal AttackEventのCurrent／SlotまたはWeak AttackEventへAllocationする
+9. Charge successとなったシャオンダマをReservedとして保持する
+10. AttackEventを発火する
+11. Complete／Incomplete／Zero ChargeまたはWeakの結果を解決する
+12. 使用するReserved Shaondamaを確定し、Palette Bullet化する
+13. Chord／Arpeggio／Weakの規則に従ってPalette Bulletを発射する
+14. Palette Bulletの命中、Enemy Damage、および浄化を処理する
+15. Clear候補とGame Over候補を収集し、Battle結果を確定する
+16. Battle結果が未確定である間、4から15までを繰り返す
 
-各工程の内部処理や成立条件は、本ページでは定義しません。
+Charge success時には、シャオンダマを即座にPalette Bullet化しません。Charge success時の到達点はAllocationおよびReserved化であり、Palette Bullet化はAttackEvent発火時に、使用するReserved Shaondamaが確定した後で行います。
 
-特にシャオンダマ生成については、
+Allocation、Reserved、AttackEvent結果、使用対象の選択、Chord／Arpeggio／Weakの各規則は、それぞれの正本となる仕様ページで定義します。
+
+## シャオンダマ生成の責務
+
+シャオンダマ生成は、以下の責務で分離します。
 
 ```text
-BGM / MusicChart
-「何を・いつ生成するか」
+BGM／MusicChart
+「何を・いつ・何個生成するか」
         ↓
 ラジクジラ
-「世界内でどう出現させるか」
+「世界内へどう出現させるか」
         ↓
 シャオンダマ
-「生成後の存在・挙動」
+「出現後にどう存在・挙動するか」
 ```
 
-という責務で分離します。
-
-Charge、パレットブレット化・Slot登録、AttackEventについても、それぞれの正本となる仕様ページで詳細を定義します。
+- BGM／MusicChartは、生成対象、生成数、および生成タイミングを決定します。
+- ラジクジラは、生成要求を受けてシャオンダマを世界内へ出現させます。
+- 世界内へ出現した後のシャオンダマのlifecycleと挙動は、シャオンダマ側が管理します。
+- ラジクジラは、ChargeやAttackEventの成立判定へ直接関与しません。
 
 ## 状態別の挙動
 
 以下はゲーム全体の進行を高レベルに整理したものであり、PlayerのState構造そのものを定義するものではありません。
 
-| 状態・段階            | 内容                                            | 状態中に動作する主なシステム                 |
-| ---------------- | --------------------------------------------- | ------------------------------ |
-| 戦闘開始前            | ステージと戦闘を準備する                                  | ステージ、敵、BGM、UI                  |
-| 通常戦闘             | Playerが移動・回避・状況確認を行い、戦闘BGM / MusicChartが進行する  | Player、カメラ、敵、BGM               |
-| シャオンダマ生成         | BGM / MusicChart側で生成対象が決まり、ラジクジラから世界内へ出現する    | BGM、MusicChart、ラジクジラ、シャオンダマ    |
-| AttackEvent予告    | AttackEventに向けてPlayerが攻撃構成を準備する               | BGM、AttackEvent、UI             |
-| シャオンダマ選択・Charge  | Playerがシャオンダマを選択し、Chargeしてパレットブレット化・Slot登録を行う | Player、シャオンダマ、Charge、ドローシステム   |
-| AttackEvent発火・発射 | AttackEventの発火に合わせて構成した攻撃を発射する                | Player、BGM、AttackEvent、戦闘、敵、演出 |
-| クリア              | ステージクリア処理を行う                                  | UI、演出、ステージ                     |
-| ゲームオーバー          | 戦闘終了処理を行う                                     | UI、演出、ステージ                     |
+| 状態・段階 | 内容 | 状態中に動作する主なシステム |
+|---|---|---|
+| 拠点 | Playerが通常操作を行い、ステージ開始前の準備を行う | Player、カメラ、拠点、UI、BGM |
+| Battle開始前 | Stage、Player、Enemy、Battle参加対象を初期化する | Stage、Combat、Player、Enemy、BGM、UI |
+| 通常Battle | Playerが移動・回避・状況確認を行い、戦闘BGM／MusicChartが進行する | Player、カメラ、Enemy、Combat、BGM、UI |
+| シャオンダマ生成 | BGM／MusicChartが生成対象を決定し、ラジクジラが世界内へ出現させる | BGM、MusicChart、ラジクジラ、シャオンダマ |
+| AttackEvent予告 | AttackEventに向けてPlayerが攻撃構成を準備する | BGM、AttackEvent、UI |
+| シャオンダマ選択・Charge | Playerが対象を選択し、Charge判定、Allocation、Reserved化までを行う | Player、シャオンダマ、Charge、チャージシステム |
+| AttackEvent発火・発射 | 結果と使用Reservedを確定し、Palette Bullet化して発射する | Player、BGM、AttackEvent、チャージシステム、Combat、Enemy、演出 |
+| Clear処理 | Battle結果をClearとして固定し、戦闘を終了してClear側の処理へ移行する | Game、Combat、Stage、BGM、UI、演出 |
+| Game Over処理 | Battle結果をGame Overとして固定し、Player死亡側の処理へ移行する | Game、Player、Combat、Stage、BGM、UI、演出 |
+| Retry | 旧BattleのRuntime状態を破棄し、ステージ開始状態を再構築する | Game、Stage、Player、Enemy、Combat、BGM、UI |
 
-Playerの具体的なState、ActionState、遷移条件についてはPlayer仕様を正本とします。
+Playerの具体的なRootState、ActionState、および遷移条件はPlayer仕様を正本とします。
 
-## クリア・ゲームオーバー
+## Battle開始lifecycle
 
-| 判定      | 条件            | 判定後          |
-| ------- | ------------- | ------------ |
-| クリア     | ステージ内の全敵を浄化する | クリア状態へ移行     |
-| ゲームオーバー | 汚染度が上限に達する    | ゲームオーバー状態へ移行 |
+Battle開始時は、以下の高レベルな順序で処理します。
+
+```text
+Stageを準備する
+↓
+Player、Enemy、Battle対象を初期化する
+↓
+ラジクジラなどのBattle参加状態を準備する
+↓
+戦闘BGM／MusicChartを開始する
+↓
+Combatを開始する
+↓
+Playerの戦闘操作を受け付ける
+```
+
+- Playerの戦闘操作は、必要なBattle参加対象の初期化とCombat開始が完了するまで受け付けません。
+- Battle開始前に、前のBattleに属するRuntime状態を参照してはいけません。
+- 個々のシステムの内部初期化手順は各所有ページで定義しますが、Playerの操作受付開始より前に必要な初期化を完了させます。
+
+## Clear・Game Over
+
+| 判定 | 条件 | 判定後 |
+|---|---|---|
+| Clear候補 | ステージ内でClear対象に指定されたすべてのEnemyが浄化済みになる | 結果確定規則へ渡す |
+| Game Over候補 | Playerの`CurrentHP <= 0`となり、`RootState = Dead`が成立する | 結果確定規則へ渡す |
+
+Game Over後は、Player仕様に従って死亡モーション、死亡画面、Retryへ接続します。
+
+汚染度は現在のGame Over条件として使用しません。将来Game Over条件へ追加する場合は、値の所有者、増減条件、上限、UI表示、およびHP条件との優先関係を別途仕様化してから、本ページへ追加します。
+
+## Battle結果の確定規則
+
+- Clear候補とGame Over候補は、同じ更新単位内で収集してから評価します。
+- 1回のBattleで確定できる最終結果は、ClearまたはGame Overのいずれか1つだけです。
+- Clear候補とGame Over候補が同じ更新単位内で成立した場合は、**Clearを優先**します。
+- Battle結果は一度だけ確定します。確定後の命中、浄化、Damage、演出、通知によって結果を変更しません。
+- 結果確定後に既存の命中演出や終了演出を継続する場合も、Clear／Game Overの再判定は行いません。
+- 各システムは、確定済み結果を受け取り、独自に別のBattle結果を確定してはいけません。
+
+## Battle終了lifecycle
+
+ClearまたはGame Overの候補が成立した場合は、以下の高レベルな順序で終了処理を行います。
+
+```text
+Clear／Game Over候補を収集する
+↓
+優先規則に従ってBattle結果を1つに確定する
+↓
+新しい戦闘操作、Charge、生成要求、AttackEvent開始を停止する
+↓
+各システムへBattle終了と確定結果を通知する
+↓
+BGM同期イベントとCombatの戦闘進行を停止する
+↓
+Clear側または死亡・Game Over側の処理へ移行する
+```
+
+- Battle結果確定後は、新しいAttackEvent、シャオンダマ生成、Charge、Allocation、攻撃発射を開始しません。
+- 終了通知には、確定したBattle結果と終了対象Battleを識別できる情報を含めます。
+- 各システムは終了通知を複数回受けても、同じBattleに対する終了処理を重複実行してはいけません。
+- 終了時点ですでに存在する演出やRuntime objectを即時消去するか、終了演出として残すかは各所有ページで定義します。ただし、それらが新しい戦闘結果を発生させてはいけません。
+- BGM、MusicChart、およびBGM同期イベントの具体的な停止方法はBGM側の仕様を正本とします。
+
+## Pause
+
+Pauseは、Playerが通常操作できる次の段階でのみ利用できます。
+
+- 拠点滞在中
+- 通常Battle中
+
+以下の段階ではPauseを開始できません。
+
+- Battle開始前の準備・初期化中
+- Battle結果の確定後
+- Clear処理およびClear演出中
+- Playerの死亡モーションおよびGame Over処理中
+- Retryによる破棄・再初期化中
+- 通常操作を受け付けない画面遷移・演出中
+
+Pause開始後にBattle結果を確定させる処理は進行させません。Pause画面の内容、再開操作、およびPause中も継続する表示・音響の詳細はUI、BGM、および各所有ページで定義します。
+
+## Retry・リセット契約
+
+Retryは死亡地点からのその場復活ではありません。現在のBattleを終了し、旧BattleのRuntime状態を破棄したうえで、対象ステージを開始状態から再構築します。
+
+Scene Reloadまたはin-place resetのどちらを使用するかは実装上の選択とし、本ページでは指定しません。どちらの方式でも、以下のリセット結果を満たす必要があります。
+
+| 対象 | Retry後の状態 | 詳細の所有者 |
+|---|---|---|
+| Player | HP／Staminaを全回復し、ステージ開始時のState、位置、向きへ戻す | Player、Stage |
+| Enemy | ステージ開始時のEnemy集合、位置、浄化値、HP、行動状態へ戻す | Enemy、Stage |
+| Combat | 新しいBattleとして未確定結果から開始し、旧Battleの通知・判定状態を破棄する | Combat |
+| BGM／MusicChart | 旧Battleの音楽時計と同期イベントを停止・破棄し、0から再開始する | BGM／MusicChart |
+| Normal AttackEvent occurrence | 旧Battle分を破棄し、新しいBattle用に最初から再生成する | BGM／AttackEvent |
+| Weak AttackEvent | 旧Battle分をすべて破棄する | BGM／AttackEvent、チャージシステム |
+| Shaondama | 旧Battleに属するworld objectを持ち越さず、新しい生成要求から出現させる | シャオンダマ、ラジクジラ |
+| Reserved／Allocation | Current、Slot、Weakを含む旧Battle分をすべて破棄し、空の状態から開始する | チャージシステム |
+| Palette Bullet／Marker | 旧Battleに属するobjectと保留中の命中処理を持ち越さない | Combat |
+| ラジクジラ | 新しいBattleの初期位置、表示、存在状態へ戻す | ラジクジラ、Stage |
+| Stage進行・ギミック | ステージ開始時の進行度、配置、作動状態へ戻す | Stage |
+| UI | HP、Slot、予告、結果表示、Pause表示など、旧Battle由来の表示状態を破棄・再構築する | UI |
+| 入力・入力バッファ | 旧Battle中の押下状態、予約入力、選択対象を破棄する | Player、入力、UI |
+| VFX／SE／演出 | 旧Battleに属し、新Battleへ影響する再生・予約状態を持ち越さない | 演出、各所有システム |
+
+Retry完了後は、Battle開始lifecycleに従って初期化し、必要な準備が完了してからPlayerの戦闘操作を受け付けます。
 
 ## 他システムとの接続
 
-| システム             | ゲーム全体での役割                                     | 詳細ページ                                                                             |
-| ---------------- | --------------------------------------------- | --------------------------------------------------------------------------------- |
-| Player           | 移動・回避・シャオンダマ選択・Charge・攻撃操作を行う                 | [Player](/spec/player/)                                                           |
-| BGM / MusicChart | 音楽進行を管理し、シャオンダマの生成対象・生成タイミングなどを決定する           | [MusicChart](/spec/bgm/bgm-music-chart)、[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
-| ラジクジラ            | BGM側からの生成要求を受け、通常シャオンダマを世界内へ出現させる             | [ラジクジラ](/spec/radiowhale/)                                                        |
-| シャオンダマ・音楽連動      | 世界内へ出現したシャオンダマの存在・挙動と、音・色との関係を管理する            | [シャオンダマ・音楽連動](/spec/shaondama-music/)                                             |
-| Charge           | Playerが生成済みシャオンダマを選択し、攻撃へ利用するためのCharge処理を管理する | [Playerアクション｜チャージ](/spec/player/player-action-charge)                             |
-| AttackEvent      | BGM上の攻撃タイミングと発火を管理する                          | [AttackEvent](/spec/bgm/bgm-attack-event)                                         |
-| ドローシステム          | パレットブレットのSlot割当・蓄積・成立判定を管理する                  | [ドローシステム](/spec/draw-system/)                                                     |
-| カメラ              | 戦場と選択対象を表示する                                  | [カメラ](/spec/camera/)                                                              |
-| 戦闘               | 攻撃と浄化判定を処理する                                  | [戦闘](/spec/combat/)                                                               |
-| 敵                | 攻撃対象と敵の状態を管理する                                | [敵](/spec/enemy/)                                                                 |
-| ステージ             | 戦闘開始・終了・進行を管理する                               | [ステージ](/spec/stage/)                                                              |
-| UI               | プレイヤーに現在の状態を伝える                               | [UI](/spec/ui/)                                                                   |
-| 演出               | 色・音・攻撃結果を視覚的に伝える                              | [演出](/spec/effects/)                                                              |
+| システム | ゲーム全体での役割 | 詳細ページ |
+|---|---|---|
+| Player | 移動、回避、対象選択、Charge、HP 0によるDead、およびPlayer内部のRetry初期化を管理する | [Player](/spec/player/)、[Player死亡](/spec/player/player-death)、[Playerステータス](/spec/player/player-status) |
+| BGM／MusicChart | 音楽進行、シャオンダマ生成内容・タイミング、AttackEvent時刻、Battle終了・Retry時の音楽時計を管理する | [MusicChart](/spec/bgm/bgm-music-chart)、[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[Gameplay接続](/spec/bgm/bgm-gameplay-connection) |
+| AttackEvent | BGM上の攻撃タイミング、発火時の結果、使用Reserved、およびPalette Bullet化対象を確定する | [AttackEvent](/spec/bgm/bgm-attack-event)、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
+| ラジクジラ | BGM側の生成要求を受け、通常シャオンダマを世界内へ出現させる | [ラジクジラ](/spec/radiowhale/)、[Gameplayライフサイクル](/spec/radiowhale/gameplay-lifecycle) |
+| シャオンダマ・音楽連動 | 世界内へ出現したシャオンダマの存在・挙動と、音・色との関係を管理する | [シャオンダマ・音楽連動](/spec/shaondama-music/) |
+| Charge | Playerによる対象選択とCharge入力・成立処理を管理する | [Playerアクション｜チャージ](/spec/player/player-action-charge) |
+| チャージシステム | Current／Slot／WeakへのAllocationとReserved状態を管理する | [チャージシステム](/spec/draw-system/)、[Charge Allocation](/spec/draw-system/charge-allocation) |
+| Combat | Battle状態、開始・終了通知、Palette Bullet／Marker、命中、および浄化判定を管理する | [戦闘](/spec/combat/)、[Palette Bullet](/spec/combat/palette-bullet)、[Marker](/spec/combat/marker) |
+| Enemy | 攻撃対象、Damage、浄化状態、およびClear候補の成立を管理する | [敵](/spec/enemy/)、[Damage・浄化](/spec/enemy/damage-and-purify) |
+| Stage | 初期配置、Clear対象Enemy集合、Stage進行、およびRetry時のStage再初期化を管理する | [ステージ](/spec/stage/) |
+| カメラ | 拠点・Battle中の視界と選択対象を表示する | [カメラ](/spec/camera/) |
+| UI | 現在状態、Pause、死亡画面、Clear／Game OverおよびResult表示を管理する | [UI](/spec/ui/) |
+| 演出 | 色、音、攻撃結果、Clear、死亡などを視覚・聴覚的に伝える | [演出](/spec/effects/) |
 
 ラジクジラに関する詳細仕様は、役割ごとに以下のページを正本とします。
 
-* ラジクジラそのもの：[ラジクジラ](/spec/radiowhale/)
-* Playerとの追従関係：[ラジクジラ｜追従・浮遊](/spec/radiowhale/follow-and-floating)
-* シャオンダマの世界内への出現：[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)
-* Gameplay上の存在・表示：[ラジクジラ｜Gameplayライフサイクル](/spec/radiowhale/gameplay-lifecycle)
-* Animation・VFX・Sound：[ラジクジラ｜Animation・VFX・Sound](/spec/radiowhale/animation-effects-sound)
-* 世界観：[ラジクジラ｜キャラクター・世界観](/spec/radiowhale/character-worldbuilding)
+- ラジクジラそのもの：[ラジクジラ](/spec/radiowhale/)
+- Playerとの追従関係：[ラジクジラ｜追従・浮遊](/spec/radiowhale/follow-and-floating)
+- シャオンダマの世界内への出現：[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)
+- Gameplay上の存在・表示：[ラジクジラ｜Gameplayライフサイクル](/spec/radiowhale/gameplay-lifecycle)
+- Animation・VFX・Sound：[ラジクジラ｜Animation・VFX・Sound](/spec/radiowhale/animation-effects-sound)
+- 世界観：[ラジクジラ｜キャラクター・世界観](/spec/radiowhale/character-worldbuilding)
+
+## 責務境界
+
+ゲーム結果、ゲーム全体lifecycle、Battle開始・終了の高レベルな順序、Pause可能範囲、およびRetry時に満たすべき全体リセット結果は、本ページを正本とします。
+
+以下は本ページで再定義しません。
+
+- Player Stateの内部構造とAction遷移
+- Charge入力および`success`／`miss`の成立条件
+- Current AttackEvent、Slot、Weak、Allocation、Reservedの内部構造
+- MusicChartの保存構造
+- AttackEventのTimingと結果判定
+- シャオンダマの個別lifecycle
+- Palette Bullet／Markerの飛翔、衝突、および消滅
+- EnemyへのRGB Damage計算と浄化値更新
+- UIレイアウト、表示内容、演出、SEの具体的内容
+- RetryにおけるScene Reload／in-place resetなどの内部実装方式
+
+詳細ページが本ページの全体lifecycleと矛盾する場合は、矛盾を放置せず、責務の正本に合わせて該当仕様を更新します。
 
 ## 例外・禁止事項
 
-* クリアまたはゲームオーバーが確定したら、戦闘操作を停止します。
-* 状態が切り替わったときは、Player・敵・BGM・UIへ変更を通知します。
-* 個別仕様がこのページと矛盾する場合は、矛盾を未決事項として記録します。
-* 本ページではPlayer State、MusicChart内部構造、シャオンダマ生成ロジック、Charge成立判定、AttackEvent成立・発火ロジックなどの詳細仕様を再定義しません。
-* BGM / MusicChartがシャオンダマの生成対象・生成タイミングを決定し、ラジクジラはその結果を受けて世界内への出現を担当します。
-* ラジクジラから世界内へ出現した後のシャオンダマの存在・挙動は、シャオンダマ側の仕様で管理します。
-* ラジクジラはChargeやAttackEventの成立判定には直接関与しません。
+- Charge success時にシャオンダマを即座にPalette Bulletへ変換してはいけません。
+- Palette Bullet化してからSlotへ登録してはいけません。
+- 所有者・更新規則が定義されていない汚染度をGame Over条件に使用してはいけません。
+- Battle結果確定後に、後続のDamageや浄化によって結果を変更してはいけません。
+- Battle結果確定後に、新しい戦闘操作、Charge、生成要求、AttackEvent、攻撃を開始してはいけません。
+- Retry後に、旧BattleのShaondama、Reserved、Allocation、Weak AttackEvent、Palette Bullet、Marker、Enemy状態、入力、UI状態を持ち越してはいけません。
+- ラジクジラへChargeやAttackEventの成立判定を担当させてはいけません。
+- 個別システムの内部仕様を本ページで重複定義してはいけません。
 
 ## パラメータ
 
@@ -135,12 +293,9 @@ Playerの具体的なState、ActionState、遷移条件についてはPlayer仕�
 
 ## 未決事項
 
-* クリアとゲームオーバーが同時に成立した場合の優先順位
-* 戦闘開始前にどのような準備演出を行うか
-* リザルト画面に表示する内容
-* リスタート時に初期化する対象
-* クリア・ゲームオーバー時のBGMと演出
-* ポーズ機能をどの状態で使用できるか
+ゲーム全体lifecycleに関する未決事項はありません。
+
+Battle開始前の準備演出、Result画面の表示内容、Clear／Game Over時の演出・SE、およびPause画面の詳細は、UI／演出／BGM側の仕様で定義します。
 
 ## 関連タスク
 
