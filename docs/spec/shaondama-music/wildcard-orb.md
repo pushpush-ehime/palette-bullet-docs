@@ -113,7 +113,7 @@ Wildcardは生成時点では、特定のNoteEventに由来しません。その
 - Normal用の固定RGB Damage値
 
 これらを仮値で埋めたり、生成時点で将来のAllocation先を予約したりしません。攻撃に使用する実効Note・実効色はAllocation時に解決します。
-
+Wildcard自身は固有音を持たず、発音時の実効Noteおよび使用する音は、Allocation先のAttackEventまたはNoteEvent occurrenceに基づいて解決する。
 ## 最低保証不足による補充
 
 ### 不足判定の所有者
