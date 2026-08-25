@@ -1,6 +1,6 @@
 ---
 title: "BGM MusicChart仕様"
-description: Palette BulletにおけるMusicChartのImportデータ、AttackEvent音楽データ、Timing Settings、手動設定データ構造
+description: Palette BulletにおけるMusicChartのImportデータ、Battle開始pre-roll、Shaondama最低保証、AttackEvent音楽データ、loop validation
 pageType: spec
 category: "BGM"
 status: 仮仕様
@@ -8,6 +8,17 @@ relatedTasks:
 ---
 
 # BGM MusicChart仕様
+
+## 別チャットへ渡すための短い概略
+
+このページは、**1曲分の静的なMusicChartデータ契約**の正本です。
+
+- MIDIから`TempoMap`と`NoteEvents`をImportする
+- Unity上でBGM、使用Track、Shaondama最低保証数、system pre-roll時間、AttackEvent、Random Section、同期補正を設定する
+- AttackEvent、特にArpeggioが1つのBGM loopをまたがないことをvalidationする
+- Runtimeの選択可能数監視、Wildcard補充、AttackEvent進行、loop occurrence、Charge判定そのものは保存しない
+
+別チャットでこのページを修正するときは、**「MusicChartに何を保存するか」だけを決め、保存値をGameplayでどう処理するかは各正本へ委譲する**方針を維持します。
 
 ## MusicChartとは
 
@@ -42,6 +53,7 @@ TempoMap / NoteEvents
 
 Unity上の手動設定
 ├─ Shaondama Settings
+├─ Battle Timing Settings
 ├─ AttackEvent Timing Settings
 ├─ Attack Events
 ├─ Random Sections
@@ -65,6 +77,7 @@ Unity上の手動設定
 - `TempoMap`
 - `NoteEvents`
 - `Shaondama Settings`
+- `Battle Timing Settings`
 - `AttackEvent Timing Settings`
 - `Attack Events`
 - `Random Sections`
@@ -121,8 +134,11 @@ MusicChart
 │
 ├─ Shaondama Settings                 [手動設定]
 │  ├─ 使用するTrack
-│  ├─ InitialTargetCount
+│  ├─ Minimum Selectable Shaondama Count
 │  └─ MinimumLeadTime
+│
+├─ Battle Timing Settings             [手動設定]
+│  └─ System Pre-roll Duration
 │
 ├─ AttackEvent Timing Settings        [手動設定]
 │  ├─ Preview / Charge Start Offset
@@ -167,6 +183,7 @@ MIDIから自動生成
 Unity上の手動設定
 ├─ BGM AudioClip
 ├─ Shaondama Settings
+├─ Battle Timing Settings
 ├─ AttackEvent Timing Settings
 ├─ Attack Events
 ├─ Random Sections
@@ -318,6 +335,7 @@ MIDIへどのTrack・Note情報を残すかについては、[BGM MIDIファイ�
 手動設定
 ├─ BGM AudioClip
 ├─ Shaondama Settings
+├─ Battle Timing Settings
 ├─ AttackEvent Timing Settings
 ├─ Attack Events
 ├─ Random Sections
@@ -343,7 +361,7 @@ MIDIへどのTrack・Note情報を残すかについては、[BGM MIDIファイ�
 ```text
 Shaondama Settings
 ├─ 使用するTrack
-├─ InitialTargetCount
+├─ Minimum Selectable Shaondama Count
 └─ MinimumLeadTime
 ```
 
@@ -373,13 +391,105 @@ Shaondama Settings
 
 Gameplayとして実際に使用するTrackはプランナーが決定します。
 
-### InitialTargetCount / MinimumLeadTime
+### Minimum Selectable Shaondama Count
 
-`InitialTargetCount`と`MinimumLeadTime`は、現行MusicChart構造上のシャオンダマ生成パラメータとして保持します。
+MusicChartは、その曲のBattle中に維持するShaondama最低保証数を設定できるようにします。
 
-`MinimumLeadTime`の具体的な使用規則、および`InitialTargetCount`を最終的にどの生成方式で使用するかは、本ページで確定しません。
+本ページでは概念名を`Minimum Selectable Shaondama Count`とします。具体的なC#フィールド名は固定しません。
 
-具体的な生成ルールは[BGM シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama)を正とし、本ページはその決定に追随して保存構造を更新します。
+この値が表す対象は、
+
+> **現在選択可能で、かつ`Reserved`ではないShaondamaの最低個数**
+
+です。
+
+以下は最低保証数へ算入しません。
+
+- 出現演出中で、まだ選択可能ではないShaondama
+- `Reserved`のShaondama
+- 論理生成要求だけが存在し、world上で選択可能になっていないShaondama
+
+同じ値を、次の2つの境界で使用します。
+
+```text
+Battle開始時
+→ 選択可能・非Reserved数が最低保証数へ到達するまで開始gateを満たさない
+
+Battle中
+→ 最低保証数を下回った場合、不足数分のWildcard生成要求へ接続する
+```
+
+出現演出中は一時的に最低保証数を下回って構いません。MusicChart自身は個数監視やWildcard生成要求を実行せず、静的な設定値だけを保持します。
+
+算入判定、要求中個数を含む重複防止、不足数分のWildcard補充は[BGM シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama)を正とします。出現演出完了と選択可能化は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)を正とします。
+
+最低保証数の具体値は調整パラメータとし、本ページでは固定しません。
+
+### MinimumLeadTime
+
+`MinimumLeadTime`は、NoteEvent由来のNormal Shaondamaを必要時刻より前に生成要求するための先行時間設定として保持します。
+
+これは選択可能数の最低保証値ではありません。また、Battle開始時だけ必要個数分のNoteEventを先読みする旧`InitialTargetCount`方式の代替でもありません。
+
+具体的な先行生成規則は[BGM シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama)を正とします。
+
+### 旧InitialTargetCountの扱い
+
+Battle開始時にNormal NoteEventを先読みして一定個数を生成するための旧`InitialTargetCount`は、最終仕様のパラメータとして使用しません。
+
+既存assetや実装に同名データが残っている場合は、`Minimum Selectable Shaondama Count`へ意味だけを読み替えず、migration対象として明示的に置換します。
+
+```text
+旧InitialTargetCount
+= Battle開始時のNormal先読み個数
+
+Minimum Selectable Shaondama Count
+= Battle開始時とBattle中を通した選択可能・非Reserved数の最低保証
+```
+
+両者は意味が異なります。
+
+---
+
+## Battle Timing Settings
+
+`Battle Timing Settings`は、Battle音楽runtime開始後、実際のBGM音源位置0を再生するまでに置くsystem側の無音pre-roll設定です。
+
+```text
+Battle Timing Settings
+└─ System Pre-roll Duration
+```
+
+### System Pre-roll Duration
+
+`System Pre-roll Duration`は、準備gateを満たしてBattle／Gameplay／MusicChart時計を開始してから、既存のBGMを音源位置0から再生し始めるまでの時間を表します。
+
+```text
+Enemy準備完了
++
+必要数の選択可能・非Reserved Shaondama準備完了
+↓
+Battle / Gameplay / MusicChart時計を開始
+↓
+System Pre-roll Duration
+├─ AttackEvent予告を開始可能
+└─ Charge受付を開始可能
+↓
+既存BGMを音源位置0から再生
+```
+
+pre-rollはMusicChartから参照できる手動設定値として保持しますが、次の素材自体へ無音や空小節を追加しません。
+
+- 完成BGMのAudioClip
+- FLAC等の音源素材
+- MIDI
+- MIDIからImportした`TempoMap`／`NoteEvents`
+
+音源位置0およびMIDI由来の曲本編位置0は、Battle音楽runtime上のpre-roll終了点へ対応します。具体的な内部timerやAudio再生予約方式は固定しません。
+
+pre-rollの具体時間は調整パラメータです。値は0以上とし、冒頭AttackEventの予告／Charge開始に必要な時間を確保できるかEditor validationで確認できる構造にします。ただしvalidationの具体的なUIや自動修正方法は固定しません。
+
+Battle開始gate、pre-roll中の時計、Pause／Resume、Room Retry、HitStopとの同期は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。
 
 ---
 
@@ -819,6 +929,47 @@ Arpeggioの発射順・各Timingでの消費・解決完了条件は、[BGM 攻�
 
 ---
 
+## AttackEventのloop境界validation
+
+1つのNormal AttackEventは、1つのBGM loop occurrence内で完結するデータとして定義します。
+
+特にArpeggioでは、次のすべてが同じloop区間内に存在しなければなりません。
+
+- AttackEventの`Fire Music Position`
+- 最初のArpeggio Entry Timing
+- 途中のArpeggio Entry Timing
+- 最後のArpeggio Entry Timing
+
+```text
+有効
+
+Loop N
+├─ Fire Music Position
+├─ Entry 1
+├─ Entry 2
+└─ Entry 3
+```
+
+```text
+無効
+
+Loop N
+├─ Fire Music Position
+├─ Entry 1
+└─ Entry 2
+
+Loop N + 1
+└─ Entry 3
+```
+
+曲末付近に配置したAttackEventのArpeggio Entryを、次loop先頭まで継続させるデータは作成しません。Runtime側で次loopへ分割、繰越、clamp、自動補正する方式も採用しません。
+
+EditorまたはImport後validationでは、MusicChartが使用する有効なBGM loop区間を参照し、AttackEventが同一loop内で完結することを確認できるようにします。loop区間をMusicChartへ直接保存するか、BGM再生設定から参照するかという具体的な保存構造は本ページでは固定しません。
+
+このvalidationはAttackEventの`Fire Music Position`とArpeggio Entry Timingを対象とします。冒頭AttackEventのPreview／Charge開始を曲本編位置0より前へ確保する処理は、loop跨ぎではなくsystem pre-rollとの接続として扱います。
+
+---
+
 ## Harmony
 
 AttackEventには、現行どおりHarmony情報を保持できるようにします。
@@ -974,6 +1125,26 @@ NoteEvent Definition
 
 具体的なsource NoteEvent occurrence identityの保持方法は、シャオンダマ側のデータ仕様へ委譲します。
 
+### 次loopを含むNoteEvent occurrence検索
+
+Runtimeは、現在loopの終端より後にある「次のNoteEvent」を検索するとき、検索をloop境界で終了せず、次loop先頭のNoteEvent occurrenceまで継続できる必要があります。
+
+```text
+Loop N 終端付近
+↓
+現在loop内に次のNoteEventなし
+↓
+Loop N + 1先頭から検索継続
+↓
+最初に成立するNoteEvent occurrence
+```
+
+これは、曲末でWildcard ShaondamaをWeak Chargeした場合の対象NoteEvent解決に使用します。
+
+MusicChartは各NoteEventの静的Definitionと曲内位置を保持し、Runtimeが`Definition + loop occurrence`として次周回の実体を一意に解決できるデータを提供します。次NoteEventの検索algorithm、tie-break、Weak Allocation自体は[Charge Allocation仕様](/spec/draw-system/charge-allocation)を正とします。
+
+この検索規則は、AttackEvent／Arpeggioをloop跨ぎで定義する許可ではありません。AttackEventは前節のvalidationどおり同一loop内で完結させます。
+
 ### Weak AttackEventとの分離
 
 Weak AttackEventはNormal AttackEventのようにMusicChartへ事前登録しません。
@@ -1010,8 +1181,9 @@ MusicChartに存在する値の決定元は、以下を基本とします。
 | `NoteEvents` | MIDIから生成 |
 | Gameplay利用候補Track | サウンド班が提示 |
 | `使用するTrack` | プランナー |
-| `InitialTargetCount` | プランナー |
+| `Minimum Selectable Shaondama Count` | プランナー |
 | `MinimumLeadTime` | プランナー |
+| `System Pre-roll Duration` | プランナー |
 | AttackEventの`Fire Music Position` | サウンド班が提示、プランナーがGameplay採用確認 |
 | `Music Requirement Entry`のexact MIDI Note | サウンド班が音楽的内容として提示 |
 | `Chord / Arpeggio` | サウンド班が提示 |
@@ -1040,6 +1212,7 @@ MIDIから生成される値については、MusicChart上で別の担当者が
 | `TempoMap` | Import機構 |
 | `NoteEvents` | Import機構 |
 | `Shaondama Settings` | プログラマー |
+| `Battle Timing Settings` | プログラマー |
 | `AttackEvent Timing Settings` | プログラマー |
 | `Attack Events` | プログラマー |
 | `Random Sections` | プログラマー |
@@ -1103,6 +1276,7 @@ NoteEventsには、MIDIから取得した、
 
 - `BGM AudioClip`
 - `Shaondama Settings`
+- `Battle Timing Settings`
 - `AttackEvent Timing Settings`
 - `Attack Events`
 - `Random Sections`
@@ -1136,6 +1310,7 @@ MIDIを修正した場合は、MusicChartへ再Importします。
 保持
 ├─ BGM AudioClip
 ├─ Shaondama Settings
+├─ Battle Timing Settings
 ├─ AttackEvent Timing Settings
 ├─ Attack Events
 ├─ Random Sections
@@ -1215,6 +1390,8 @@ MIDI由来の音楽構造が変更された場合は、少なくとも以下を�
 - `Harmony`
 - Random Candidate
 - `Shaondama Settings`の使用Track
+- `System Pre-roll Duration`が冒頭AttackEventの予告開始を確保できるか
+- AttackEvent／Arpeggioが有効なloop区間内で完結しているか
 - AttackEvent Timing Settingsとの音楽的・Gameplay上の妥当性
 
 #### Track変更
@@ -1226,6 +1403,8 @@ MIDIのTrack名やTrack構成を変更した場合は、`Shaondama Settings`の�
 #### 演奏位置・Tempo変更
 
 Tempo、拍子、演奏位置、曲構成等を変更した場合は、Attack EventsやRandom Sectionsが引き続き意図した音楽位置を指しているか確認します。
+
+同時に、各AttackEvent／Arpeggioが1つの有効なBGM loop区間内で完結していることと、冒頭AttackEventのPreview／Charge開始にsystem pre-rollが不足していないことを再確認します。
 
 #### AttackEventの再確認
 
@@ -1324,6 +1503,7 @@ BGM上の再生位置
 
 以下のデータは、同一の音楽時間基準へ接続できる必要があります。
 
+- `System Pre-roll Duration`と曲本編位置0の対応
 - NoteEventのMusic Position
 - Normal AttackEventの`Fire Music Position`
 - Arpeggio EntryのTiming
@@ -1344,8 +1524,11 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 | MusicChart全体データ構造 | 本ページ |
 | TempoMap / NoteEvents保存構造 | 本ページ |
 | MIDI Import / 再Import | 本ページ |
+| Shaondama最低保証数の保存構造 | 本ページ |
+| `System Pre-roll Duration`の保存構造 | 本ページ |
 | AttackEvent Timing Settings保存構造 | 本ページ |
 | AttackEvent Entry / exact MIDI Note保存契約 | 本ページ |
+| AttackEvent／Arpeggioの同一loop内完結validation | 本ページ |
 | Random Section保存構造 | 本ページ |
 | Sync Settings保存構造 | 本ページ |
 | DAW / FLAC / MIDIの制作・Export条件 | [BGM MIDIファイルの設定](/spec/bgm/bgm-midi-settings) |
@@ -1355,6 +1538,7 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 | Complete / Incomplete / Zero Charge / Palette Bullet化 | [BGM 攻撃判定仕様](/spec/bgm/bgm-attack-judgement) |
 | BGMとGameplayの発音・同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | NoteEventからのシャオンダマ生成 | [BGM シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama) |
+| 選択可能・非Reserved数の監視とWildcard不足補充 | [BGM シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama) |
 | Random Sectionの候補・抽選ルール | [BGM Random Section仕様](/spec/bgm/bgm-random-section) |
 | PlayerのCharge入力・Action | Player仕様 |
 
@@ -1362,6 +1546,9 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 
 以下はMusicChartページで再定義しません。
 
+- Battle準備gateとsystem pre-rollのRuntime進行
+- 選択可能・非Reserved Shaondama数のRuntime監視
+- 不足数分のWildcard生成要求
 - Current AttackEvent選択アルゴリズム
 - Click / Drag Charge
 - Slot Allocation
@@ -1428,6 +1615,24 @@ octave
 具体値は未定です。
 
 Gameplay調整パラメータとします。
+
+### Shaondama最低保証数
+
+`Minimum Selectable Shaondama Count`を保持することと、その算入条件は確定しています。
+
+具体的な個数は未定で、曲・Battleの調整パラメータとします。
+
+### System Pre-roll Duration
+
+system pre-rollを使用し、MusicChartから時間設定を参照できることは確定しています。
+
+具体的な秒数は未定です。完成BGM／MIDIへ無音を追加せず、冒頭AttackEventの予告／Charge時間を確保できる値として調整します。
+
+### 有効なBGM loop区間の参照方法
+
+AttackEvent／Arpeggioを同一loop内で完結させるvalidationは必須です。
+
+validationが参照するloop開始／終了をMusicChartへ直接保存するか、BGM再生設定から参照するかは実装設計時に確定します。
 
 ### Timing Override UI
 
