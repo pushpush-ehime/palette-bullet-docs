@@ -1,6 +1,6 @@
 ---
 title: 浮遊・挙動
-description: シャオンダマが世界内へ出現した後の浮遊・Lifetime・消滅に関する仕様
+description: 出現演出完了後のShaondama状態・浮遊・Lifetime・Reserved・自然破裂・終了条件に関する仕様
 pageType: spec
 category: シャオンダマ
 order: 20
@@ -12,25 +12,41 @@ status: 仮仕様
 ## ページ概要
 
 - 対象担当：プログラム班・デザイン班
-- 出典：統合仕様書v3.2 §4.2.2
-- 関連ページ：[玉のデータ](/spec/shaondama-music/orb-data)、[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、[Charge Allocation](/spec/draw-system/charge-allocation)、[戦闘](/spec/combat/)
+- 出典：統合仕様書v3.2 §4.2.2、および全体仕様決定D-02・D-12
+- 関連ページ：[玉のデータ](/spec/shaondama-music/orb-data)、[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)、[Charge Allocation](/spec/draw-system/charge-allocation)、[戦闘](/spec/combat/)
 
 ## 目的
 
-本ページでは、**ラジクジラから世界内へ出現した後のシャオンダマ**について、浮遊、一般Lifetime、Normal Shaondamaのsource NoteEvent時刻、Reserved、自然破裂、消費、Battle終了、および消滅の競合規則を定義します。
+本ページでは、**出現演出が完了してGameplayへ制御移譲された後のShaondama**について、浮遊、選択可能状態、最低保証数への算入状態、一般Lifetime、Normal Shaondamaのsource NoteEvent時刻、`Reserved`、自然破裂、消費、Battle終了、および消滅の競合規則を定義します。
 
-ラジクジラはシャオンダマを世界内へ出現させるところまでを担当し、出現後はシャオンダマ側へ制御と責務が移ります。
+ラジクジラはShaondamaを世界内へ出現させ、出現演出を完了し、Gameplayへ制御移譲して選択可能化するところまでを担当します。制御移譲後はShaondama側へ責務が移ります。
 
-本ページは、未使用Normal Shaondamaがsource NoteEvent時刻へ到達した際の自然破裂と小範囲Weak攻撃、一般Lifetimeとの優先順位、および各終了条件が同時に成立した場合の一回終了処理の正本です。
+本ページを、**出現演出完了後のShaondama状態と終了条件**の正本とします。
 
-個体が保持するBattle ID、source NoteEvent occurrence、source music timeなどのデータは[玉のデータ](/spec/shaondama-music/orb-data)、生成対象・生成タイミング・生成個数は[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、出現完了・選択可能化は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、Charge・Allocation・Reservedへの遷移は[Charge Allocation](/spec/draw-system/charge-allocation)を正本とします。
+本ページは特に、次の境界を所有します。
+
+- 出現演出完了後に浮遊・選択可能状態へ入ること
+- 選択可能かつ非`Reserved`の個体だけを最低保証数へ算入すること
+- `Reserved`への遷移時点で最低保証数から除外すること
+- 個体の選択可否変化と不足検出結果を最低保証判定側へ通知すること
+- 未使用Normal Shaondamaがsource NoteEvent時刻へ到達した際の自然破裂と小範囲Weak攻撃
+- Charge成功と自然破裂が同一フレームに成立する場合の優先順位
+- 一般Lifetimeおよび各終了条件が競合した場合の一回終了処理
+- Battle終了・Room RetryにおけるGameplay無効化と旧Battle個体の破棄
+
+個体が保持するBattle ID、source NoteEvent occurrence、source music time、基本色・RGB値などのデータは[玉のデータ](/spec/shaondama-music/orb-data)、生成対象・生成タイミング・最低保証数・Wildcard生成要求は[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、出現演出完了までの状態遷移と制御移譲は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、Charge成功と`Reserved`へのcommitは[Charge Allocation](/spec/draw-system/charge-allocation)を正本とします。
 
 ## プレイヤーから見た挙動
 
 - シャオンダマは、世界内へ出現した後、独立したobjectとして空中を漂います。
+- 出現演出中は選択できず、最低保証数にも数えられません。
+- 出現演出完了後に浮遊状態へ入り、Playerが選択できるようになります。
+- 選択可能な個体がCharge成功によって`Reserved`になると、選択対象および最低保証数から外れます。
 - 浮遊中の具体的な移動範囲・速度・配置方法は未決です。
 - シャオンダマには一般Lifetimeがあり、正式値は未決ですが**数十秒程度**を想定します。
-- 未使用のNormal Shaondamaは、自身のsource NoteEvent時刻に自然破裂し、周囲へ小範囲Weak攻撃を発生させて消滅します。
+- 未使用のNormal Shaondamaは、自身のsource NoteEvent時刻に自然破裂し、元個体のRGB値による小範囲Weak攻撃を発生させて消滅します。
+- 1回の自然破裂は、攻撃範囲内の同一Enemyへ1回だけ命中します。
+- Charge成功と自然破裂が同一フレームに成立する場合はCharge成功が優先され、対象個体は自然破裂しません。
 - Reservedになったシャオンダマは、対応するAttackEventで使用されるまで一般Lifetimeと未使用時の自然破裂から保護されます。
 - Clear時に残ったシャオンダマは、一斉に割れる終了演出として処理できますが、Weak攻撃やDamageは発生しません。
 
@@ -55,7 +71,37 @@ BGM / MusicChart
 「浮遊・Lifetime・自然破裂・終了」
 ```
 
-ラジクジラからの出現演出が完了し、浮遊状態へ移行してシャオンダマ側へ制御が移譲された後の挙動を本ページの対象とします。
+ラジクジラからの出現演出が完了し、浮遊状態へ移行してShaondama Gameplay側へ制御が移譲された後の挙動を本ページの対象とします。
+
+出現演出完了前後の境界は次のとおりです。
+
+```text
+生成要求
+↓
+論理生成
+↓
+出現演出中
+  ├─ 選択不可
+  └─ 最低保証数へ算入しない
+↓
+出現演出完了
+↓
+Gameplayへ制御移譲
+↓
+選択可能な浮遊状態
+  └─ 非Reservedなら最低保証数へ算入
+```
+
+出現演出中の個体にworld objectまたは論理dataが存在していても、浮遊中・選択可能・最低保証算入済みとして扱いません。
+
+出現演出完了時は、対象Battleが継続中であり、個体のBattle IDが現在のBattleと一致することを確認したうえで、次を一度だけ行います。
+
+1. 出現演出完了を確定する
+2. Spawn／RadioWhale側からShaondama Gameplay側へ制御を移譲する
+3. 選択可能な浮遊状態へ移行する
+4. 個体の選択可能化を最低保証判定側へ通知する
+
+出現演出そのもの、演出時間、および完了通知の送信は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)を正本とします。本ページは、完了通知を受けた後の状態を所有します。
 
 生成対象・生成タイミング・生成個数については、BGM側の仕様を正本とします。
 
@@ -78,6 +124,65 @@ BGM / MusicChart
 
 特に、**敵の周囲を基準として浮遊させる仕様は採用しません**。
 
+### 選択可能状態と最低保証数
+
+最低保証数へ算入できるShaondamaは、次の条件をすべて満たす個体だけです。
+
+- 出現演出が完了している
+- Gameplayへ制御移譲済みである
+- 現在Playerの選択対象として公開されている
+- `Reserved`ではない
+- 消費済み・終了処理中ではない
+- 現在のBattle IDに属している
+- Battle結果が未確定である
+
+次の個体は最低保証数へ算入しません。
+
+- 生成要求中
+- 論理生成済み・出現演出開始前
+- 出現演出中
+- 出現演出完了処理中・制御移譲前
+- 選択不可
+- `Reserved`
+- 消費済み・自然破裂処理中・一般Lifetime終了処理中
+- Battle終了後または旧Battle ID所属
+
+### `Reserved`への遷移
+
+Charge成功がcommitされ、対象個体が`Reserved`へ移行した時点で、次を一体として扱います。
+
+1. Playerの新しい選択対象から除外する
+2. 最低保証数から除外する
+3. 一般Lifetimeの進行を停止する
+4. Normalの場合は未使用時の自然破裂対象から除外する
+5. 選択可能数の変化を最低保証判定側へ通知する
+
+`Reserved`へのcommitと最低保証数からの除外を別フレームへ分けません。`Reserved`個体を一時的に選択可能数へ残し、不足検出を遅らせる処理は行いません。
+
+### 不足検出結果の通知
+
+出現演出完了、`Reserved`への遷移、消費、自然破裂、一般Lifetime終了、Battle終了などによって選択可能数が変化した場合、現在Battleについて選択可能かつ非`Reserved`の個体数を再評価できる通知を最低保証判定側へ送ります。
+
+通知は少なくとも、次の意味を識別できる状態にします。
+
+| 通知情報 | 内容 |
+|---|---|
+| Battle ID | 集計対象となるBattle |
+| 個体識別情報 | 状態が変化したShaondama |
+| 変更後状態 | 選択可能、`Reserved`、消費済み、終了等 |
+| 算入可否 | 変更後に最低保証数へ数えられるか |
+| 不足検出結果 | 現在数が最低保証数を下回ったか |
+
+本ページは個体状態と算入可否を確定し、個数不足の検出結果を生成側へ通知します。ただし、次の処理は[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)を正本とします。
+
+- 最低保証数の具体値を所有する
+- 現在不足数を確定する
+- 補充要求中数を差し引く
+- Wildcardを新しく何個要求するか判断する
+- Battle開始Readyを成立させる
+
+不足を検出しただけで、本ページからWildcardを直接生成しません。Wildcardの生成元・個体生成は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)、最低保証補充の出現演出は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)へ委譲します。
+
 ### 一般Lifetime
 
 シャオンダマには、浮遊開始後の通常滞在時間を制御する一般Lifetimeを設定します。
@@ -85,7 +190,7 @@ BGM / MusicChart
 - 一般Lifetimeは数十秒程度を想定しますが、正式な秒数は未決です。
 - Pause中は一般Lifetimeを進行させません。
 - Reserved中は一般Lifetimeの進行を停止します。
-- 一般Lifetimeで終了する場合は、割れる演出を行ってworld objectを消滅させます。
+- 一般Lifetimeで終了する場合は、選択不能化・最低保証数からの除外・終了通知を行い、割れる演出後にworld objectを消滅させます。
 - 一般Lifetimeによる破裂は、未使用Normalのsource NoteEvent時刻による自然破裂とは区別します。
 
 Wildcard Shaondamaは固定source NoteEvent occurrenceを持たないため、未使用時は一般Lifetimeが通常の時間切れ条件です。一般Lifetime終了時のWildcardは割れて消滅しますが、Normalのsource時刻自然破裂として扱わず、小範囲Weak攻撃を発生させません。
@@ -110,15 +215,19 @@ source NoteEvent時刻が一般Lifetimeより先、または同時に到達し�
 
 ### 未使用Normalの自然破裂
 
-未使用Normal Shaondamaが自身のsource NoteEvent時刻へ到達した場合は、以下の順序で一度だけ自然破裂を処理します。
+未使用Normal Shaondamaが自身のsource NoteEvent時刻へ到達した場合は、同一フレームのCharge成功commitを先に解決した後、以下の順序で一度だけ自然破裂を処理します。
 
 1. Battle IDが現在のBattleと一致し、Battle結果が未確定であることを確認する
-2. 対象が未使用であり、Reserved・消費済み・終了処理済みではないことを確認する
-3. 対象個体を選択不能にし、自然破裂の終了処理を開始済みとして固定する
-4. 自然破裂の見た目と音を発生させる
-5. 対象個体を発生元とする小範囲Weak攻撃要求を1回だけ発行する
-6. 攻撃範囲内の有効Enemy候補に対してWeak Damage処理へ接続する
-7. world objectを消滅させ、個体の終了状態を固定する
+2. 同一フレームで対象個体のCharge成功がcommitされていないことを確認する
+3. 対象が未使用であり、`Reserved`・消費済み・終了処理済みではないことを確認する
+4. 対象個体を選択不能にし、最低保証数から除外する
+5. 自然破裂の終了処理を開始済みとして固定する
+6. 自然破裂の見た目と音を発生させる
+7. 対象個体を発生元とする小範囲Weak攻撃要求を1回だけ発行する
+8. 攻撃範囲内の有効EnemyをEnemy単位で重複排除する
+9. 各Enemyへ、発生元NormalのRGB値を使ったWeak Damageを1回だけ通知する
+10. world objectを消滅させ、個体の終了状態を固定する
+11. 選択可能数の変化を最低保証判定側へ通知する
 
 ```text
 未使用Normal Shaondama
@@ -143,14 +252,71 @@ Weak攻撃要求は、少なくとも次を識別できる状態にします。
 | source NoteEvent occurrence | 自然破裂の基準となった発生回 |
 | 発生位置 | 自然破裂時のworld位置 |
 | 攻撃種別 | Normal Shaondamaの自然破裂Weak攻撃 |
-| 色・Damage参照 | 発生元Normalの基本色参照と、自然破裂Weak専用Damage definition（値は未決） |
+| RGB payload | 発生元Normal Shaondamaが保持する基本色／RGB値 |
+| 攻撃識別情報 | 1回の自然破裂をEnemy側で重複識別できる情報 |
 
-具体的な攻撃範囲、Damage量、同一Enemyへの重複Hit規則、および最終Damage計算式は未決です。これらの値を本ページで推測しません。
+### 同一Enemyへの命中は1回
+
+1回の自然破裂では、攻撃範囲内の同一Enemyへ1回だけWeak Damageを通知します。
+
+Enemyが複数のColliderまたはHurtboxを持ち、それらが同じ自然破裂範囲へ入った場合も、Collider単位ではなくEnemy単位で重複排除します。
+
+```text
+1回の自然破裂
+↓
+範囲内Collider／Hurtboxを収集
+↓
+所属Enemy単位で重複排除
+↓
+同一EnemyへRGB Damage通知1回
+```
+
+範囲内に異なるEnemyが3体いる場合は、各Enemyへ1回ずつ、合計3件の通知を行えます。同一Enemyへ3回通知する意味ではありません。
+
+具体的な攻撃範囲は未決の調整パラメータです。Enemy単位の識別方法、同一フレームのRGB候補収集、加算、clamp、および浄化判定は[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。
+
+### 元NormalのRGB値を使用する
+
+自然破裂Damageには、発生元Normal Shaondamaが保持する基本色／RGB値を使用します。
+
+例えば、発生元が赤のRGB値`(255, 0, 0)`を持つ場合、その値をEnemyのRGB浄化値へ加算するpayloadとして通知します。Player HP Damageのような単一Damage値へ変換しません。
+
+- 破裂時に周囲の色から新しいRGB値を決めません。
+- 範囲内Enemyごとに別の色へ変えません。
+- Wildcard専用Damage値へ置き換えません。
+- 見た目のVFX色だけを根拠にpayloadを作りません。
+
+発生元Normalの基本色／RGB値の保持方法は[玉のデータ](/spec/shaondama-music/orb-data)、Enemyへの最終的なRGB加算と浄化は[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。
+
+### 同一フレームのCharge成功を優先する
+
+同じNormal Shaondamaについて、Charge成功とsource NoteEvent時刻到達が同一フレームに成立する場合は、Charge成功を先にcommitします。
+
+```text
+同一フレーム
+├─ Charge成功候補
+└─ source NoteEvent時刻到達
+↓
+Charge成功をcommit
+↓
+対象個体をReservedへ移行
+↓
+自然破裂を発生させない
+```
+
+Charge入力またはCharge判定が存在するだけでは自然破裂を抑止しません。対象個体についてCharge successが成立し、同一フレームのcommitで`Reserved`へ移行した場合に限って自然破裂を抑止します。
+
+Chargeがmiss、cancel、強制終了、またはcommit不成立であり、他の自然破裂条件をすべて満たす場合は、source NoteEvent時刻による自然破裂を行います。
+
+Charge成功判定と`Reserved`へのcommit順序は[Charge Allocation](/spec/draw-system/charge-allocation)を正本とします。本ページはcommit済み状態を受けて自然破裂の可否を確定します。
 
 ### Reserved
 
 Charge successによってReservedへ移行したシャオンダマは、未使用シャオンダマではありません。
 
+- `Reserved`へ移行した時点でPlayerの選択対象から外します。
+- `Reserved`へ移行した時点で最低保証数から除外します。
+- 最低保証判定側へ算入状態の変化を通知します。
 - 一般Lifetimeの進行を停止します。
 - source NoteEvent時刻へ到達しても、未使用Normalの自然破裂を発生させません。
 - 対応するAttackEventで使用されるか、Battle終了処理を受けるまでworld上の対応実体を保持します。
@@ -177,42 +343,82 @@ AttackEventで使用対象に確定したReserved Shaondamaは、対応する発
 - BGMの音楽時計が停止するため、source NoteEvent時刻の自然破裂判定も進行させません。
 - Resume後は同じBattle IDと停止前の状態を維持して再開します。
 
+### Parry由来Wildcardの選択可能化例外
+
+Parry成功した邪音玉1弾が、そのworld位置でWildcard 1個へ変換されることは決定済みです。
+
+ただし、Parry由来Wildcardを、
+
+- 変換成立と同時に選択可能にする
+- 最低保証補充と同じ一定時間の出現演出完了後に選択可能にする
+
+のどちらとするかは未確定です。
+
+この決定が確定するまでは、Parry変換が成立したという理由だけで、本ページの選択可能な浮遊状態へ自動的に移行させません。また、最低保証補充のRadioWhale出現経路や出現演出時間を自動適用しません。
+
+どちらの方式に決定しても、最低保証数へ算入できるのは、実際に選択可能かつ非`Reserved`となった時点からです。選択可能化後の浮遊・一般Lifetime・`Reserved`・Battle終了は本ページの共通規則へ接続します。
+
+変換条件、1弾1個、生成位置、および生成元区分は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とします。
+
 ### Battle終了
 
 ClearまたはGame Overの結果が確定した時点で、対象Battleの全シャオンダマをGameplay上無効化します。
 
 - 新しいCharge対象として公開しません。
+- 最低保証数へ算入せず、個体の算入状態を無効化します。
 - 一般Lifetimeとsource NoteEvent時刻の自然破裂判定を停止します。
 - 新しいWeak攻撃、Damage、AttackEvent、Palette Bulletを発生させません。
+- 遅延した選択可能化、`Reserved`、自然破裂、Lifetime終了のcallbackをGameplayへ適用しません。
 - 終了通知を複数回受けても、同じ個体の終了処理を重複実行しません。
 
 Clear時に残っているシャオンダマは、終了演出として一斉に割れて構いません。この破裂は通常の自然破裂とは別のBattleEndPresentationとして扱い、Weak攻撃要求・Damage・AttackEventを発生させません。
 
 Game Over時もGameplay上の無効化は同じです。残存objectを即時消去するか、Game Over演出として表示を残すかは演出仕様として未決ですが、いずれの場合もGameplay出力を発生させません。
 
-Retry開始後までに旧Battleのシャオンダマobjectをすべて破棄し、新しいBattleへ持ち越しません。
+### Room Retry
+
+Room Retry開始時は旧Battleに属するShaondama runtimeを破棄し、新しいBattle IDに付け替えません。
+
+少なくとも次を新Battleへ持ち越しません。
+
+- 選択可能な浮遊中個体
+- `Reserved`個体
+- 消費処理中・Palette Bullet化待ちのShaondama参照
+- 自然破裂処理中objectとWeak攻撃予約
+- 一般Lifetime timerとsource時刻監視状態
+- 最低保証数への算入状態と不足通知予約
+- 旧Battleの個体識別情報、source occurrence、Allocation参照
+- 遅延した終了callback・Damage通知
+
+新しいBattle IDを受領した後、新Battleの生成要求と出現演出完了通知から状態を構築し直します。旧Battle IDを持つ個体や通知は、選択可能化、最低保証算入、Charge、自然破裂、Damageへ接続しません。
+
+Retry地点とPlayer／Enemy／BGM等の再初期化値はGame・Stage／Room側へ委譲します。本ページは、旧BattleのShaondama状態をGameplay上無効化し、新Battleへ持ち越さないことを保証します。
 
 ## 状態別の挙動
 
-| 状態・終了契機 | 選択可否 | 一般Lifetime | source時刻処理 | world object | Weak攻撃 |
-|---|---|---|---|---|---|
-| 選択可能な浮遊中 | 可 | 進行 | 未使用Normalは到達時に自然破裂 | 維持 | 自然破裂時のみ発生 |
-| Charge判定中・未Reserved | 判定対象 | 進行 | 到達時に自然破裂し、Charge側は対象消失として扱う | 自然破裂まで維持 | 自然破裂時のみ発生 |
-| Reserved | 不可 | 停止 | 未使用時の自然破裂対象外 | AttackEvent解決まで維持 | 発生しない |
-| 消費済み・Palette Bullet化 | 不可 | 終了 | 対象外 | シャオンダマobjectとしては終了 | 発生しない |
-| 一般Lifetime到達・Wildcard | 不可 | 終了 | 固定sourceなし | 割れて消滅 | 発生しない |
-| 一般Lifetime到達・未使用Normal | 可 | source時刻まで終了を保留 | source時刻で自然破裂 | source時刻まで維持 | source時刻に発生 |
-| source時刻自然破裂 | 不可 | 終了 | 一回だけ解決 | 演出後に消滅 | 小範囲Weak攻撃を1回要求 |
-| Battle終了cancel／演出 | 不可 | 停止 | 停止 | 即時消去または終了演出後に消滅 | 発生しない |
+| 状態・終了契機 | 選択可否 | 最低保証数 | 一般Lifetime | source時刻処理 | world object | Weak攻撃 |
+|---|---|---|---|---|---|---|
+| 生成要求中・論理生成済み | 不可 | 算入しない | 未開始 | 対象外 | 未表示または準備中 | 発生しない |
+| 出現演出中 | 不可 | 算入しない | 未開始 | 対象外 | 出現途中 | 発生しない |
+| 出現演出完了・制御移譲前 | 不可 | 算入しない | 未開始 | 対象外 | 出現済み | 発生しない |
+| 選択可能な浮遊中 | 可 | 算入する | 進行 | 未使用Normalは到達時に自然破裂候補 | 維持 | 自然破裂時のみ発生 |
+| Charge判定中・未`Reserved` | 判定対象 | 算入する | 進行 | 同frame success commitならCharge優先。未成立なら自然破裂 | commitまたは自然破裂まで維持 | Charge不成立時の自然破裂のみ |
+| `Reserved` | 不可 | 算入しない | 停止 | 未使用時の自然破裂対象外 | AttackEvent解決まで維持 | 発生しない |
+| 消費済み・Palette Bullet化 | 不可 | 算入しない | 終了 | 対象外 | Shaondama objectとしては終了 | 発生しない |
+| 一般Lifetime到達・Wildcard | 不可 | 算入しない | 終了 | 固定sourceなし | 割れて消滅 | 発生しない |
+| 一般Lifetime到達・未使用Normal | 可 | 算入する | source時刻まで終了を保留 | source時刻で自然破裂 | source時刻まで維持 | source時刻に発生 |
+| source時刻自然破裂 | 不可 | 算入しない | 終了 | 一回だけ解決 | 演出後に消滅 | 小範囲Weak攻撃を1回要求 |
+| Battle終了cancel／演出 | 不可 | 算入しない | 停止 | 停止 | 即時消去または終了演出後に消滅 | 発生しない |
 
 どの終了条件が同時に成立しても、個体の最終終了処理は1回だけ実行します。
 
 優先順位は以下です。
 
 1. Battle結果確定済み状態によるGameplay無効化
-2. Reserved／消費済み状態
-3. 未使用Normalのsource NoteEvent時刻
-4. 一般Lifetime
+2. 同一フレームのCharge成功commitと`Reserved`への遷移
+3. 既に`Reserved`／消費済みである状態
+4. 未使用Normalのsource NoteEvent時刻による自然破裂
+5. 一般Lifetime
 
 同一フレーム内でも、Battle結果確定前に有効な自然破裂Weak攻撃として受理されたDamageは、そのフレームの結果候補収集へ参加できます。Battle結果確定後に開始された自然破裂、または確定後に到着した遅延DamageはGameplayへ適用しません。
 
@@ -232,11 +438,13 @@ MusicChart / NoteEventの構造については、BGMカテゴリ側を正本と�
 
 本ページではこれらの生成ロジックを再定義しません。
 
+本ページからは、選択可能化、`Reserved`、消費、自然破裂、Lifetime終了、Battle終了による算入可否の変化と、不足検出結果を生成側へ通知します。生成側は現在数、最低保証数、補充要求中数を使って、新しいWildcard補充要求の要否と個数を決定します。
+
 生成要求は、[玉のデータ](/spec/shaondama-music/orb-data)で定義したBattle ID、source NoteEvent occurrence、loop occurrence、source music timeを欠落なく個体へ渡す必要があります。
 
 ### ラジクジラ
 
-ラジクジラは、生成要求を受け取ったシャオンダマを世界内へ出現させるところまでを担当します。
+ラジクジラは、生成要求を受け取ったShaondamaを世界内へ出現させ、出現演出を完了し、Gameplayへ制御移譲して選択可能化するところまでを担当します。
 
 詳細は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)を正本とします。
 
@@ -244,11 +452,15 @@ MusicChart / NoteEventの構造については、BGMカテゴリ側を正本と�
 
 ラジクジラ自身のPlayer追従・浮遊については、本ページでは扱いません。
 
+Normal Shaondamaを使用するBattleではRadioWhaleを必須とします。RadioWhaleを経由せずにNormalを選択可能化し、本ページの浮遊状態や最低保証算入へ直接追加する経路は設けません。
+
 ### Charge
 
 選択可能なシャオンダマをPlayerが選択した後のCharge入力は[Playerアクション｜チャージ](/spec/player/player-action-charge)、AllocationとReservedは[Charge Allocation](/spec/draw-system/charge-allocation)を正本とします。
 
 本ページではChargeの開始条件・処理・終了条件などを再定義しません。
+
+同一フレームにCharge成功とsource NoteEvent時刻到達が競合する場合、Charge／Allocation側はsuccess commitと`Reserved`への遷移を自然破裂判定より先に確定し、本ページへ結果を渡します。
 
 また、旧仕様に存在した**選択されたシャオンダマ自体が敵へ飛んでいく挙動は採用しません**。
 
@@ -258,11 +470,35 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 
 未使用Normalの自然破裂Weak攻撃は、Weak AttackEventまたはPalette Bulletへ変換せず、本ページが定義する即時範囲攻撃要求としてDamage処理へ接続します。
 
+### Wildcard
+
+- 最低保証不足から生成するWildcardの個数・生成元区分は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とします。
+- 最低保証補充のWildcardは、出現演出完了・選択可能化後に本ページの浮遊状態へ入ります。
+- Parry由来Wildcardの選択可能化timingは未確定であり、本ページから同じ出現演出を決めません。
+- 選択可能化後は、生成元にかかわらず選択可能・非`Reserved`の場合だけ最低保証数へ算入します。
+
 ### Combat／Enemy Damage
 
 - Battle結果確定後のGameplay無効化は[ゲーム全体](/spec/game/)と[戦闘](/spec/combat/)を正本とします。
-- 自然破裂Weak攻撃からEnemyへ渡す最終Damage payload、同一Enemyへの重複Hit規則、加算、clamp、および浄化は[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。
-- 本ページは、自然破裂Weak攻撃を発生させる条件と、発生元個体の終了までを所有します。
+- 本ページは、自然破裂Weak攻撃を発生させる条件、元NormalのRGB値をpayloadへ使用すること、1回の破裂につき同一Enemyへ1回だけ通知すること、および発生元個体の終了までを所有します。
+- Enemyの識別・候補集約、同一フレームのRGB加算、clamp、浄化、および最終的なDamage適用は[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。
+
+## 責務境界
+
+| 事項 | 所有者・正本 |
+|---|---|
+| 出現演出中の状態・完了通知 | RadioWhale Spawn |
+| 出現演出完了後の浮遊・選択可能状態 | 本ページ |
+| 最低保証数へ算入できる個体状態 | 本ページ |
+| 最低保証数・不足数・補充要求中数・Wildcard要求判断 | BGM側のShaondama生成 |
+| Wildcardの生成元・生成個数 | 万能シャオンダマ |
+| Charge success判定・`Reserved`へのcommit | Player Charge／Charge Allocation |
+| 一般Lifetime・Normal自然破裂・終了競合 | 本ページ |
+| 自然破裂の元RGB使用・同一Enemy一回 | 本ページ |
+| Normalの基本色・RGB data | 玉のデータ |
+| EnemyへのRGB加算・clamp・浄化 | Enemy Damage |
+| Battle結果確定・Room Retry境界 | Game／Combat／Stage・Room |
+| Parry由来Wildcardの選択可能化timing | 未確定。Wildcard／Parry／邪音玉／本ページへ同期して確定 |
 
 ## 責務外
 
@@ -303,7 +539,6 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 | 配置方法 | 未決 | Gameplayテストで調整予定 |
 | 浮遊速度 | 未決 | Gameplayテストで調整予定 |
 | 自然破裂Weak攻撃範囲 | 未決 | Gameplayテストで調整予定 |
-| 自然破裂Weak Damage | 未決 | Gameplayテストで調整予定 |
 
 ## 未決事項
 
@@ -313,11 +548,22 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 - 生成後の詳細な浮遊アルゴリズム
 - 浮遊範囲・配置方法・浮遊速度
 - Normal Shaondama自然破裂のWeak攻撃範囲
-- Normal Shaondama自然破裂のDamage量
-- 自然破裂Weak攻撃での同一Enemyへの重複Hit規則
-- 自然破裂Weak攻撃の最終Damage payload・計算式
+- Parry由来Wildcardを変換成立と同時に選択可能にするか、出現演出完了後に選択可能にするか
 
-これらはGameplayテスト、バランス調整、または後続正本との接続が必要なため、意図的に未決とします。source NoteEvent時刻の優先、未使用Normalの自然破裂Weak攻撃、Reserved中の一般Lifetime停止、およびBattle終了後にDamageを発生させない挙動は決定済みです。
+これらはGameplayテスト、バランス調整、または関係ページ間の決定が必要なため、意図的に未決とします。
+
+一方、次の事項は決定済みです。
+
+- 出現演出中は選択不可・最低保証数への算入外とする
+- 出現演出完了後に浮遊状態へ入り、選択可能化する
+- 最低保証数へ数えるのは選択可能かつ非`Reserved`の個体だけとする
+- `Reserved`へ移行した時点で最低保証数から除外する
+- 不足検出結果を生成側へ通知し、Wildcard生成判断は担当ページへ委譲する
+- Normalの自然破裂は範囲内の同一Enemyへ1回だけ命中する
+- 自然破裂Damageには発生元NormalのRGB値を使用する
+- 同一フレームではCharge成功commitを自然破裂より優先する
+- Battle終了・Room Retry時は旧BattleのShaondamaをGameplay上無効化し、持ち越さない
+- Parry由来Wildcardの選択可能化timingは未確定のまま扱う
 
 ## 関連タスク
 
