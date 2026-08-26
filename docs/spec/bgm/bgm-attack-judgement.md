@@ -215,9 +215,18 @@ AttackEvent Target Position Snapshotとして保持
 同じAttackEventが発射する全Palette Bulletへ使用
 ```
 
-Target候補の優先順位および座標計算は、パレットブレット(../spec/combat/palette-bullet)を正本とします。
+TTarget候補の優先順位と座標計算規則は、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
 
-本ページは、その規則をAttackEvent発火時に1回だけ実行し、結果をAttackEventの解決情報として固定することを定義します。
+本ページは、その規則をAttackEvent発火時に1回だけ実行し、Target座標をsnapshotします。
+
+Palette Bullet発射後の以下の処理は、Palette Bullet側の正本へ委譲します。
+
+- 飛翔
+- 命中
+- Damage / 浄化
+- Enemyへの結果
+- Bullet消滅
+- 未着弾BulletのBattle終了処理
 
 TargetとなったMarkerまたはEnemyへの追従参照は保持しません。
 
@@ -943,10 +952,7 @@ Palette Bullet化された実体は、同じAttackEventのReserved Shaondamaと�
 
 以下はPalette Bullet側の正本へ委譲します。
 
-- Target決定
-- Markerとの接続
 - 飛翔
-- Target消失
 - 命中
 - Damage / 浄化
 - Enemyへの結果
@@ -986,7 +992,7 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | Weak AttackEvent発火後の解決・破棄 | **本ページ** |
 | バフの具体的効果・数値・継続時間等 | バフシステム側 |
 | BGM / 音程音 / Gameplay SE同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
-| Palette Bullet発射後のTarget・飛翔・命中・Damage・消滅 | Palette Bullet側 |
+| Palette Bullet発射後の飛翔・命中・Damage・消滅 | [パレットブレット](/spec/combat/palette-bullet) |
 | Markerの有効条件・置換・消滅 | [マーカー](/spec/combat/marker) |
 | Target候補の優先順位・座標計算 | [パレットブレット](/spec/combat/palette-bullet) |
 | AttackEvent発火時のTarget座標snapshot | **本ページ** |
@@ -1086,8 +1092,9 @@ Weak AttackEvent解決完了
 - Weak用NoteEvent解決を本ページでやり直さない
 - Weak待機中にNormal AttackEventがCurrentになっても再割り当てしない
 - Weak AttackEventは発火・使用後に解決完了し、破棄する
-- Palette Bullet発射後のTarget・飛翔・命中・Damage・消滅は別正本へ委譲する
-
+- Target候補の優先順位・座標計算は`combat/palette-bullet.md`を正本とする
+- AttackEvent発火時のTarget座標snapshotは本ページを正本とする
+- Palette Bullet発射後の飛翔・命中・Damage・消滅は別正本へ委譲する
 ---
 
 # 未決事項
