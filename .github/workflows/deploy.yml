@@ -43,6 +43,7 @@ jobs:
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_TASK_DB_ID: ${{ secrets.NOTION_TASK_DB_ID }}
+          DISCORD_TASK_WEBHOOK_URL: ${{ secrets.DISCORD_TASK_WEBHOOK_URL }}
         run: |
           if [ -z "$NOTION_TOKEN" ] || [ -z "$NOTION_TASK_DB_ID" ]; then
             echo "::notice::NOTION_TOKENまたはNOTION_TASK_DB_IDが未設定のため、Notion連携を飛ばしました。"
