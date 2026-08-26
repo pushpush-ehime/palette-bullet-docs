@@ -53,7 +53,7 @@ Playerは、シャオンダマを弾丸化し、曲に合わせて敵へ発射�
 3. AttackEventが発生し、チャージできる状態になります。
 4. Playerはシャオンダマを弾丸化し、AttackEventのスロットへチャージします。
 5. AttackEventの攻撃タイミングが来ると、チャージした弾丸が発射されます。
-6. マーカーがある場合はマーカーへ発射し、ない場合は近くの敵を自動で狙います。
+6. AttackEvent発火時に、有効なマーカーがあればマーカーの現在座標を使用し、なければPlayerに最も近い有効なEnemyを狙います。どちらも存在しない場合はレティクル方向のRay接触地点を使用し、Rayが何にも接触しない場合は同方向の十分遠い地点を使用します。
 7. 攻撃を繰り返し、敵を倒します。
 
 通常シャオンダマについて、「何を・いつ・何個生成するか」はBGM / MusicChart側が管理します。ラジクジラは、その結果を受けてシャオンダマを世界内へ出現させます。出現後のシャオンダマの挙動はシャオンダマ側が管理し、Playerによる弾丸化・ChargeはPlayer側が管理します。
@@ -68,6 +68,8 @@ Playerは、シャオンダマを弾丸化し、曲に合わせて敵へ発射�
 - PlayerによるCharge：[Playerアクション｜チャージ](./player-action-charge.md)
 - 生成後のシャオンダマ：[シャオンダマ概要](../shaondama-music/index.md)
 - ラジクジラのGameplay上の存在・表示：[ラジクジラ｜Gameplayライフサイクル](../radiowhale/gameplay-lifecycle.md)
+- Markerの有効条件・置換・消滅：[マーカー](../combat/marker.md)
+- Palette BulletのTarget座標決定：[パレットブレット](../combat/palette-bullet.md)
 
 ## Playerが行える主要行動
 
