@@ -843,7 +843,9 @@ Weak AttackEvent発火時には、
 ```text
 Weak AttackEvent発火
 ↓
-対応Reserved Shaondama
+Target座標snapshot
+↓
+対応Reserved Shaondama 1つ
 ↓
 Palette Bullet化
 ↓
