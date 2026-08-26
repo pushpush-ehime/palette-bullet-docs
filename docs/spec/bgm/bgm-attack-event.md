@@ -732,17 +732,18 @@ Arpeggio AttackEvent A
 Arpeggio AttackEvent B
 Arpeggio AttackEvent C
 ```
-各Arpeggio AttackEventは、それぞれ独立して以下を持ちます。
+MusicChart上の各Arpeggio AttackEventは、それぞれ独立して以下を持ちます。
 
 - Fire Music Position
 - Charge受付期間
 - Music Requirement Entries
 - Arpeggio順序・Timing
-- Allocation結果
-- 発火時に確定するTarget座標snapshot
-- 解決完了タイミング
 
-各AttackEventは、自身の発火時にTarget座標を個別に確定します。
+Gameplay Runtimeでは、各AttackEvent occurrenceに対して以下を個別に対応付けます。
+
+- Allocation結果
+- 発火時のTarget座標snapshot
+- 解決完了状態
 
 前のArpeggio AttackEventで確定したTarget座標を、後続のArpeggio AttackEventへ引き継ぎません。
 
