@@ -26,6 +26,7 @@ relatedTasks:
 - AttackEvent発火時のPalette Bullet化
 - Weak AttackEvent発火時の使用実体・終了処理
 - Complete Chord時のバフ発生条件
+- AttackEvent発火時のTarget座標snapshot
 
 一方、本ページでは、以下を再定義しません。
 
@@ -39,7 +40,9 @@ relatedTasks:
 - Chord / Arpeggio構造
 - Arpeggio順序・音楽的タイミング
 - AttackEventの発火時刻
-- Palette Bullet発射後の飛翔・Target・命中・Damage・消滅
+- Palette Bullet発射後の飛翔・命中・Damage・消滅
+- Markerの有効条件・Lifecycle
+- Target候補の優先順位・座標計算・Raycast条件
 
 これらは、それぞれの正本ページへ委譲します。
 
@@ -196,8 +199,40 @@ Reserved Shaondama
 
 です。
 
----
+## Target座標を発火時にsnapshotする
 
+AttackEventは、発火時にTarget座標を1回だけ確定してsnapshotします。
+
+```text
+AttackEvent発火
+↓
+combat/palette-bullet.mdのTarget優先順位を評価
+↓
+Target座標を1つ確定
+↓
+AttackEvent Target Position Snapshotとして保持
+↓
+同じAttackEventが発射する全Palette Bulletへ使用
+```
+
+Target候補の優先順位および座標計算は、パレットブレット(/spec/combat/palette-bullet)を正本とします。
+
+本ページは、その規則をAttackEvent発火時に1回だけ実行し、結果をAttackEventの解決情報として固定することを定義します。
+
+TargetとなったMarkerまたはEnemyへの追従参照は保持しません。
+
+発火後にMarkerやEnemyが移動・消滅してもTarget座標を再取得しません。
+
+この規則は、以下のすべてへ適用します。
+
+- Normal Chord AttackEvent
+- Normal Arpeggio AttackEvent
+- Weak AttackEvent
+- Complete
+- Incomplete
+- Zero Charge
+
+Zero ChargeでもAttackEvent発火時のsnapshot処理は行いますが、使用するPalette Bulletが存在しないため、確定したTarget座標を使用する攻撃は発生しません。
 ## Click / Dragの違いを判定材料にしない
 
 発火時には、そのReserved Shaondamaが、
@@ -527,6 +562,7 @@ Arpeggio AttackEventは、発火した瞬間に、以下を確定してsnapshot�
 - `Complete / Incomplete / Zero Charge`
 - 各Slotの`Occupied / Empty`
 - 使用するReserved Shaondama
+- AttackEvent全体で共有するTarget座標
 
 ```text
 AttackEvent発火
@@ -544,8 +580,9 @@ G Reserved Shaondama
 
 発火後に、Slot状態やAllocation結果を再評価しません。
 
-snapshotした結果を、最後のArpeggio timingの処理が完了するまで維持します。
+snapshotした結果とTarget座標を、最後のArpeggio timingの処理が完了するまで維持します。
 
+各Arpeggio timingでTargetを再取得しません。
 ---
 
 ## 発射順
@@ -950,6 +987,9 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | バフの具体的効果・数値・継続時間等 | バフシステム側 |
 | BGM / 音程音 / Gameplay SE同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | Palette Bullet発射後のTarget・飛翔・命中・Damage・消滅 | Palette Bullet側 |
+| Markerの有効条件・置換・消滅 | [マーカー](/spec/combat/marker) |
+| Target候補の優先順位・座標計算 | [パレットブレット](/spec/combat/palette-bullet) |
+| AttackEvent発火時のTarget座標snapshot | **本ページ** |
 
 ---
 
@@ -1073,10 +1113,7 @@ Weak AttackEvent解決完了
 
 ## Palette Bullet発射後
 
-- Target決定
-- Markerとの接続
 - 飛翔
-- Target消失時処理
 - 命中
 - Damage / 浄化計算
 - Enemy側処理
