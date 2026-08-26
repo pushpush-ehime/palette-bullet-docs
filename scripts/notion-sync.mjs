@@ -86,8 +86,10 @@ if (import.meta.url === executedFile) {
 }
 
 async function main() {
-  const token = process.env.NOTION_TOKEN?.trim()
-  const databaseId = normalizeId(process.env.NOTION_TASK_DB_ID ?? '')
+ const token = process.env.NOTION_TOKEN?.trim()
+ const databaseId = normalizeId(process.env.NOTION_TASK_DB_ID ?? '')
+ const discordWebhookUrl =
+  process.env.DISCORD_TASK_WEBHOOK_URL?.trim() ?? ''
 
   if (!token) {
     throw new Error('環境変数NOTION_TOKENが設定されていません。')
