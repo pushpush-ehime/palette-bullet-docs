@@ -748,7 +748,7 @@ Arpeggio AttackEvent C
 
 長いArpeggioをRuntimeで自動分割しません。MusicChart上で、プランナーまたはサウンド担当者がGameplay上のAttackEvent単位を明示的に設定します。
 
-Target候補の優先順位はパレットブレット(/spec/combat/palette-bullet)、発火時のTarget座標snapshotはAttackEvent成立判定(/spec/bgm/bgm-attack-judgement)を正本とします。
+Target候補の優先順位は[パレットブレット](/spec/combat/palette-bullet)、発火時のTarget座標snapshotは[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正本とします。
 # Gameplay Pitch Classと実発音MIDI Note
 
 ## octaveを無視するSlot照合
