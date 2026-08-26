@@ -35,7 +35,7 @@ relatedTasks:
 - 1つのAttackEventを同一loop内へ収める音楽境界
 - Random Section CandidateとAttackEvent occurrenceの関係
 - MusicChartへ要求するAttackEventデータ契約
-
+- Gameplay上のArpeggio AttackEvent分割単位
 ---
 
 ## 本ページの責務
@@ -705,7 +705,50 @@ G5
 Arpeggio発火時のsnapshot、Empty Entryのスキップ、最後のTimingでの解決完了は[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正とします。
 
 ---
+## Gameplay上のArpeggio AttackEvent単位
 
+1つのArpeggio AttackEventは、以下を共有する短い攻撃フレーズとして定義します。
+
+```text
+1つのArpeggio AttackEvent
+=
+1つのCharge受付・解決単位
++
+1つのTarget座標snapshot
++
+複数のArpeggio Entry
+```
+ここでいう「1つのCharge受付・解決単位」は、1回のClickまたはDrag入力だけに限定する意味ではありません。
+
+そのAttackEventの各Slotへ確定したAllocation結果全体を、1つのAttackEventとして解決することを表します。
+
+音楽上のアルペジオが長く連続する場合は、Gameplay上の攻撃単位ごとに複数のArpeggio AttackEventへ分割します。
+```text
+長い音楽上のArpeggio
+↓
+Gameplay上の攻撃単位で分割
+↓
+Arpeggio AttackEvent A
+Arpeggio AttackEvent B
+Arpeggio AttackEvent C
+```
+各Arpeggio AttackEventは、それぞれ独立して以下を持ちます。
+
+- Fire Music Position
+- Charge受付期間
+- Music Requirement Entries
+- Arpeggio順序・Timing
+- Allocation結果
+- 発火時に確定するTarget座標snapshot
+- 解決完了タイミング
+
+各AttackEventは、自身の発火時にTarget座標を個別に確定します。
+
+前のArpeggio AttackEventで確定したTarget座標を、後続のArpeggio AttackEventへ引き継ぎません。
+
+長いArpeggioをRuntimeで自動分割しません。MusicChart上で、プランナーまたはサウンド担当者がGameplay上のAttackEvent単位を明示的に設定します。
+
+Target候補の優先順位はパレットブレット(/spec/combat/palette-bullet)、発火時のTarget座標snapshotはAttackEvent成立判定(/spec/bgm/bgm-attack-judgement)を正本とします。
 # Gameplay Pitch Classと実発音MIDI Note
 
 ## octaveを無視するSlot照合
@@ -1351,7 +1394,10 @@ Normal AttackEventではAttackEvent自身のMusic Requirement Entryが実発音�
 - MusicChart上の具体的な保存形式・C#データ型は`bgm-music-chart.md`へ委譲する
 - `Complete / Incomplete / Zero Charge`、使用Reserved Shaondama、Palette Bullet化、発射対象、Arpeggio snapshotは`bgm-attack-judgement.md`へ委譲する
 - 実際の発音処理・BGMとの音響同期・Pause / Resumeは`bgm-gameplay-connection.md`へ委譲する
-
+- 1つのArpeggio AttackEventを、1つのCharge受付・解決単位と1つのTarget座標を共有する短い攻撃フレーズとする
+- 長い音楽上のArpeggioは、Gameplay上の攻撃単位ごとに複数のArpeggio AttackEventへ分割する
+- Arpeggio AttackEventの分割はMusicChart上で明示し、Runtimeで自動分割しない
+- 分割後の各AttackEventは、発火時にTarget座標を個別に確定する
 ---
 
 # 未決事項
