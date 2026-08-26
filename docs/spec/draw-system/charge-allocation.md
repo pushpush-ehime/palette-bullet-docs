@@ -13,19 +13,22 @@ relatedTasks: []
 本ページでは、PlayerがシャオンダマをChargeした際に、
 
 * 現在どの通常AttackEventをCharge対象とするか
+* 選択されたShaondamaをAllocation対象として扱えるか
 * 複数の通常AttackEventが存在する場合に、どの論理順でCurrent AttackEventを一意に決定するか
 * Click ChargeでどのSlotへ割り当てるか
 * Drag Chargeで複数Shaondamaをどのように一括判定・一括commitするか
 * 同一音のSlotが複数存在する場合にどう扱うか
 * 対応する未充填Slotが存在しない場合にどう扱うか
 * 万能シャオンダマを通常AttackEventのどのSlotへ割り当てるか
+* 万能シャオンダマの実効Note・Pitch・RGBをどのEntryから解決するか
 * Weak Attackを使用できる状態へいつ移行するか
 * 通常Shaondama / 万能ShaondamaをWeak AttackEventへどう割り当てるか
 * Charge成功後のShaondama実体をどの状態でAttackEvent発火まで保持するか
+* Charge成功と自然破裂が同一フレームで競合した場合に、どちらを先に確定するか
 
 を定義します。
 
-本ページを、**Current AttackEventの決定、通常AttackEventのSlot割り当て、Weak AttackEventへの割り当て、Charge成功後の予約関係の正本**とします。
+本ページを、**Current AttackEventの決定、通常AttackEventのSlot割り当て、Weak AttackEventへの割り当て、Allocation結果、Charge成功後の`Reserved`確定、およびCharge commitと自然破裂の競合順の正本**とします。
 
 Click / Dragそのものの入力、ActionState、対象選択、Release検出、キャンセル、Actionとしてのsuccess / miss通知等は、`player/player-action-charge.md` を正とします。
 
@@ -47,11 +50,38 @@ AttackEvent発火時の、
 
 本ページでは、これら他ページの責務を再定義しません。
 
+本ページは実装が保持すべき意味と決定規則を定義します。具体的なC#型、class・struct・enum名、field名、ID形式、collection構造、および処理を分割するcomponent数は固定しません。
+
 ---
 
 # 基本原則
 
-Charge先の決定では、各Charge判定Eventごとに最初に、
+Charge先を決定する前に、選択されたShaondamaがその判定時点でAllocation対象として有効かを確認します。
+
+Allocation対象にできるのは、次の両方を満たすShaondamaだけです。
+
+* **出現演出が完了している**
+* **現在選択可能である**
+
+出現演出中、選択不可、消滅済み、旧Battle所属、またはすでに`Reserved`となっているShaondamaはAllocation対象にしません。ClickではCharge判定Event時点、DragではRelease後のbatch検証・commit時点に、対象の有効性を確認します。
+
+選択可能性、出現演出、および`Reserved`を区別する個体dataは`shaondama-music/orb-data.md`、それらの状態遷移は`shaondama-music/floating-behavior.md`を正とします。本ページは状態遷移を再定義せず、有効な個体だけを割り当てる規則を所有します。
+
+```text
+Charge判定Event / Drag Release
+↓
+選択Shaondamaは出現演出完了済み・現在選択可能？
+│
+├─ No
+│   ↓
+│   Allocationをcommitしない
+│
+└─ Yes
+    ↓
+    Current Normal AttackEventの有無を判定
+```
+
+Allocation対象の有効性を確認できた後、各Charge判定Eventごとに、
 
 **その時点でCurrentとなる通常AttackEventが存在するか**
 
@@ -197,7 +227,7 @@ Drag判定でも、同音Slotを単なる集合としてまとめず、**必要�
 
 単なるNote名や時刻だけではなく、Loop中のどの周回のNoteEventであるかまで区別します。
 
-Weak Attackでは、別周回の同名NoteEventへ自動的に付け替えません。
+通常ShaondamaのWeak Attackでは、別周回の同名NoteEventへ自動的に付け替えません。
 
 ---
 
@@ -206,6 +236,8 @@ Weak Attackでは、別周回の同名NoteEventへ自動的に付け替えませ
 Charge成功したShaondama実体がAttackEvent / Slotへ対応付けられ、AttackEventの解決を待っている状態です。
 
 Reserved中のShaondamaは世界上の対応実体として保持され、通常Lifetimeの進行を停止します。
+
+`Reserved`確定時には、Shaondama実体、Battle ID、AttackEvent、Slot、および必要なAllocation実効値を対応付けます。これはPalette Bullet実体の生成ではありません。
 
 ---
 
@@ -510,6 +542,33 @@ E Slotへ割り当て
 
 ことはありません。
 
+## 万能Shaondamaの実効値解決
+
+万能Shaondamaを通常AttackEventへ割り当てる場合は、割り当て先Slotに対応する**Music Requirement Entry**から、その攻撃で使用する実効値を解決します。
+
+最低限、次の意味をAllocation結果として保持します。
+
+* 割り当て先AttackEvent / Slot / Entry
+* Entryが要求するexact MIDI Noteとoctave
+* Entryから得られるpitch class
+* Entryの音程に対応する実効色と実効RGB
+
+```text
+万能Shaondama
+↓
+Current AttackEventの先頭未充填Slotを決定
+↓
+そのSlotに対応するMusic Requirement Entryを取得
+↓
+Entryから実効Note / Pitch / RGBを解決
+↓
+Slot対応と実効値を同じAllocation結果としてcommit
+↓
+Reserved
+```
+
+虹色の表示をRGB payloadとして使用しません。万能Shaondama自身へ恒久的な固有Note・Pitch・RGBを書き込まず、今回のAllocation結果として保持します。実効値の個体data契約は`shaondama-music/orb-data.md`、Entryが持つ音楽情報は`bgm/bgm-attack-event.md`を正とします。
+
 ---
 
 # Drag Chargeのatomic判定
@@ -745,6 +804,8 @@ E → E Slot
 
 万能Shaondamaが複数のSlotを満たせる場合は、通常の万能Shaondama規則と同様に、残っている未充填Slotの**先頭Slotから**対応させます。
 
+万能Shaondamaを含むDragでは、仮のSlot対応を構築した後、各万能Shaondamaについて対応Entryから実効Note・Pitch・RGBを仮解決します。batch全体がsuccessの場合だけ、Slot対応と実効値を一括commitします。Drag全体がmissの場合は、仮解決した実効値もAllocation結果として残しません。
+
 ---
 
 ## commitは全体判定成功後に一度だけ行う
@@ -944,7 +1005,7 @@ Weak Charge判定時に、その場で使用するNoteEventを解決します。
 
 ## 次に発音するNoteEventへ解決する
 
-万能ShaondamaをWeakへ割り当てる場合、Weak Charge判定時点より**後で最初に発音するNoteEvent**をMusicChartから検索します。
+万能ShaondamaをWeakへ割り当てる場合、Weak Charge判定時点より**後で最初に発音するNoteEvent occurrence**を、Battle上の連続した音楽時間に沿ってMusicChartから検索します。
 
 ```text
 万能Shaondama
@@ -953,22 +1014,52 @@ Weak Charge判定
 ↓
 判定時点より後のNoteEventを検索
 ↓
-最初に発音するNoteEventを選択
+最初に発音するNoteEvent occurrenceを選択
 ↓
-そのNoteEventへ一時的に解決
+そのNoteEvent definition + loop occurrenceへ一時的に解決
 ↓
 Weak AttackEventを生成
 ↓
-そのNoteEvent発音時刻で発火
+そのoccurrenceの発音時刻で発火
 ```
 
 別の通常AttackEventや待機コードの不足音を検索して割り当てる方式にはしません。
+
+## loop境界を越えて検索する
+
+「次に発音するNoteEvent occurrence」の検索は、現在loopの終端で打ち切りません。
+
+```text
+Weak Charge判定
+↓
+現在loopの判定時刻より後を検索
+│
+├─ 候補あり
+│   ↓
+│   最初のNoteEvent occurrenceを採用
+│
+└─ 候補なし
+    ↓
+    次loop occurrenceの先頭から検索を継続
+    ↓
+    次loopで最初のNoteEvent occurrenceを採用
+```
+
+現在loopに候補がないこと、または検索中にloop境界へ到達したことを理由に、万能Weak Chargeを失敗させません。音楽的な検索順はloopを越えて連続させますが、NoteEvent occurrenceの同一性は周回ごとに分けます。
+
+同じNoteEvent definitionであっても、現在loopと次loopでは別のoccurrenceです。解決結果には、少なくとも次を組み合わせて保持します。
+
+* NoteEvent definition
+* loop occurrence
+* 対象Battle上の発音時刻を一意に解決できる情報
+
+NoteEvent definitionだけを保存し、発火時に「その時点の同じNoteEvent」へ再解決してはいけません。loop occurrenceの識別形式や具体的なID型は本ページでは固定しません。
 
 ---
 
 ## 同時NoteEventのtie-break
 
-「次に発音するNoteEvent」が完全同時に複数存在する場合は、
+「次に発音するNoteEvent occurrence」が完全同時に複数存在する場合は、
 
 **MusicChart定義順の先頭**
 
@@ -986,20 +1077,25 @@ MusicChart定義順の先頭を採用
 
 これにより万能Weakの解決結果を決定的にします。
 
+loopを越える場合もtie-breakは変更しません。Battle上で最も早く発音するoccurrenceを選び、発音時刻が完全同時の場合だけMusicChart定義順を使用します。Track順、Pitch順、object生成順、または実装上の列挙順など、新しいtie-breakを追加しません。
+
 ---
 
 ## 実効Pitch / octave / RGB等
 
 万能Shaondamaは、Weak用に解決したNoteEventから、Weak Attackに必要な、
 
-* 実効Pitch
+* 解決済みNoteEvent definition
+* 解決済みloop occurrence
+* exact MIDI Note
+* 実効pitch class
 * octave
-* RGB
+* 実効色と実効RGB
 * その他NoteEvent由来でWeak Attackに必要な値
 
 を取得します。
 
-これは、そのWeak AttackEventで使用する**実効値の解決**です。
+これは、そのWeak AttackEventで使用する**実効値と発火対象occurrenceの解決**です。
 
 万能Shaondama自身へ恒久的な固有音程を付与・書き換える処理ではありません。
 
@@ -1007,14 +1103,14 @@ MusicChart定義順の先頭を採用
 
 ## Weak AttackEventの生成
 
-NoteEventを解決した後は、通常ShaondamaのWeak処理と同様に、対象万能Shaondama専用のWeak AttackEventを1つ動的生成し、単音Slotへ割り当てます。
+NoteEvent definitionとloop occurrenceを解決した後は、通常ShaondamaのWeak処理と同様に、対象万能Shaondama専用のWeak AttackEventを1つ動的生成し、単音Slotへ割り当てます。
 
 ```text
 万能Shaondama
 ↓
-次NoteEventへ解決
+次NoteEvent occurrenceへ解決
 ↓
-実効値確定
+definition / loop occurrence / 実効値確定
 ↓
 Weak AttackEvent生成
 ↓
@@ -1101,6 +1197,40 @@ Drag全体がmissの場合、どのShaondamaもそのbatchによってReserved�
 
 ---
 
+## Charge commitと自然破裂の優先順位
+
+Charge成功と、通常Shaondamaのsource NoteEvent時刻到達による自然破裂候補が同一フレームに成立した場合は、**Charge成功のcommitを先に確定**します。
+
+ただし、同一フレームですでにBattle終了またはRoom Retryが確定している場合は、後述する旧Battle状態の破棄を優先し、そのBattleへ新しいCharge commitを残しません。
+
+```text
+同一フレーム
+├─ Charge成功候補
+└─ source NoteEvent時刻到達による自然破裂候補
+↓
+Charge Allocationの成立可否を確定
+│
+├─ success
+│   ↓
+│   Slot / Weak Allocationをcommit
+│   ↓
+│   対象ShaondamaをReservedとして確定
+│   ↓
+│   その個体の自然破裂候補を無効化
+│
+└─ miss / commitなし
+    ↓
+    本ページでは状態を変更しない
+    ↓
+    自然破裂可否はFloating側で評価
+```
+
+commit済みのShaondamaへ、同一フレーム内または以後の更新で自然破裂を発生させません。Clickでは対象1個のcommit、Dragではbatch全体のatomic commitが完了した時点を優先確定点とします。
+
+本ページはCharge commitの確定と優先境界を正本とし、自然破裂のHit・RGB payload・消滅処理そのものは`shaondama-music/floating-behavior.md`を正とします。
+
+---
+
 ## Reserved中は通常Lifetimeを停止する
 
 ReservedになったShaondamaは、通常の世界上Lifetimeの進行を停止します。
@@ -1147,6 +1277,23 @@ AttackEvent発火時にどのReserved Shaondamaを使用し、どのようにPal
 
 ---
 
+## Battle終了・Room Retry時の破棄
+
+Battle終了またはRoom Retryが確定した場合は、旧Battle IDに属する次のruntime dataと待機状態を破棄します。
+
+* 通常AttackEvent / Weak AttackEventへのAllocation結果
+* 各Slotの充填状態とShaondama対応
+* `Reserved`状態と予約関係
+* 未発火のWeak AttackEvent
+* Wildcardの解決済みNoteEvent definition / loop occurrence / 実効値
+* commit待ち・解決待ちの通知や参照
+
+AttackEvent発火待ち、Arpeggioの途中、または次loop occurrenceを参照するWildcard Weakであっても、旧Battleの状態を次Battleへ持ち越しません。Room Retry後は、新しいBattle IDと新しいMusicChart runtime occurrenceからAllocation状態を再構築します。
+
+破棄後に旧BattleのSlotや`Reserved`参照を使ってPalette Bullet化・発音・Damage通知を行いません。Battle終了判断とRoom Retryの高レベルlifecycleは`game/index.md`および`combat/index.md`を正とします。
+
+---
+
 # 割り当てアルゴリズム
 
 ## 共通入口
@@ -1154,17 +1301,23 @@ AttackEvent発火時にどのReserved Shaondamaを使用し、どのようにPal
 ```text
 Charge判定Event
 ↓
-Current Normal AttackEventを論理順で決定
-↓
-Currentが存在する？
+選択Shaondamaの出現演出完了・選択可能・Battle IDを検証
 │
-├─ Yes
-│   ↓
-│   通常Slot割り当てへ
+├─ 無効 → commitなし
 │
-└─ No
+└─ 有効
     ↓
-    Weak割り当てへ
+    Current Normal AttackEventを論理順で決定
+    ↓
+    Currentが存在する？
+    │
+    ├─ Yes
+    │   ↓
+    │   通常Slot割り当てへ
+    │
+    └─ No
+        ↓
+        Weak割り当てへ
 ```
 
 ---
@@ -1173,6 +1326,8 @@ Currentが存在する？
 
 ```text
 Click Charge判定Event
+↓
+選択ShaondamaはAllocation対象として有効
 ↓
 Current Normal AttackEventあり
 ↓
@@ -1207,29 +1362,35 @@ Shaondama選択だけを更新
 ↓
 Release
 ↓
-Release時点のCurrent AttackEventを1つ確定
-↓
-未充填要求Slot群をsnapshot
-↓
-選択Shaondama群を全体検証
+全選択Shaondamaの出現演出完了・選択可能・Battle IDを検証
 │
-├─ 過不足なく割り当て可能
-│   ↓
-│   仮対応を確定
-│   ↓
-│   一括commit
-│   ↓
-│   全対象ShaondamaをReserved
-│   ↓
-│   success
+├─ 1個でも無効 → commitなし → Drag全体miss
 │
-└─ 過剰 / 不足 / 不適合
+└─ 全個体有効
     ↓
-    commitなし
+    Release時点のCurrent AttackEventを1つ確定
     ↓
-    Slot状態不変
+    未充填要求Slot群をsnapshot
     ↓
-    Drag全体miss
+    選択Shaondama群を全体検証
+    │
+    ├─ 過不足なく割り当て可能
+    │   ↓
+    │   仮対応を確定
+    │   ↓
+    │   一括commit
+    │   ↓
+    │   全対象ShaondamaをReserved
+    │   ↓
+    │   success
+    │
+    └─ 過剰 / 不足 / 不適合
+        ↓
+        commitなし
+        ↓
+        Slot状態不変
+        ↓
+        Drag全体miss
 
 ※batch途中でCurrentを切り替えない
 ※残りShaondamaを後続Eventへ送らない
@@ -1264,11 +1425,15 @@ Current Normal AttackEventなし
 ↓
 万能ShaondamaをWeakへ割り当て
 ↓
-判定時点より後で最初に発音するNoteEventを検索
+判定時点より後で最初に発音するNoteEvent occurrenceを検索
+↓
+現在loopに候補がなければ次loop先頭から検索継続
 ↓
 完全同時ならMusicChart定義順の先頭
 ↓
-実効Pitch / octave / RGB等を解決
+NoteEvent definition / loop occurrenceを保持
+↓
+実効Note / Pitch / octave / RGB等を解決
 ↓
 専用Weak AttackEvent生成
 ↓
@@ -1548,6 +1713,59 @@ MusicChart定義順
 
 ---
 
+## 例13：万能Shaondamaを通常AttackEventへ割り当てる
+
+```text
+Current AttackEvent
+Slot E
+└─ Music Requirement Entry：E4 / 対応色・RGB
+
+万能ShaondamaをSlot Eへ割り当て
+↓
+EntryからE4、pitch class E、対応色・RGBを解決
+↓
+Slot Eへの対応と実効値をcommit
+↓
+Reserved
+```
+
+万能Shaondamaの虹色や生成元から実効RGBを決めません。
+
+---
+
+## 例14：万能Weakが次loopへ進む
+
+```text
+現在loop occurrence = Loop 2
+Weak Charge判定時刻 = Loop 2終端直前
+Loop 2の残り = NoteEventなし
+
+次loop occurrence = Loop 3
+先頭NoteEvent = E4
+```
+
+この場合、loop境界を理由にWeak Chargeを失敗させず、Loop 3のE4 occurrenceへ解決します。Allocation結果にはE4のNoteEvent definitionだけでなく、Loop 3のloop occurrenceも保持します。
+
+---
+
+## 例15：Charge successと自然破裂が同一フレーム
+
+```text
+同一Normal Shaondamaについて
+├─ Click Chargeがsuccess
+└─ source NoteEvent時刻へ到達
+↓
+Slot Allocationをcommit
+↓
+Reservedとして確定
+↓
+自然破裂させない
+```
+
+Chargeがmissとなりcommitされなかった場合の自然破裂可否は、Floating側のlifecycle規則に従います。
+
+---
+
 # 責務境界
 
 ## `player/player-action-charge.md`
@@ -1557,7 +1775,7 @@ MusicChart定義順
 * ClickCharging
 * DragCharging
 * 入力判定
-* 対象選択
+* 対象選択と、出現演出中・選択不可の個体を入力対象から除外する処理
 * Drag中の選択状態
 * Release検出
 * Charge判定Eventを発生させるタイミング
@@ -1566,7 +1784,7 @@ MusicChart定義順
 * Actionとしてのsuccess / miss通知
 * Charge中断処理
 
-本ページでは、Charge判定Eventを受け取った後の**Current決定・Slot割り当て・Weak割り当て・atomic commit**を定義します。
+本ページでは、Charge判定Eventを受け取った後の**Allocation対象の再検証・Current決定・Slot割り当て・Weak割り当て・atomic commit**を定義します。
 
 Weak時にClick / Drag入力をどのように許可・制限するかはPlayer Action側の責務であり、本ページでは新しいActionStateや入力遷移を追加しません。
 
@@ -1585,6 +1803,7 @@ Weak時にClick / Drag入力をどのように許可・制限するかはPlayer 
 * 音楽時間上のCharge対象順を決める時間情報
 * Charge受付期間
 * 発火タイミング
+* Music Requirement Entryが持つexact MIDI Note等の音楽情報
 
 本ページでは、これらの時間データ自体を再定義せず、Current決定時にその論理順を使用します。
 
@@ -1612,6 +1831,9 @@ Weak時にClick / Drag入力をどのように許可・制限するかはPlayer 
 * source NoteEvent identity
 * source NoteEvent occurrence
 * Loop周回を区別する情報
+* Battle ID
+* 出現演出・選択可能・`Reserved`を区別できる情報
+* Normalのsource RGBとWildcardのAllocation後実効値
 * その他NoteEvent由来runtime data
 
 のデータ契約を正とします。
@@ -1625,12 +1847,21 @@ Weak時にClick / Drag入力をどのように許可・制限するかはPlayer 
 以下を正とします。
 
 * 通常Lifetime
+* 出現演出と選択可能化の状態遷移
 * source NoteEvent発音時刻へ未使用で到達した場合の自然破裂
 * 自然破裂時の弱い範囲攻撃
 * 自然破裂後の消滅
 * Reservedとのlifecycle接続
 
-本ページでは、Weak割り当て時に過去source NoteEvent例外を作らないための前提として、このlifecycleを参照します。
+本ページでは、Weak割り当て時に過去source NoteEvent例外を作らないための前提として、このlifecycleを参照します。また、同一フレームのCharge commit結果をFloating側へ渡し、commit済み個体を自然破裂対象から除外します。
+
+---
+
+## `game/index.md`・`combat/index.md`
+
+Battle終了とRoom Retryの高レベル通知、および新しいBattle IDでのruntime再構築開始を正とします。
+
+本ページはその通知を受け、旧BattleのAllocation、Slot、`Reserved`、Weak AttackEvent、および解決済みoccurrenceを破棄します。
 
 ---
 
@@ -1650,6 +1881,7 @@ Weak時にClick / Drag入力をどのように許可・制限するかはPlayer 
 
 以下の実装は行いません。
 
+* 出現演出中、現在選択不可、消滅済み、旧Battle所属、または`Reserved`中のShaondamaをAllocation対象にする
 * UI表示順をCurrent AttackEvent決定の根拠にする
 * 音楽時間上のCharge対象順が完全同時の場合に、MusicChart定義順以外の実装依存順でCurrentを決める
 * 1つの通常AttackEvent Slotへ複数ShaondamaをChargeする
@@ -1661,6 +1893,8 @@ Weak時にClick / Drag入力をどのように許可・制限するかはPlayer 
 * 発火が近いという理由だけで別AttackEventを優先する
 * 同音未充填Slotが複数ある場合に実装依存でランダムに選択する
 * 万能Shaondamaを任意の後続AttackEventへ入れる
+* 万能Shaondamaを通常AttackEventへ割り当てる際、対応Entryを参照せず虹色表示や生成元から実効Note・Pitch・RGBを決める
+* 万能Shaondamaの通常AttackEvent Allocation結果を、個体の恒久的な固有Note・Pitch・RGBとして書き込む
 * Current Normal AttackEventが存在する状態でSlot不一致をWeak Attackへ逃がす
 * Current Normal AttackEventが存在する状態で、対応する同音Slotがすべて充填済みであることを理由にWeak Attackへ逃がす
 * Charge受付期間を終了した過去の未完成AttackEventを再びCurrentにする
@@ -1678,10 +1912,18 @@ Weak時にClick / Drag入力をどのように許可・制限するかはPlayer 
 * 万能ShaondamaをWeakで使用不可とする
 * 万能ShaondamaのWeakを旧「待機コードの不足音」へ割り当てる
 * 万能ShaondamaのWeakで次NoteEventが同時の場合にランダム選択する
+* 万能ShaondamaのWeak検索を現在loopの終端で打ち切る
+* 現在loopに候補がないことだけを理由に万能Weak Chargeを失敗させる
+* 万能Weakの解決結果へNoteEvent definitionだけを保持し、loop occurrenceを失う
+* 万能Weakのtie-breakへTrack順、Pitch順、object生成順等を追加する
 * 万能ShaondamaへWeak解決結果のPitch / octave等を恒久的な固有値として書き込む
 * Weak AttackEventを通常AttackEventの蓄積上限へ含める
 * Weak Charge済みShaondamaを、後からCurrentになった通常AttackEventへ再割り当てする
 * Charge成功した瞬間にPalette Bullet化する
+* Charge successと自然破裂が同一フレームで競合したとき、commit前に自然破裂させる
+* Charge commit済みで`Reserved`となったShaondamaへ自然破裂を発生させる
 * Reserved中も通常Lifetimeを進行させ、AttackEvent解決前にShaondamaを通常Lifetimeで消滅させる
 * Slotから物理Palette BulletをCharge時点で新規生成する
+* Battle終了・Room Retry後も旧BattleのAllocation、Slot、`Reserved`、Weak AttackEvent、解決済みoccurrenceを保持・再利用する
+* 本ページの契約として具体的なC#型、enum名、field名、ID形式を固定する
 * 本ページ内でAttackEvent発火時の成立判定・使用Bullet決定を再定義する
