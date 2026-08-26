@@ -23,6 +23,7 @@ relatedTasks:
 - Normal AttackEventの発火音楽位置
 - AttackEventの予告開始・Charge受付開始
 - Charge受付終了
+- system pre-roll中の冒頭AttackEvent予告・Charge受付
 - BGM実再生位置との時間関係
 - Chord / Arpeggioの音楽構造
 - 各要求音のexact MIDI Note
@@ -31,6 +32,7 @@ relatedTasks:
 - Harmony
 - Weak AttackEventが保持する解決済み音楽情報
 - BGM Loop時のNormal AttackEvent occurrence
+- 1つのAttackEventを同一loop内へ収める音楽境界
 - Random Section CandidateとAttackEvent occurrenceの関係
 - MusicChartへ要求するAttackEventデータ契約
 
@@ -65,24 +67,27 @@ Gameplay側で発火結果を解決
 | AttackEvent音楽情報 | **本ページ** |
 | AttackEvent Fire音楽位置 | **本ページ** |
 | 3 Progressの音楽時間関係 | **本ページ** |
+| system pre-roll中のPreview / Charge開始条件 | **本ページ** |
 | Charge受付開始 / 終了の音楽条件 | **本ページ** |
 | 各要求Entryのexact MIDI Note | **本ページ** |
 | Chord / Arpeggio構造 | **本ページ** |
 | Arpeggio順序 / 音楽的Timing | **本ページ** |
+| AttackEventの同一loop内完結条件 | **本ページ** |
 | Harmony | **本ページ** |
 | Click / Drag入力・ActionState | [Player Charge仕様](/spec/player/player-action-charge) |
 | Current Normal AttackEvent | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
 | Slot構造・Slot Allocation | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
-| Weak Allocation / Weak用NoteEvent解決 | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
-| Reserved | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
+| Weak Allocation / Weak用NoteEvent解決・次loop検索 | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
+| Charge成功時のReserved確定・保持 | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
 | Complete / Incomplete / Zero Charge | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | 使用Reserved Shaondama | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
-| Palette Bullet化対象 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
+| Palette Bullet化・発射対象決定 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | Arpeggio snapshot / 解決完了 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | Palette Bullet発射時の音程音 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | BGMとの実音響同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
+| system pre-roll時計・音源開始offset | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | Pause / Resume音響同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
-| MusicChart上の保存構造・Import | [MusicChart仕様](/spec/bgm/bgm-music-chart) |
+| MusicChart上の保存構造・Import・loop validation | [MusicChart仕様](/spec/bgm/bgm-music-chart) |
 
 本ページでは、他ページが正本となるGameplay処理を再判定しません。
 
@@ -208,6 +213,30 @@ AttackEventごとに独立した複数の時計を進める方式にはしませ
 
 ---
 
+## system pre-rollとの接続
+
+Battle開始時は、実音源の再生開始より前にsystem側のpre-roll区間を設けます。冒頭のNormal AttackEventについても、このpre-roll中に`Preview / Charge Start Progress`がFire Music Positionへ到達でき、AttackEventの予告とCharge受付を開始できます。
+
+```text
+Battle / MusicChart基準時計開始
+↓
+system pre-roll
+├─ 冒頭AttackEventの予告開始が可能
+└─ 冒頭AttackEventのCharge受付開始が可能
+↓
+pre-roll終了
+↓
+既存音源を再生位置0から開始
+```
+
+pre-rollはGameplay／MusicChart時間側の先行区間です。完成楽曲、音源ファイル、MIDI、およびMIDI由来NoteEventへ物理的な無音を追加する仕様ではありません。
+
+AttackEventのFire Music Positionは、無音を追加して後ろへずらした仮想的な音源位置ではなく、既存の楽曲／MusicChart上の位置を使用します。最初のAttackEventだけPreview時間やCharge受付時間を短縮したり、曲頭より前に必要な予告を破棄したりせず、必要な先行時間をsystem pre-rollで確保します。
+
+pre-roll中を含む基準時計、実音源の開始offset、および音響同期は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。pre-roll設定の保存とvalidationは[MusicChart仕様](/spec/bgm/bgm-music-chart)へ委譲します。本ページでは、pre-roll中にもAttackEventのPreview／Charge開始境界を評価できるという音楽時間上の契約だけを定義します。
+
+---
+
 ## 3つのProgress
 
 ```text
@@ -287,6 +316,24 @@ Actual BGMの音楽時間がAttackEventのFire Music Positionへ到達した時�
 
 ---
 
+## Charge成功時点とAttackEvent発火時点の分離
+
+Charge成功時点で行うのは、Allocation結果を確定し、対象Shaondamaを`Reserved`として保持することまでです。この時点ではPalette Bullet化せず、実際に発射へ使用するReserved Shaondama／Entryも本ページでは確定しません。
+
+```text
+Charge成功
+↓
+Allocation commit
+↓
+ShaondamaをReservedとして確定
+↓
+AttackEvent発火まで保持
+```
+
+AttackEvent発火後の`Complete / Incomplete / Zero Charge`、使用Reserved Shaondama、Palette Bullet化、およびChord／Arpeggioの発射対象決定は[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正とします。本ページは、それらの処理を開始するFire Music Positionと各Entryの音楽的Timingだけを提供します。
+
+---
+
 ## Offsetパラメータ
 
 3つのProgressの位置差はパラメータ化します。
@@ -317,6 +364,7 @@ Actual BGM Progress
 - Inspector上の構造
 - 共通値 / 曲単位override / AttackEvent単位overrideの保存方式
 - 具体的なOffset値
+- system pre-rollの具体的な長さ
 
 これらの保存構造は[MusicChart仕様](/spec/bgm/bgm-music-chart)で整理します。
 
@@ -652,6 +700,8 @@ G5
 
 各Timingは同じBGM音楽時間軸へ変換可能な情報とし、実時間への変換にはMusicChartのTempoMapを利用できる構造とします。
 
+すべてのArpeggio Entryの音楽的Timingは、そのAttackEventのFire Music Positionと同じloop occurrence内へ収めます。loop境界を越えるTimingは許可しません。
+
 Arpeggio発火時のsnapshot、Empty Entryのスキップ、最後のTimingでの解決完了は[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正とします。
 
 ---
@@ -831,9 +881,9 @@ Normal Shaondama
 → Charge判定時点より後で最初に発音するNoteEvent
 ```
 
-へ解決します。
+へ解決します。万能Shaondamaの検索は現在loop内だけで終了せず、現在loopに候補がなければ次loop occurrenceの先頭から継続します。
 
-完全同時候補のtie-break等を含む詳細は[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
+次loopを含む検索範囲、完全同時候補のtie-break、解決するNoteEvent definition／loop occurrence、およびWeak AttackEventへの保持方法は[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。本ページでは検索を実行しません。
 
 本ページでは、
 
@@ -927,6 +977,35 @@ Random Section Candidateとして使用するAttackEventにも、本ページで
 
 # BGM Loop
 
+## AttackEventの同一loop内完結
+
+1つのNormal AttackEvent occurrenceについて、Fire Music Positionと、そのAttackEventに属するChord／Arpeggioの全Music Requirement Entryを同じloop occurrence内へ収めます。
+
+```text
+1つのNormal AttackEvent occurrence
+├─ Fire Music Position
+├─ Chord Entryの発火Timing
+└─ Arpeggio全Entryの音楽的Timing
+
+すべて同一loop occurrence内
+```
+
+Fire Music Positionが属するloop occurrenceと、いずれかのEntry Timingが属するloop occurrenceが異なるAttackEvent定義は、無効なMusicChartデータとして扱います。MusicChart作成・validation時に検出し、Runtimeへ有効なAttackEvent occurrenceとして渡しません。
+
+Runtimeでは、loopをまたぐAttackEventに対して次の補正を行いません。
+
+- AttackEventをloop境界で複数のEventへ分割する
+- 境界を越えたArpeggio Entryを次loopへ繰り越す
+- Entry Timingをloop終端へclampまたは自動移動する
+- 前loopの途中状態を次loop occurrenceへ持ち越して解決を継続する
+- 無効な定義から別の有効なTimingを推測して補完する
+
+同一loop内完結は本ページが定義するauthoring constraintです。保存時・Import時・編集時の具体的なvalidation方法とerror表示は[MusicChart仕様](/spec/bgm/bgm-music-chart)へ委譲します。
+
+この制約はNormal AttackEventのFire Music Positionと発火Entryに対するものです。冒頭AttackEventの先行Preview／Charge開始はsystem pre-rollで確保し、Wildcard Weakの次NoteEvent検索はAllocation側で次loopまで継続します。これらを、Normal AttackEventの発火Entryがloopをまたいでよい根拠にはしません。
+
+---
+
 ## AttackEvent Definition
 
 MusicChart上に保存されるAttackEvent定義と、BGM各周回で実際に発生する論理Occurrenceを分離します。
@@ -958,6 +1037,10 @@ AttackEvent Definition A
 
 を要求します。
 
+各loop occurrenceは論理上区別しますが、loop境界を理由に音楽時間の進行そのものを不連続にはしません。先行Progressが次loopのAttackEvent occurrenceを評価する場合も、どのloop occurrenceに対するPreview／Charge／Fireかを識別したまま扱います。
+
+この音楽時間上の連続性は、前節の同一loop内完結条件を緩和しません。Normal AttackEventのFire Music Positionと全発火Entryは、引き続き同じloop occurrenceへ属する必要があります。
+
 ---
 
 ## Random Section再抽選との関係
@@ -975,6 +1058,10 @@ Random Sectionは各Loopで再抽選する既存仕様を維持します。
 Weak AttackEventは、Allocation済みの特定NoteEvent occurrenceへ紐づきます。
 
 別周回の同名NoteEventへ自動的に付け替えません。
+
+万能ShaondamaのWeak Allocationが次loopまで検索した結果、次loopのNoteEvent occurrenceへ解決された場合は、その解決済みoccurrenceへ最初から紐づくWeak AttackEventとして扱います。これはRuntimeでの自動付け替えではありません。
+
+次loop検索とoccurrence解決の詳細は[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)へ委譲します。
 
 source NoteEvent occurrence等のruntime保持方法は、Shaondamaデータ・生成側の正本へ委譲します。
 
@@ -1150,6 +1237,7 @@ MusicChart
 ↓
 Normal AttackEvent occurrence
 ↓
+system pre-roll中を含む基準時間で
 Preview / Charge Start ProgressがFire位置へ到達
 ↓
 AttackEvent予告開始
@@ -1161,6 +1249,7 @@ Current Normal AttackEvent候補
 Allocation
 ↓
 Reserved
+（この時点ではPalette Bullet化しない）
 ↓
 Charge Close ProgressがFire位置へ到達
 ↓
@@ -1203,6 +1292,7 @@ Resolved exact MIDI Note
 Weak AttackEvent
 ↓
 Reserved
+（この時点ではPalette Bullet化しない）
 ↓
 Resolved Fire Timing到達
 ↓
@@ -1225,6 +1315,9 @@ Normal AttackEventではAttackEvent自身のMusic Requirement Entryが実発音�
 - Normal AttackEventはMusicChartへ事前設定される
 - AttackEventごとに独立した3本の時計を持たず、1本のBGM音楽時間軸を正本とする
 - その音楽時間軸に対して`Preview / Charge Start`、`Charge Close`、`Actual BGM`の3 Progressを同じ速度で進める
+- 冒頭AttackEventの予告・Charge受付はsystem pre-roll中に開始可能とする
+- system pre-rollを完成楽曲・音源・MIDI内の無音として追加しない
+- 最初のAttackEventだけPreview／Charge受付時間を短縮または破棄しない
 - `Preview / Charge Start`到達時に予告開始とCharge受付開始を同時に行う
 - `Charge Close`到達時にCharge受付を終了する
 - `Actual BGM`がFire Music Positionへ到達した時点でAttackEventを発火する
@@ -1241,19 +1334,22 @@ Normal AttackEventではAttackEvent自身のMusic Requirement Entryが実発音�
 - 同じPitch Classを複数要求する場合もEntryを統合しない
 - Chordでは各Entryが同一のChord音楽タイミングを使用する
 - ArpeggioではAttackEvent自身の音楽的順序・Timingを使用し、Playerの選択順を使用しない
+- Normal AttackEventのFire Music PositionとChord／Arpeggio全Entryを同一loop occurrence内へ収める
+- loopをまたぐAttackEvent定義は無効なMusicChartデータとし、Runtimeで分割・繰越・自動補正しない
 - 万能ShaondamaがNormalへAllocationされた場合は対応Entryのexact MIDI Noteを実効音高として使用する
 - Weak AttackEventは`1 Event = 1 Slot = 1 Reserved Shaondama`の単音AttackEventとする
 - Weak AttackEventはAllocation時に解決済みのNoteEvent / Fire Timing / exact MIDI Noteを使用する
 - Weak発火時にNoteEventを再検索しない
-- Normal Shaondama / 万能ShaondamaのWeak用NoteEvent解決方法は`charge-allocation.md`へ委譲する
+- Normal Shaondama / 万能ShaondamaのWeak用NoteEvent解決方法と、万能Weakの次loop検索は`charge-allocation.md`へ委譲する
 - 「Weakは必ずShaondama自身のsource NoteEventで発火する」と一般化しない
 - HarmonyはAttackEventの音楽情報として保持する
 - MusicChart上のAttackEvent Definitionと各BGM周回の論理Occurrenceを分離する
 - Random Sectionでは各周回で選択されたCandidateだけがNormal AttackEvent occurrenceになる
 - 選択されなかったCandidateはその周回では予告・Charge対象・発火の対象にしない
 - Weak AttackEventはAllocation済みの特定NoteEvent occurrenceに紐づき、別周回へ自動付け替えしない
+- Charge成功時点では対象ShaondamaをReservedとして確定するだけで、Palette Bullet化しない
 - MusicChart上の具体的な保存形式・C#データ型は`bgm-music-chart.md`へ委譲する
-- `Complete / Incomplete / Zero Charge`、使用Reserved Shaondama、Palette Bullet化、Arpeggio snapshotは`bgm-attack-judgement.md`へ委譲する
+- `Complete / Incomplete / Zero Charge`、使用Reserved Shaondama、Palette Bullet化、発射対象、Arpeggio snapshotは`bgm-attack-judgement.md`へ委譲する
 - 実際の発音処理・BGMとの音響同期・Pause / Resumeは`bgm-gameplay-connection.md`へ委譲する
 
 ---
@@ -1279,6 +1375,14 @@ Actual BGM
 ```
 
 具体値は調整パラメータとします。
+
+---
+
+## system pre-rollの具体値
+
+system pre-rollの具体的な秒数は未確定です。
+
+pre-roll長は、冒頭AttackEventのPreview／Chargeに必要な先行時間を確保できる調整パラメータとして扱います。具体値を調整しても、完成楽曲・音源・MIDIへ無音を追加しない契約は変更しません。
 
 ---
 
