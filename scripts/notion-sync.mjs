@@ -5,8 +5,9 @@
  *   node scripts/notion-sync.mjs --dry-run  実行せずに内容だけ表示する
  *
  * 必要な環境変数
- *   NOTION_TOKEN       Notionインテグレーションのトークン（ntn_で始まる）
- *   NOTION_TASK_DB_ID  タスクDBのID
+ *   NOTION_TOKEN              Notionインテグレーションのトークン（ntn_で始まる）
+ *   NOTION_TASK_DB_ID         タスクDBのID
+ *   DISCORD_TASK_WEBHOOK_URL   Discordタスク通知用Webhook URL（任意）
  *
  * 役割分担
  *   設計書サイト … 作業内容・完了条件の正。タスク名・設計書URLと、明示された班はこちらが上書きする。
@@ -86,10 +87,10 @@ if (import.meta.url === executedFile) {
 }
 
 async function main() {
- const token = process.env.NOTION_TOKEN?.trim()
- const databaseId = normalizeId(process.env.NOTION_TASK_DB_ID ?? '')
- const discordWebhookUrl =
-  process.env.DISCORD_TASK_WEBHOOK_URL?.trim() ?? ''
+  const token = process.env.NOTION_TOKEN?.trim()
+  const databaseId = normalizeId(process.env.NOTION_TASK_DB_ID ?? '')
+  const discordWebhookUrl =
+    process.env.DISCORD_TASK_WEBHOOK_URL?.trim() ?? ''
 
   if (!token) {
     throw new Error('環境変数NOTION_TOKENが設定されていません。')
@@ -147,6 +148,13 @@ async function main() {
         notionUrl = page.url
         created.push(task.taskId)
         console.log(`[作成] ${task.taskId}｜${task.title} → ${notionUrl}`)
+
+        await notifyDiscordTaskCreated({
+          webhookUrl: discordWebhookUrl,
+          task,
+          siteUrl,
+          notionUrl
+        })
       }
     } else {
       const changes = diffOwnedProperties(existing, task, siteUrl)
@@ -190,6 +198,81 @@ function writeLinks(links) {
     resolve(process.cwd(), NOTION_LINKS_FILE),
     `${JSON.stringify(sorted, null, 2)}\n`
   )
+}
+
+/*
+ * Discordへの通知
+ *
+ * Notionに新規タスクを起票できたときだけ呼び出す。
+ * Webhookが未設定、または通知に失敗した場合でもNotion同期は止めない。
+ */
+async function notifyDiscordTaskCreated({
+  webhookUrl,
+  task,
+  siteUrl,
+  notionUrl
+}) {
+  if (!webhookUrl) return
+
+  const team = task.team || DEFAULT_TASK_FIELDS.team
+  const priority = task.priority || DEFAULT_TASK_FIELDS.priority
+  const milestone = task.milestone || DEFAULT_TASK_FIELDS.milestone
+
+  const payload = {
+    username: 'Palette Bullet Task Bot',
+    allowed_mentions: { parse: [] },
+    embeds: [
+      {
+        title: `🎯 ${task.taskId}｜${task.title}`,
+        url: siteUrl,
+        description:
+          `新しいタスクが追加されました。\n\n` +
+          `📘 [Webで詳細を見る](${siteUrl})\n` +
+          `✅ [Notionでチケットを開く](${notionUrl})`,
+        fields: [
+          {
+            name: '班',
+            value: team,
+            inline: true
+          },
+          {
+            name: '優先度',
+            value: priority,
+            inline: true
+          },
+          {
+            name: 'マイルストーン',
+            value: milestone,
+            inline: true
+          }
+        ],
+        timestamp: new Date().toISOString()
+      }
+    ]
+  }
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) {
+      const detail = await response.text()
+      throw new Error(
+        `Discord Webhook が${response.status}を返しました。${detail}`
+      )
+    }
+
+    console.log(`[Discord通知] ${task.taskId}｜${task.title}`)
+  } catch (error) {
+    console.warn(
+      `注意：Discord通知に失敗しました：${error.message}`
+    )
+  }
 }
 
 /*
