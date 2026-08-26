@@ -215,7 +215,7 @@ AttackEvent Target Position Snapshotとして保持
 同じAttackEventが発射する全Palette Bulletへ使用
 ```
 
-Target候補の優先順位および座標計算は、パレットブレット(/spec/combat/palette-bullet)を正本とします。
+Target候補の優先順位および座標計算は、パレットブレット(../spec/combat/palette-bullet)を正本とします。
 
 本ページは、その規則をAttackEvent発火時に1回だけ実行し、結果をAttackEventの解決情報として固定することを定義します。
 
