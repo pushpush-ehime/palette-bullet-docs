@@ -1,6 +1,6 @@
 ---
 title: "Playerアクション｜マーカー"
-description: Palette BulletにおけるPlayerのマーカー発射仕様
+description: Palette BulletにおけるMarkerFiring・Marker生成要求仕様
 pageType: spec
 category: "Player"
 status: 仮仕様
@@ -19,7 +19,8 @@ relatedTasks: []
 * `ActionState = MarkerFiring`への遷移
 * 発射モーション
 * MarkerFiring内部Phase
-* マーカーの生成・発射
+* Marker生成・発射要求
+* 発射Event時点の生成位置・狙点の取得
 * Dashキャンセル
 * Marker再入力
 * Aimingとの関係
@@ -31,7 +32,11 @@ relatedTasks: []
 
 ActionState間の遷移、キャンセル、Action先行入力、Dashキャンセル入力バッファなどの共通ルールについては「Playerアクション遷移」を正とします。
 
-マーカーオブジェクト自体の移動、衝突、付着、寿命などについては、マーカーオブジェクト側の仕様で定義します。
+レティクルから狙点を決定する規則は、[エイム時のカメラ](/spec/camera/aim)を正本とします。
+
+Markerの初期発射方向・初期速度・重力・飛行・衝突・付着・飛行終了・消滅は、[マーカー](/spec/combat/marker)を正本とします。
+
+本ページは、MarkerFiringの発射Event時にMarker生成位置と狙点を取得し、Marker側へ生成・発射要求を渡すところまでを扱います。
 
 ## マーカーとは
 
@@ -40,6 +45,12 @@ ActionState間の遷移、キャンセル、Action先行入力、Dashキャン�
 Playerは敵、地面、壁などへマーカーを発射・付着させ、パレットブレットの攻撃先を指定します。
 
 本ページでは、Playerがマーカーを発射するまでのActionを扱います。
+
+MarkerはPlayerが発射する物理オブジェクトですが、本ページが扱うのはPlayer Actionとしての生成・発射要求までです。
+
+生成後のMarkerはMarkerFiringから独立して存在します。
+
+MarkerFiringが終了・中断・Dashキャンセルされても、すでに生成済みのMarkerの飛行・付着・有効性には影響しません。
 
 ## MarkerFiringとは
 
@@ -56,7 +67,7 @@ MarkerFiring
 
 MarkerFiringは短時間のActionです。
 
-発射モーションを行い、その途中でマーカーを生成・発射します。
+発射モーションを行い、その途中でMarker生成・発射要求を通知します。
 
 MarkerFiringが正常終了すると、`ActionState`は`None`へ戻ります。
 
@@ -165,6 +176,10 @@ Dash要求がバッファされている場合でも、このPhaseを途中で�
 
 マーカーが実際に生成・発射された直後から、MarkerFiring終了までのPhaseです。
 
+本ページでは、Marker objectの生成が成立し、`Flying`として有効化された時点を「Marker発射済み」とします。
+
+MarkerがEnemy・地面・壁へ到達した時点を、MarkerFiringの発射完了タイミングには使用しません。
+
 このPhaseでは以下の処理を行います。
 
 * 発射後モーションを継続する
@@ -191,43 +206,61 @@ MarkerFiring終了
 
 ### 発射タイミング
 
-マーカーは、発射モーション中の指定されたタイミングで生成・発射します。
+MarkerFiringは、発射モーション中の指定されたタイミングでMarker生成・発射要求を1回だけ通知します。
+
+Marker側は、この要求を受けてMarker objectを生成・発射します。
 
 ```text
 MarkerFiring
 ↓
 発射Event
 ↓
-発射方向を決定
+発射Event時点の狙点を取得
 ↓
-マーカー生成
+Marker生成位置を取得
 ↓
-発射
+Marker生成・発射要求
+├─ Marker生成位置
+└─ 狙点
+↓
+Marker object生成
+↓
+Marker側で初期発射方向・初期速度を確定
+↓
+Flying
+↓
+Dashキャンセル受付開始
 ```
 
 具体的な発射タイミングは、Animation Eventなどで調整できるようにします。
 
 Dash要求がバッファされていても、発射Eventを中止しません。
 
-### 発射方向
+発射Eventより前にMarkerFiringが中断された場合は、Marker生成・発射要求を通知せず、Markerを生成しません。
 
-マーカーは、発射Eventが実行された時点の画面中央のレティクル方向へ発射します。
+### 狙点の取得
+
+Markerの生成・発射に使用する狙点は、発射Eventが実行された時点で取得します。
 
 ```text
 発射Event
 ↓
-現在のレティクル方向を取得
+現在のレティクルから狙点を取得
 ↓
-発射方向を確定
-↓
-Marker発射
+Marker生成・発射要求へ渡す
 ```
 
-Marker入力時点やMarkerFiring開始時点では、発射方向を固定しません。
+Marker入力時点またはMarkerFiring開始時点では、狙点をsnapshotしません。
 
-発射方向が確定した後にAimStateやPlayerの向きが変化しても、すでに発射されたマーカーの進行方向には影響しません。
+狙点の決定には、[エイム時のカメラ](/spec/camera/aim)で定義するCamera Rayを使用します。
 
-### 発射位置
+Rayが何かへ接触した場合は最初の接触地点を狙点とし、何にも接触しない場合はレティクル方向の十分遠い地点を狙点とします。
+
+本ページでは、Markerの初期発射方向を計算しません。
+
+Marker生成位置と狙点から初期発射方向を確定する処理は、[マーカー](/spec/combat/marker)を正本とします。
+
+### Marker生成位置
 
 マーカーは、Playerの武器に設定された発射位置から生成します。
 
@@ -240,6 +273,42 @@ Marker生成
 ```
 
 発射位置には、武器先端などに設定した専用のTransformを使用します。
+
+発射Event時点の専用Transformのworld座標を、Marker生成位置として取得します。
+
+Marker入力時点またはMarkerFiring開始時点の位置を保存して使用しません。
+
+取得したMarker生成位置は、同じ発射Eventで取得した狙点とともにMarker生成・発射要求へ渡します。
+
+### Marker生成・発射要求
+
+発射Eventでは、Marker側へ以下を含む生成・発射要求を1回だけ通知します。
+
+| 情報 | 内容 |
+|---|---|
+| Marker生成位置 | 発射Event時点の武器の専用Transform位置 |
+| 狙点 | 発射Event時点のレティクルから決定したworld座標 |
+| Player識別情報 | Markerを発射したPlayer |
+| Battle識別情報 | Markerが属する現在のBattle |
+
+```text
+発射Event
+↓
+Marker生成・発射要求
+↓
+combat/marker.md
+├─ 既存の有効Markerを消滅
+├─ 新しいMarkerを生成
+├─ 初期発射方向を確定
+├─ 初期速度を適用
+└─ Flyingとして有効化
+```
+
+既存Markerの置換、新しいMarkerの有効化、初期発射方向、物理的な飛行は[マーカー](/spec/combat/marker)を正本とします。
+
+本ページで既存Markerを直接削除したり、Markerの速度・重力・衝突・付着を処理したりしません。
+
+1回の発射Eventから複数のMarker生成要求を発行しません。
 
 ## Aimingとの関係
 
@@ -298,6 +367,29 @@ MarkerFiring自体は継続します。
 つまり、MarkerFiringは**開始時にAimingであることを要求しますが、開始後にAimingを維持することまでは要求しません。**
 
 Aim終了によってMarkerFiringをキャンセルすることはありません。
+
+Marker発射Eventより前にAimStateが`Normal`へ戻った場合も、MarkerFiringは予定どおり発射Eventを実行します。
+
+この場合も、Marker入力時点やMarkerFiring開始時点の狙点は使用せず、発射Event時点のCamera・レティクルから現在の狙点を取得します。
+
+```text
+MarkerFiring開始
++
+AimState = Aiming
+↓
+発射前にAim終了
+↓
+AimState = Normal
+MarkerFiring継続
+↓
+発射Event
+↓
+発射Event時点の狙点を取得
+↓
+Marker生成・発射要求
+```
+
+AimStateが`Normal`でも、進行中のMarkerFiringが狙点を取得できる状態を維持します。
 
 ## 移動
 
@@ -549,6 +641,8 @@ AimState      = Normal
 
 Airborne移行によってAimingは終了しますが、MarkerFiringは終了しません。
 
+Airborne移行によってAimingが終了した後に発射Eventへ到達した場合も、前節の規則に従って発射Event時点の狙点を取得し、Markerを生成・発射します。
+
 対象となる主な状況は以下です。
 
 * 崖から落下する
@@ -637,6 +731,22 @@ MarkerFiring終了
 
 `Dead`への遷移は他のPlayer状態より優先します。
 
+## Marker生成後のobject lifecycle
+
+Marker生成・発射要求が成立した後は、Marker objectをMarkerFiringから独立して管理します。
+
+以下を理由に、生成済みMarkerを削除・停止・方向変更しません。
+
+- MarkerFiring正常終了
+- Dashキャンセル
+- Aim終了
+- Airborne移行
+- `SmallHit`
+- `BigHit`
+- PlayerのRootState変更
+
+ただし、Battle結果確定・Retryなど、Marker側またはCombat側で定義された無効化条件は適用します。
+
 ## MarkerFiringの終了
 
 MarkerFiringの主な終了条件を以下に示します。
@@ -700,6 +810,10 @@ Dashキャンセル入力バッファの具体的な保持時間は、共通の�
 
 移動速度の最終決定については「Player基本移動」を正とします。
 
+Markerの初期発射速度、重力補正、最大飛行距離、最大飛行時間、衝突判定は[マーカー](/spec/combat/marker)側の調整パラメータとします。
+
+本ページのMarkerFiring用パラメータへ、Marker objectの物理パラメータを重複して保持しません。
+
 ## 各ページとの責務分離
 
 Markerに関係する仕様は、以下のように管理します。
@@ -710,7 +824,15 @@ Markerに関係する仕様は、以下のように管理します。
 | MarkerFiring開始条件              | 本ページ                             |
 | Marker発射モーション                 | 本ページ                             |
 | Marker発射タイミング                 | 本ページ                             |
-| 発射方向・発射位置                     | 本ページ                             |
+| 発射Event時点の狙点決定規則             | [エイム時のカメラ](/spec/camera/aim)       |
+| 発射Event時点の狙点取得                | 本ページ                             |
+| Marker生成位置                     | 本ページ                             |
+| Marker生成・発射要求                 | 本ページ                             |
+| 既存Markerの置換                    | [マーカー](/spec/combat/marker)          |
+| Markerの初期発射方向・初期速度           | [マーカー](/spec/combat/marker)          |
+| Markerの飛行・重力・衝突・付着            | [マーカー](/spec/combat/marker)          |
+| Markerの最大飛行距離・最大飛行時間         | [マーカー](/spec/combat/marker)          |
+| Markerの有効性・Target座標公開・消滅       | [マーカー](/spec/combat/marker)          |
 | Dashキャンセル受付開始タイミング            | 本ページ                             |
 | 発射前後のDash入力に対するMarker固有処理     | 本ページ                             |
 | MarkerFiring中の再入力             | 本ページ                             |
@@ -724,7 +846,6 @@ Markerに関係する仕様は、以下のように管理します。
 | Aim入力方式                       | Player入力と操作                      |
 | ActionState間の遷移可否             | Playerアクション遷移                    |
 | SmallHit / BigHitによる共通中断      | Playerアクション遷移                    |
-| マーカーオブジェクトの飛行・衝突・付着           | マーカーオブジェクト側の仕様                   |
 
 ## 未決事項
 
