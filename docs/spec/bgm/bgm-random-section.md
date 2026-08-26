@@ -5,7 +5,6 @@ pageType: spec
 category: "BGM"
 status: 仮仕様
 relatedTasks:
-  - /tasks/music-chart-scriptableobject/pb-task-0017
 ---
 
 # BGM Random Section仕様
