@@ -205,7 +205,7 @@ snapshot時点ですでに浄化済み、現在の`battleId`と不一致、ま�
 
 snapshot時点で未浄化かつ有効であるEnemyについては、同一frame内の個別候補を順番に適用して途中で浄化状態を変更しません。有効な候補をすべて集約した最終値に対してだけ、浄化判定を1回行います。
 
-Clear対象であるか、またはStage側Clear対象記録が`FormallyExcluded`であるかは、Enemy自身のRGB Damage集約と浄化成立可否を決めるsnapshot条件に含めません。
+Clear対象であるかは、Enemy自身のRGB Damage集約と浄化成立可否を決めるsnapshot条件に含めません。一方、frame受付開始時点ですでにStage側Clear対象記録が`FormallyExcluded`であるEnemyは、新しいHit／Damage候補の受付対象外とします。ただし、snapshot取得後に同一frame内で正式除外が成立した場合、正式除外前に有効成立して収集済みのDamage候補は、そのsnapshotに従って処理を完了できます。
 
 ### 確定処理順
 
@@ -334,7 +334,7 @@ B = Max B
 
 Enemy自身の浄化は、StageのClear対象であるかにかかわらず成立できます。Clear対象ではない戦闘Enemyも、同じRGB条件を満たした場合は浄化済みになります。
 
-Stage側Clear対象記録の`FormallyExcluded`は、Enemy自身の浄化状態とは独立します。正式除外済みのEnemyであっても、その後もDamage受付が有効であり、上記条件を満たす場合はEnemy自身の浄化を成立させられます。ただし、Stage側の`FormallyExcluded`記録を`Purified`へ変更しません。
+Stage側Clear対象記録の`FormallyExcluded`は、Enemy自身の浄化状態とは独立します。正式除外成立後は、新しいHit／Damage候補を受け付けません。ただし、正式除外成立前に有効成立し、同一frameのDamage処理対象として収集済みの候補は、frame受付開始時点のsnapshotに従って処理を完了できます。その処理によってEnemy自身の浄化が成立した場合も、Stage側Clear対象記録は`FormallyExcluded`を維持し、`Purified`へ変更しません。
 
 ## Stageへの浄化成立通知
 
