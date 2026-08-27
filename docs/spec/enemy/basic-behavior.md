@@ -254,7 +254,7 @@ Retryでは旧BattleのEnemyを新BattleのEnemyとして再利用せず、新Ba
 - **初期配置準備**：初期配置EnemyのClear対象登録とGameplayを伴わない初期化は、`battleId`配布後のBattle準備中（`NonCombat`）に行い、Combat受付gateの成立を待たない。必要な初期Enemy／Spawn準備とClear対象登録の完了をEnemy Readyへ接続する
 - **Combat受付**：初期配置EnemyのGameplay上の`Active`化、AI、攻撃、Target提供、Hit／Damage受付、およびSpawn連携はBattle開始gate成立後だけ許可する。動的Spawnの確定、登録、生成・初期化、および`PendingSpawn → Active`は、現在BattleのCombat受付が有効な間だけ進行する。Pause中またはBattle結果確定後は進行しない（[戦闘](/spec/combat/)）
 - **攻撃対象**：Gameplay上`Active`なEnemyだけがパレットブレットの攻撃対象であり、マーカーの付着対象になる（[Playerアクション｜マーカー](/spec/player/player-action-marker)）。発射後の飛翔・ターゲット決定・命中処理の詳細は各所有ページを正本とする
-- **パリィ**：敵の攻撃（邪音玉）はプレイヤーのパリィで無効化される。無効化された邪音玉がその後どうなるかは未決（[Playerアクション｜パリィ](/spec/player/player-action-parry)）
+- **パリィ**：Parry成功した邪音玉はPlayerへのDamageを発生させず、攻撃projectileとして終了し、Parry成立時のworld位置で同じ`battleId`のWildcard 1個へ変換される。同一Physics Stepに接触した複数弾の成功batch判定は[Playerアクション｜パリィ](/spec/player/player-action-parry)、各邪音玉のDamage無効化・projectile終了・弾ごとの変換要求は[Jaon Bullet](/spec/enemy/jaon-bullet)、Wildcardへの1弾1個変換は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とする
 - **プレイヤーへのダメージ**：邪音玉がプレイヤーに命中するとダメージを与える（被弾処理は[Player｜被弾](/spec/player/player-reaction-damaged)、HP・ダメージ量は[Playerステータス](/spec/player/player-status)）
 - **シャオンダマ生成**：シャオンダマの散布先・浮遊範囲と敵位置の関係は未決（[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、[浮遊挙動](/spec/shaondama-music/floating-behavior)側の配置方法の決定に従う）
 - **浄化通知**：Enemy Damage OwnerがEnemy側の浄化成立を一度だけ確定し、`battleId`と対象識別情報を含む通知をStageへ送る。StageがStage側記録を`Purified`へ変更する。EnemyおよびEnemy Damage OwnerはStage側記録またはClear条件を確定しない（[Damage・浄化](/spec/enemy/damage-and-purify)）
