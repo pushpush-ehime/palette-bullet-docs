@@ -31,7 +31,8 @@ Player State、Charge、Allocation、MusicChart、AttackEvent、シャオンダ�
 | Playerの役割 | 戦場を移動し、シャオンダマを選択・Chargeして攻撃を構成する | 確定 |
 | コア体験 | 色と音で世界をつなぐ爽快ドローアクション | 確定 |
 | Battleの目的 | ステージ内の対象Enemyをすべて浄化し、Clearを目指す | 確定 |
-| Player死亡後 | その場では復活せず、Retryによってステージを最初から開始する | 確定 |
+| Player死亡後 | 最終Battle結果がGame Overの場合、その場では復活せず、Game Over ResultのRetryによって現在のステージを最初から開始する | 確定 |
+| Battle終了後 | 共通Result画面に確定結果のClear／Game Over variantを表示し、cleanup完了後に操作を受け付ける | 確定 |
 
 ## ゲーム全体の進行
 
@@ -48,14 +49,16 @@ Battle開始
 ↓
 通常Battle
 ↓
-ClearまたはGame Over
+ClearまたはGame Overを確定
 ↓
-終了側の画面・演出
+共通Result画面を表示開始
 ↓
-次の進行またはRetry
+必須OwnerのGameplay cleanup完了後にResult操作を解禁
+↓
+Clearは拠点／Stage選択へ戻る、Game Overは現在のStageをRetry
 ```
 
-各画面の構成、遷移演出、Fade、SE、およびリザルトの表示内容はUI／演出側の仕様を正本とします。
+ResultはClear／Game Overで別々の勝敗判定を行う画面ではなく、Gameが通知した確定Battle結果に応じてvariantを切り替える共通画面です。各画面の構成、遷移演出、Fade、SE、およびResult内の具体的な表示内容はUI／演出側の仕様を正本とします。
 
 ## 基本戦闘フロー
 
@@ -83,8 +86,9 @@ ClearまたはGame Over
 20. 使用するReserved Shaondamaを確定し、Palette Bullet化する
 21. Chord／Arpeggio／Weakの規則に従ってPalette Bulletを発射する
 22. Palette Bulletの命中、Enemy Damage、および浄化を処理する
-23. 同一フレーム内のClear候補とGame Over候補を収集し、Battle結果を確定する
+23. 同一フレーム内のClear候補とGame Over候補を収集し、優先規則に従ってBattle結果を1回だけ評価する
 24. Battle結果が未確定である間、12から23までを繰り返す
+25. Battle結果が確定した場合は、Battle終了lifecycleへ移行する
 
 Battle IDの配布は対象Battleの準備を開始する境界、Ready gateの成立はCombat／Player受付と3時計を開始する境界、system pre-rollの終了はBGM Audioを実際に鳴らし始める境界です。これらを同じ開始Eventとして扱いません。
 
@@ -132,9 +136,11 @@ BGM／MusicChart
 | AttackEvent予告 | AttackEventに向けてPlayerが攻撃構成を準備する | BGM、AttackEvent、UI |
 | シャオンダマ選択・Charge | Playerが対象を選択し、Charge判定、Allocation、Reserved化までを行う | Player、シャオンダマ、Charge、チャージシステム |
 | AttackEvent発火・発射 | 結果と使用Reservedを確定し、Palette Bullet化して発射する | Player、BGM、AttackEvent、チャージシステム、Combat、Enemy、演出 |
-| Clear処理 | Battle結果をClearとして固定し、戦闘を終了してClear側の処理へ移行する | Game、Combat、Stage、BGM、UI、演出 |
-| Game Over処理 | Battle結果をGame Overとして固定し、Player死亡側の処理へ移行する | Game、Player、Combat、Stage、BGM、UI、演出 |
-| Retry | 旧BattleのRuntime状態を破棄し、ステージ開始状態を再構築する | Game、Stage、Player、Enemy、Combat、BGM、UI |
+| Clear処理 | Battle結果をClearとして固定し、Game Over向け表示を抑止してClear Resultの表示を開始する。同一frameで`RootState = Dead`が成立済みでも巻き戻さない | Game、Player、Combat、Stage、BGM、UI、演出 |
+| Game Over処理 | Battle結果をGame Overとして固定し、死亡側の演出とGame Over Resultの表示へ接続する | Game、Player、Combat、Stage、BGM、UI、演出 |
+| Result cleanup中 | 共通Result画面を確定結果のvariantで表示するが、Result操作をlockしたまま必須OwnerのGameplay cleanupを行う | Game、Player、Combat、BGM、AttackEvent、チャージシステム、UI |
+| Result操作可能 | 必須Ownerすべてのcleanup完了後、ClearではContinue、Game OverではRetryだけを受け付ける | Game、UI、入力 |
+| Retry | 旧BattleのRuntime状態を再利用せず、新しいBattle IDでステージ開始状態を再構築する | Game、Stage、Player、Enemy、Combat、BGM、UI |
 
 Playerの具体的なRootState、ActionState、および遷移条件はPlayer仕様を正本とします。
 
@@ -206,7 +212,11 @@ Battle開始における3つの境界は、以下のとおりです。
 
 Clear対象Enemy集合には、Battle開始時の戦闘対象Enemyに加え、戦闘中に動的Spawnして戦闘対象となったEnemyも追加します。Enemyが遠くへ移動しただけでは対象から外しません。特殊イベントによる正式な除外だけをStageが明示的に行い、背景演出用など戦闘Enemyではない存在は含めません。集合の登録・更新・除外手続きは[ステージ](/spec/stage/)を正本とします。
 
-Game Over後は、Player仕様に従って死亡モーション、死亡画面、Retryへ接続します。
+Playerの`CurrentHP <= 0`と`RootState = Dead`は、Game Over候補を発生させるGameplay上の事実です。死亡演出、Game Over Result、およびRetry受付は、この事実だけから直ちに開始せず、Gameが最終Battle結果を確定した後に分岐します。
+
+同一フレーム内にClear候補とGame Over候補が成立した場合、最終Battle結果はClearです。この場合も、そのフレームまでに成立したPlayerのHP 0、`RootState = Dead`、Damage、および状態変更は巻き戻しません。一方、Clear Resultへ接続するため、Playerの死亡演出、Game Over variant、Game Over専用の入力待機、およびRetry受付は開始しません。内部の`Dead`状態と、死亡演出／Game Over表示を分離して扱います。
+
+最終Battle結果がGame Overの場合に限り、Player仕様に従って死亡側の演出を開始し、共通Result画面のGame Over variantとRetryへ接続します。
 
 汚染度は現在のGame Over条件として使用しません。将来Game Over条件へ追加する場合は、値の所有者、増減条件、上限、UI表示、およびHP条件との優先関係を別途仕様化してから、本ページへ追加します。
 
@@ -216,51 +226,102 @@ Game Over後は、Player仕様に従って死亡モーション、死亡画面�
 - 各フレームでは、そのフレームの候補発生処理を完了してから結果評価を1回だけ行います。先に届いた候補だけで即時確定せず、同一フレーム内の両候補を評価対象に含めます。
 - 1回のBattleで確定できる最終結果は、ClearまたはGame Overのいずれか1つだけです。
 - 同一フレーム内にClear候補だけが成立した場合はClear、Game Over候補だけが成立した場合はGame Over、両方が成立した場合は**Clearを優先**します。
+- ClearとGame Overの両候補が成立してClearを確定した場合も、すでに成立したHP 0、`RootState = Dead`、Damage、および状態変更は巻き戻しません。
+- Clearを確定した場合は、`RootState = Dead`が成立済みであっても死亡演出、Game Over variant、Game Over専用の入力待機、およびRetry受付を開始しません。
 - Battle結果は一度だけ確定します。確定後の命中、浄化、Damage、演出、通知によって結果を変更しません。
 - 結果確定後に既存の命中演出や終了演出を継続する場合も、Clear／Game Overの再判定は行いません。
-- 各システムは、確定済み結果を受け取り、独自に別のBattle結果を確定してはいけません。
+- Result、UI、および各システムは、Gameから確定済み結果を受け取り、独自に勝敗を再判定したり別のBattle結果を確定したりしてはいけません。
+- 確定結果には終了対象のBattle IDを付与します。現在のBattle IDと一致しない結果通知は適用しません。
 
 ## Battle終了lifecycle
 
 ClearまたはGame Overの候補が成立した場合は、以下の高レベルな順序で終了処理を行います。
 
 ```text
-Clear／Game Over候補を収集する
+1. 同一フレーム内のClear／Game Over候補を収集する
 ↓
-優先規則に従ってBattle結果を1つに確定する
+2. Clear優先でBattle結果を1回だけ確定する
 ↓
-新しいGameplay処理の受付を停止する
+3. Gameplay入力と新しいGameplay処理の受付を停止する
 ↓
-各システムへBattle終了と確定結果を通知する
+4. 共通Result画面を確定結果のvariantで表示開始する
 ↓
-開始済みGameplay処理をcancelまたはGameplay上無効化する
+5. 各必須OwnerがGameplay cleanupを行う
 ↓
-終了演出として残すobjectをGameplay処理から切り離す
+6. 同じBattle IDに対する必須Ownerすべてのcleanup完了を集約する
 ↓
-BGM同期イベントとCombatの戦闘進行を停止する
+7. Result操作を解禁する
 ↓
-Clear側または死亡・Game Over側の処理へ移行する
+8. ContinueまたはRetryの入力に従ってroute遷移する
 ```
 
-- Battle結果確定後は、新しいAttackEvent、Arpeggio、シャオンダマ生成、Charge、Allocation、攻撃発射、Damage、浄化を開始しません。
-- 開始済みArpeggioの未発火Entryと、AttackEventの未発火分は停止します。snapshot、Reserved、およびAllocationのcancel／release手順はAttackEventとチャージシステムの正本で定義します。
-- 飛翔中のPalette Bulletと保留中の命中処理は、見た目を終了演出として一時的に残す場合でも、結果確定後にDamageを発生させません。
-- Clear時に残っているシャオンダマは、終了演出として一斉に破裂させても構いません。この破裂は通常の自然破裂とは区別し、Weak攻撃、Damage、新しいAttackEventを発生させません。
-- Game Over時も、結果確定後に新しいGameplay上のDamageを発生させない原則は同じです。
-- 終了通知には、確定したBattle結果と終了対象Battleを識別できる情報を含めます。
-- 各システムは終了通知を複数回受けても、同じBattleに対する終了処理を重複実行してはいけません。
-- 終了時点ですでに存在する演出やRuntime objectの視覚的な消滅時点は各所有ページで定義します。ただし、Gameplay上の無効化はBattle結果確定直後に行い、新しいDamageや戦闘結果を発生させてはいけません。
-- BGM、MusicChart、およびBGM同期イベントの具体的な停止方法はBGM側の仕様を正本とします。
+Battle結果確定直後にGameplay側の受付gateを閉じます。Result画面はcleanup完了を待たずに表示開始できますが、表示開始時点ではボタンなどのResult操作をlockします。確定結果と終了通知には終了対象のBattle IDを含め、各Ownerは現在のBattle IDと一致する通知だけを受理します。
 
-| 結果確定時の対象 | 全体条件 | 詳細の所有者 |
+### 結果確定後の共通受付gate
+
+Battle結果確定後は、次の処理を新しく成立させません。
+
+- PlayerのGameplay入力、および新しいActionへの遷移
+- 新しいAttackEvent、Arpeggio Entryの発火、およびAttackEvent Preview
+- 新しいCharge、Allocation、Reserved化、およびPalette Bullet化
+- 新しいHit、Damage、浄化、およびParry判定
+- 新しいTarget決定、およびMarkerによるTarget座標の提供
+- 新しいPalette Bullet、Marker、Jaon BulletなどのProjectile生成
+- 新しいシャオンダマ生成、および新しいEnemy Spawn
+- 停止後のMusicChart Eventや予約済みGameplay callbackによる状態変更
+- 旧Battleの遅延通知、生成結果、命中、Damage、cleanup完了通知による現在Battleの状態変更
+
+同一フレームの候補収集までに成立済みのHP 0、`RootState = Dead`、Damage、および状態変更は巻き戻しません。一方、Battle結果確定後に到着した処理は、見た目上同じフレームであっても新しいGameplay結果として成立させません。同一フレームDamageの処理順の詳細は、Player Damageの正本で確定後に本規則との横断確認を行います。
+
+### Gameplay cleanupの共通契約
+
+各必須Ownerは、Battle結果確定後に担当Gameplay要素をcancel、無効化、解放、または破棄し、担当範囲にGameplay上の効果が残らない状態でcleanup完了を通知します。基本となる必須cleanup区分は以下です。
+
+| 必須cleanup区分 | cleanup完了条件 | 詳細の所有者 |
 |---|---|---|
-| 新しい戦闘操作・生成・Charge・攻撃 | 受付を停止する | Combat、各入力所有システム |
-| 未発火AttackEvent・Arpeggio | 未発火分をcancelし、新しい弾とDamageを発生させない | BGM／AttackEvent |
-| snapshot・Reserved・Allocation | 二重弾化・二重解放を避けてcancel／releaseする | AttackEvent、チャージシステム |
-| 飛翔中Palette Bullet・保留命中 | Gameplay上無効化し、以後Damageを発生させない | Palette Bullet、Combat |
-| Marker | 現在targetとして利用不能にし、表示終了方法は専用ページで定義する | Marker、Combat |
-| 残存シャオンダマ | Clear演出で破裂可能だが、自然破裂のWeak攻撃を発生させない | シャオンダマ、演出 |
-| 音楽時計・同期イベント | Battle終了通知に従って停止する | BGM／MusicChart |
+| Player受付・State | Gameplay入力、Action、Aim、Reaction、および保留入力を停止し、結果確定後のGameplay State遷移を拒否している | Player、入力 |
+| 音楽時計・同期通知 | `Battle／Gameplay／MusicChart`の3時計を停止し、新しいMusicChart Eventと予約済みGameplay callbackを無効化している | BGM／MusicChart |
+| AttackEvent | 未発火AttackEventとArpeggioの未発射Entryを取り消し、Arpeggioの使用Slot snapshotなど、AttackEventが保持するすべてのRuntime snapshotを無効化している。| BGM／AttackEvent |
+| Charge・Allocation・Reserved | 未確定Chargeを破棄し、Allocation／Slot／Reserved関係を解消し、未消費Reservedを一度だけ解放している | Charge、チャージシステム、AttackEvent |
+| Combat集約 | 新しいHit、Damage、Parry、Target決定、Projectile生成を拒否し、必須Combat Ownerのcleanupを集約済みである | Combat |
+| Palette Bullet・Jaon Bullet | 飛行中objectと保留命中をGameplay上無効化し、Damage、衝突、爆発、Parry判定を発生させない | Combat、各Projectile Owner |
+| Marker | 飛行中／付着済みにかかわらずTarget公開を停止し、Gameplay上無効化している | Marker、Combat |
+| シャオンダマ | Charge、Allocation、Palette Bullet化、自然破裂Damageの対象から外し、旧Battleの参照を無効化している | シャオンダマ、チャージシステム |
+| Enemy Spawn・Stage進行 | 新しいEnemy Spawnと旧Battle由来のStage進行通知を停止している | Enemy、Stage |
+
+各Ownerは同じBattle終了通知を複数回受けても安全な冪等処理とし、同じ予約、参照、Slot、またはobjectを二重に解放・破棄してはいけません。未消費Reserved Shaondamaの実際の解放OwnerはAttackEventとAllocationの所有ページ間で一意に定め、もう一方は同じ対象を再解放しません。すでに消費済みのReserved Shaondamaも解放対象へ戻しません。
+
+cleanup完了通知にもBattle IDを含めます。Gameは現在のBattle IDと一致し、かつ未受理の必須Ownerから届いた完了だけを集約します。Combatなどが配下Ownerを集約する場合、そのOwnerは配下の必須cleanupがすべて完了してから自身の完了を通知します。重複通知および旧Battle IDの完了通知は、Result操作解禁数へ加算しません。
+
+### 演出とGameplay処理の分離
+
+Battle終了後にVFX、SE、Projectile、Marker、またはシャオンダマの表示を残す場合でも、Gameplay上の効果は結果確定直後に無効化します。表示専用として残るobjectは、Damage、Hit、Parry、Target提供、Chargeへの再利用、またはResult操作の妨害を行いません。
+
+BGM Audioや終了SEをResult演出として継続する場合でも、3時計とMusicChartからGameplayへ向かうEventは停止済みとします。演出として継続するAudioはBattle結果の再判定やGameplay callbackを発生させません。
+
+Clear時に残っているシャオンダマは、終了演出として一斉に破裂させても構いません。この破裂は通常の自然破裂とは区別し、Weak攻撃、Damage、新しいAttackEventを発生させません。Game Over時に表示を残す場合も同じ無効化規則に従います。
+
+任意のVFX、SE、画面内に残る非Gameplay演出、およびDamageや衝突判定を持たない表示専用objectの終了は、必須cleanup完了条件に含めません。これらが継続中でも、必須Ownerすべてのcleanupが完了すればResult操作を解禁できます。
+
+Battle終了後に表示専用として残す演出およびRuntime objectの視覚的な消滅時点・消去方法は、各objectの所有ページで定義する。Markerの表示終了方法はMarker仕様を正本とする。
+
+## Result接続
+
+Resultは共通画面とし、Gameが通知した確定Battle結果に応じて`Clear`または`Game Over`のvariantを1つだけ表示します。Result／UI側はEnemy状態やPlayer HPを参照して勝敗を再判定しません。同一フレームにClearとPlayer Deadが成立した場合は、Clear variantだけを表示します。
+
+| 確定Battle結果 | Result操作 | route |
+|---|---|---|
+| Clear | `Continue` | 拠点／Stage選択へ戻る |
+| Game Over | `Retry` | 現在のStageを最初から再開する |
+
+- Result表示開始時点では操作をlockし、必須OwnerすべてのGameplay cleanupが完了した後に解禁します。
+- Result操作の受付gateはPlayerのGameplay StateおよびGameplay入力gateと分離し、Result操作解禁のためにGameplay受付を再開しません。
+- 誤操作防止用の最小待ち時間を設ける場合はTuning値として管理し、必須cleanup完了と最小待ち時間の両方が成立した後に解禁します。
+- 操作lock中に入力されたContinue／Retry相当の入力は破棄し、解禁後に遅延実行しません。
+- 1つの確定結果に対して受理できるroute操作は1回だけです。受理直後にResult操作を再度lockし、連打や重複通知による複数route遷移を防止します。
+- Clear ResultのContinueでは、終了したBattleのBattle IDとRuntime状態を無効化して拠点／Stage選択へ戻ります。遷移先Sceneで旧Battle IDを再利用せず、Battle識別が必要な場合および以後新しいBattleを開始する場合は、新しいBattle IDを発行します。
+- Game Over ResultのRetryでは、終了したBattleの状態を再利用せず、旧Battleを破棄して新しいBattle IDで現在のStageを初期化します。
+- Resultのレイアウト、表示文言、および具体的な演出はUI／演出側を正本とします。ただし、確定結果、variant、操作解禁条件、およびrouteは本ページを正本とします。
 
 ## Pause
 
@@ -273,16 +334,17 @@ Pauseは、Playerが通常操作できる次の段階でのみ利用できます
 
 - Battle開始前の準備・初期化中
 - Battle結果の確定後
-- Clear処理およびClear演出中
-- Playerの死亡モーションおよびGame Over処理中
+- Battle終了cleanup、Result表示、およびResult操作中
+- Clear演出またはGame Over側の死亡演出中
 - Retryによる破棄・再初期化中
+- Result操作受理後のroute遷移中
 - 通常操作を受け付けない画面遷移・演出中
 
 Pause開始後にBattle結果を確定させる処理は進行させません。Pause画面の内容、再開操作、およびPause中も継続する表示・音響の詳細はUI、BGM、および各所有ページで定義します。
 
 ## Retry・リセット契約
 
-Retryは死亡地点からのその場復活ではありません。現在のBattleを終了し、旧BattleのRuntime状態を破棄したうえで、対象ステージを開始状態から再構築します。
+RetryはGame Over Resultからのみ受け付け、死亡地点からのその場復活には使用しません。現在のBattleを終了し、旧BattleのRuntime状態を破棄したうえで、新しいBattle IDを発行して現在のステージを開始状態から再構築します。Clear ResultではRetryを受け付けず、Continueによって拠点／Stage選択へ戻ります。
 
 Scene Reloadまたはin-place resetのどちらを使用するかは実装上の選択とし、本ページでは指定しません。どちらの方式でも、以下のリセット結果を満たす必要があります。
 
@@ -296,14 +358,14 @@ Scene Reloadまたはin-place resetのどちらを使用するかは実装上の
 | Weak AttackEvent | 旧Battle分をすべて破棄する | BGM／AttackEvent、チャージシステム |
 | Shaondama | 旧Battleに属するworld objectを持ち越さず、新しい生成要求から出現させる | シャオンダマ、ラジクジラ |
 | Reserved／Allocation | Current、Slot、Weakを含む旧Battle分をすべて破棄し、空の状態から開始する | チャージシステム |
-| Palette Bullet／Marker | 旧Battleに属するobject、target情報、および保留中の命中処理を持ち越さない | Combat |
+| Palette Bullet／Marker／Jaon Bullet | 旧Battleに属するobject、target情報、および保留中の命中処理を持ち越さない | Combat |
 | ラジクジラ | 新しいBattleの初期位置、表示、存在状態へ戻す | ラジクジラ、Stage |
 | Stage進行・ギミック | ステージ開始時の進行度、配置、作動状態へ戻す | Stage |
-| UI | HP、Slot、予告、結果表示、Pause表示など、旧Battle由来の表示状態を破棄・再構築する | UI |
+| UI | HP、Slot、予告、共通Result、操作lock、Pause表示など、旧Battle由来の表示状態を破棄・再構築する | UI |
 | 入力・入力バッファ | 旧Battle中の押下状態、予約入力、選択対象を破棄する | Player、入力、UI |
 | VFX／SE／演出 | 旧Battleに属し、新Battleへ影響する再生・予約状態を持ち越さない | 演出、各所有システム |
 
-Retry完了後は、Battle開始lifecycleに従って初期化し、必要な準備が完了してからPlayerの戦闘操作を受け付けます。
+Retry完了後は、新しいBattleとしてBattle開始lifecycleに従って初期化し、必要な準備が完了してからPlayerの戦闘操作を受け付けます。終了したBattleのcleanup済みobjectやStateを初期値として再利用しません。
 
 旧Battle IDを持つ遅延通知、生成結果、命中、Damage、および浄化結果は、新しいBattleへ適用しません。
 
@@ -311,18 +373,18 @@ Retry完了後は、Battle開始lifecycleに従って初期化し、必要な準
 
 | システム | ゲーム全体での役割 | 詳細ページ |
 |---|---|---|
-| Player | 移動、回避、対象選択、Charge、HP 0によるDead、およびPlayer内部のRetry初期化を管理する | [Player](/spec/player/)、[Player死亡](/spec/player/player-death)、[Playerステータス](/spec/player/player-status) |
-| BGM／MusicChart | 音楽進行、シャオンダマ生成内容・タイミング、AttackEvent時刻、Battle終了・Retry時の音楽時計を管理する | [MusicChart](/spec/bgm/bgm-music-chart)、[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[Gameplay接続](/spec/bgm/bgm-gameplay-connection) |
-| AttackEvent | BGM上の攻撃タイミング、発火時の結果、使用Reserved、およびPalette Bullet化対象を確定する | [AttackEvent](/spec/bgm/bgm-attack-event)、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
+| Player | 移動、回避、対象選択、Charge、HP 0による`Dead`成立、Battle終了時のGameplay State・入力停止、およびPlayer内部のRetry初期化を管理する。死亡演出はGameの確定結果に従う | [Player](/spec/player/)、[Player死亡](/spec/player/player-death)、[Player State](/spec/player/states)、[入力・操作](/spec/player/input-and-controls)、[Playerステータス](/spec/player/player-status) |
+| BGM／MusicChart | 音楽進行、シャオンダマ生成内容・タイミング、AttackEvent時刻、Battle終了時の3時計・Gameplay同期通知の停止、およびRetry時の再初期化を管理する | [MusicChart](/spec/bgm/bgm-music-chart)、[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[Gameplay接続](/spec/bgm/bgm-gameplay-connection) |
+| AttackEvent | BGM上の攻撃タイミング、発火時の結果、使用Reserved、Palette Bullet化対象、およびBattle終了時の未発火処理・snapshot取消を管理する | [AttackEvent](/spec/bgm/bgm-attack-event)、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | ラジクジラ | BGM側の生成要求を受け、通常シャオンダマを世界内へ出現させる | [ラジクジラ](/spec/radiowhale/)、[Gameplayライフサイクル](/spec/radiowhale/gameplay-lifecycle) |
 | シャオンダマ・音楽連動 | 世界内へ出現したシャオンダマの存在・挙動と、音・色との関係を管理する | [シャオンダマ・音楽連動](/spec/shaondama-music/) |
 | Charge | Playerによる対象選択とCharge入力・成立処理を管理する | [Playerアクション｜チャージ](/spec/player/player-action-charge) |
 | チャージシステム | Current／Slot／WeakへのAllocationとReserved状態を管理する | [チャージシステム](/spec/draw-system/)、[Charge Allocation](/spec/draw-system/charge-allocation) |
-| Combat | Battle状態、開始・終了通知、Palette Bullet／Marker、命中、および浄化判定を管理する | [戦闘](/spec/combat/)、[Palette Bullet](/spec/combat/palette-bullet)、[Marker](/spec/combat/marker) |
+| Combat | Battle状態、開始・終了通知、Palette Bullet／Marker、命中、浄化判定、Battle終了gate、および必須Combat Ownerのcleanup完了集約を管理する | [戦闘](/spec/combat/)、[Palette Bullet](/spec/combat/palette-bullet)、[Marker](/spec/combat/marker) |
 | Enemy | 攻撃対象、Damage、浄化状態、およびClear候補の成立を管理する | [敵](/spec/enemy/)、[Damage・浄化](/spec/enemy/damage-and-purify) |
 | Stage | 初期配置、Clear対象Enemy集合、Stage進行、およびRetry時のStage再初期化を管理する | [ステージ](/spec/stage/) |
 | カメラ | 拠点・Battle中の視界と選択対象を表示する | [カメラ](/spec/camera/) |
-| UI | 現在状態、Pause、死亡画面、Clear／Game OverおよびResult表示を管理する | [UI](/spec/ui/) |
+| UI | 現在状態、Pause、共通ResultのClear／Game Over variant、Result操作lock、および確定route操作の通知を管理する。勝敗は再判定しない | [UI](/spec/ui/) |
 | 演出 | 色、音、攻撃結果、Clear、死亡などを視覚・聴覚的に伝える | [演出](/spec/effects/) |
 
 ラジクジラに関する詳細仕様は、役割ごとに以下のページを正本とします。
@@ -336,7 +398,7 @@ Retry完了後は、Battle開始lifecycleに従って初期化し、必要な準
 
 ## 責務境界
 
-ゲーム結果、ゲーム全体lifecycle、Battle開始・終了の高レベルな順序、Pause可能範囲、およびRetry時に満たすべき全体リセット結果は、本ページを正本とします。
+Battle結果の確定、同一フレームに複数の終了候補が成立した場合の優先規則、Clear＋Dead時の非巻き戻しと演出分岐、共通Resultへの接続、Result操作解禁条件、ゲーム全体lifecycle、Battle開始・終了の高レベルな順序、Pause可能範囲、およびRetry時に満たすべき全体リセット結果は、本ページを正本とします。
 
 以下は本ページで再定義しません。
 
@@ -348,7 +410,7 @@ Retry完了後は、Battle開始lifecycleに従って初期化し、必要な準
 - シャオンダマの個別lifecycle
 - Palette Bullet／Markerの飛翔、衝突、および消滅
 - EnemyへのRGB Damage計算と浄化値更新
-- UIレイアウト、表示内容、演出、SEの具体的内容
+- UIレイアウト、Result内の表示内容、演出、SEの具体的内容
 - RetryにおけるScene Reload／in-place resetなどの内部実装方式
 
 詳細ページが本ページの全体lifecycleと矛盾する場合は、矛盾を放置せず、責務の正本に合わせて該当仕様を更新します。
@@ -363,8 +425,19 @@ Retry完了後は、Battle開始lifecycleに従って初期化し、必要な準
 - 論理生成済み、生成要求中、出現演出中、またはGameplayへのhand-off前のシャオンダマをShaondama Supply Readyの最低保証数へ算入してはいけません。
 - Ready gate成立時にBGM Audioを開始してはいけません。BGM Audioはsystem pre-roll終了時に音源位置0から開始します。
 - Charge開始可否をBGM Audioの再生状態だけで決定してはいけません。
+- PlayerのHP 0または`RootState = Dead`だけを根拠に、最終Battle結果の確定前からGame Over表示やRetry受付を開始してはいけません。
+- 同一フレームにClearとPlayer Deadが成立してClearを確定した場合、HP 0、`RootState = Dead`、Damage、または成立済みの状態変更を巻き戻してはいけません。
+- Clearを確定した場合に、`RootState = Dead`を根拠として死亡演出、Game Over variant、またはRetry受付を開始してはいけません。
 - Battle結果確定後に、後続の命中、Damageや浄化によって結果を変更してはいけません。
-- Battle結果確定後に、新しい戦闘操作、Charge、生成要求、AttackEvent、Arpeggio、攻撃、Damage、浄化を開始してはいけません。
+- Result／UIまたは各Ownerが、Player HPやEnemy状態からBattle結果を再判定してはいけません。
+- Battle結果確定後に、新しい戦闘操作、Charge、生成要求、Enemy Spawn、AttackEvent、Arpeggio、Projectile、Target決定、Hit、Damage、Parry、または浄化を開始してはいけません。
+- Battle結果確定後も表示を残すGameplay objectに、Damage、Hit、Parry、Target提供、Chargeへの再利用、またはResult操作の妨害を許可してはいけません。
+- 必須Ownerすべてのcleanup完了前にResult操作を解禁してはいけません。
+- 任意のVFX、SE、または表示専用objectの終了だけを理由に、必須cleanup完了後もResult操作をlockし続けてはいけません。ただし、Tuningで定義した誤操作防止用の最小待ち時間は適用できます。
+- Result操作lock中の入力を保存し、解禁後にContinue／Retryとして遅延実行してはいけません。
+- 1つのResult操作から複数のroute遷移を開始してはいけません。
+- 同じBattle終了通知に対してcleanupを複数回実行したり、同じReserved、Slot、参照、またはobjectを二重に解放・破棄したりしてはいけません。
+- 現在と異なるBattle IDのGameplay通知、Damage、生成結果、callback、またはcleanup完了通知を適用してはいけません。
 - Clear演出としてのシャオンダマ破裂から、Weak攻撃、Damage、またはAttackEventを発生させてはいけません。
 - Retry後に、旧BattleのShaondama、Reserved、Allocation、Weak AttackEvent、Palette Bullet、Marker、Enemy状態、入力、UI状態を持ち越してはいけません。
 - ラジクジラへChargeやAttackEventの成立判定を担当させてはいけません。
@@ -372,13 +445,20 @@ Retry完了後は、Battle開始lifecycleに従って初期化し、必要な準
 
 ## パラメータ
 
-なし
+- Result操作の誤操作防止用最小待ち時間を設ける場合、その値はTuningで管理します。本ページでは固定値を定めません。
 
 ## 未決事項
 
-Battle IDのデータ型・採番方式、Battle開始前の準備演出、Result画面の表示内容、Clear／Game Over時の演出・SE、およびPause画面の詳細は、実装または各所有ページで定義します。これらは本ページが定義するGameplay上のBattle順序・結果規則を変更しません。
+Battle IDのデータ型・採番方式、Battle開始前の準備演出、Result画面の具体的なレイアウト・表示文言、Clear／Game Over時の演出・SE、誤操作防止用最小待ち時間の採用可否と値、およびPause画面の詳細は、実装、Tuning、または各所有ページで定義します。これらは本ページが定義するGameplay上のBattle順序・結果規則を変更しません。
 
-Q-01〜Q-03でBattle lifecycleの主要挙動は決定済みです。ただし、AttackEvent、Palette Bullet、Marker、シャオンダマ、BGMなど各正本へのcancel／終了演出契約の同期と横断確認が完了するまでは、本ページのstatusを`仮仕様`とします。
+従来Q-01〜Q-03として管理していたBattle結果、同一フレーム優先規則、および終了後の接続は、本ページの「Battle結果の確定規則」「Battle終了lifecycle」「Result接続」の内容で決定済みです。
+
+上位方針とResult接続は決定済みですが、AttackEvent、Charge Allocation、BGM同期、Palette Bullet、Marker、Jaon Bullet、シャオンダマ、Player State／Damageなど各Ownerページへのcleanup契約の同期、および「Parry／Jaon Bullet／Wildcard」「Playerの同一フレームDamage」「各Owner固有の通常lifecycle」確定後の逆監査が残っています。次を横断確認できるまでは、本ページのstatusを`仮仕様`とします。
+
+- 結果確定後にGameplay処理が残らないこと
+- 各Ownerのcleanupが一度だけ実行されること
+- 旧Battle IDの通知を拒否できること
+- 必須cleanup完了がResult操作解禁へ接続されること
 
 ## 関連タスク
 
