@@ -1,6 +1,6 @@
 ---
 title: "BGM MusicChart仕様"
-description: Palette BulletにおけるMusicChartのImportデータ、AttackEvent音楽データ、Timing Settings、手動設定データ構造
+description: Palette BulletにおけるMusicChartのImportデータ、AttackEvent音楽データ、system pre-roll対応、Timing Settings、validation
 pageType: spec
 category: "BGM"
 status: 仮仕様
@@ -41,6 +41,7 @@ TempoMap / NoteEvents
 +
 
 Unity上の手動設定
+├─ system pre-rollとの対応
 ├─ Shaondama Settings
 ├─ AttackEvent Timing Settings
 ├─ Attack Events
@@ -54,7 +55,7 @@ Unity上の手動設定
 
 本ページでは、
 
-> **MusicChartのデータ構造と、MIDI Importデータ・Unity上の手動設定データの境界**
+> **MusicChartのデータ構造、MIDI Importデータ・Unity上の手動設定データの境界、および静的データvalidation**
 
 を正とします。
 
@@ -64,12 +65,14 @@ Unity上の手動設定
 - `BGM AudioClip`
 - `TempoMap`
 - `NoteEvents`
+- system pre-roll時間と曲本編位置0の対応
 - `Shaondama Settings`
 - `AttackEvent Timing Settings`
 - `Attack Events`
 - `Random Sections`
 - `Sync Settings`
 - MIDI Import / 再Import
+- MusicChart保存・Import・再Import後のvalidation
 - 各データの決定者・入力者
 - 静的DefinitionとRuntime状態の境界
 
@@ -119,6 +122,11 @@ MusicChart
 │     ├─ Music Position
 │     └─ Note Length
 │
+├─ system pre-rollとの対応             [手動設定]
+│  ├─ system pre-roll時間を取得可能な情報
+│  └─ pre-roll終了点
+│     └─ BGM Audio / 曲本編 Music Position 0
+│
 ├─ Shaondama Settings                 [手動設定]
 │  ├─ 使用するTrack
 │  ├─ InitialTargetCount
@@ -166,6 +174,7 @@ MIDIから自動生成
 
 Unity上の手動設定
 ├─ BGM AudioClip
+├─ system pre-rollとの対応
 ├─ Shaondama Settings
 ├─ AttackEvent Timing Settings
 ├─ Attack Events
@@ -196,6 +205,39 @@ MusicChart.BGM
 MusicChartでは、FLACそのものではなくUnityへImportされた`AudioClip`を参照します。
 
 FLAC / MIDIの制作・Export条件については、[BGM MIDIファイルの設定](/spec/bgm/bgm-midi-settings)を正とします。
+
+---
+
+## system pre-rollとの対応
+
+MusicChartは、対象曲のBattle音楽runtimeで使用するsystem pre-roll時間と、曲本編位置0との対応を静的データとして保持できる必要があります。
+
+具体的なフィールド名や保存形式は固定しません。ただし、MusicChartから少なくとも以下を一意に取得できることを必須とします。
+
+- system pre-rollの時間
+- Battle音楽runtimeの開始点
+- system pre-rollの終了点
+- system pre-roll終了点とBGM Audioの音源位置0との対応
+- system pre-roll終了点と曲本編の`Music Position 0`との対応
+
+概念上の時間関係は次のとおりです。
+
+```text
+Battle音楽runtime開始点
+= system pre-roll開始点
+
+Battle音楽runtime開始点
++ system pre-roll時間
+= system pre-roll終了点
+= BGM Audio 音源位置0
+= 曲本編 Music Position 0
+```
+
+system pre-rollは、音源、完成BGM、またはMIDIへ追加した無音区間として保存しません。BGM Audioはsystem pre-roll中、音源位置0で停止し、pre-roll終了時に音源位置0から再生を開始します。
+
+Battle音楽runtime開始からBGM Audio再生開始までの実行制御、`Battle／Gameplay／MusicChart`の3時計、およびsystem pre-roll中のPreview／Charge受付は、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。本ページは、そのRuntime処理に必要な静的な時間対応とvalidationを所有します。
+
+system pre-rollの具体的な長さはTuning項目とします。秒、Tick、Beat、専用時間型のどれで保存するか、またMusicChart直下または専用Settings内のどこへ保持するかはImplementation Decisionとします。
 
 ---
 
@@ -317,6 +359,7 @@ MIDIへどのTrack・Note情報を残すかについては、[BGM MIDIファイ�
 ```text
 手動設定
 ├─ BGM AudioClip
+├─ system pre-rollとの対応
 ├─ Shaondama Settings
 ├─ AttackEvent Timing Settings
 ├─ Attack Events
@@ -418,6 +461,8 @@ Charge Close Progress
 
 3つのProgressは、同じBGM時間軸を基準として同じ速度で進行します。
 
+system pre-roll中に発生するPreviewまたはCharge境界も、[system pre-rollとの対応](#system-pre-rollとの対応)を使用して同じBattle音楽runtime上の位置へ解決できる必要があります。BGM Audioがまだ再生されていないことを理由に、別のTiming値へ置き換えません。
+
 ### Preview / Charge Start Offset
 
 `Preview / Charge Start Offset`は、予告開始およびCharge受付開始に必要な時間差を表します。
@@ -433,6 +478,8 @@ Charge受付開始
 ```
 
 として扱える値を保存します。
+
+現行構造ではPreview開始とCharge受付開始に同じOffsetを使用するため、両者は同時刻になり得ます。ただし、validationでは「Preview開始」と「Charge受付開始」を別の意味境界として解決し、両方がBattle音楽runtime開始点以後に存在することを確認します。
 
 ### Charge Close Offset
 
@@ -465,16 +512,18 @@ AttackEvent発火
 ただしGameplay上、
 
 ```text
-Preview / Charge Start
+Preview開始
+↓
+Charge受付開始
 ↓
 Charge Close
 ↓
 Actual Fire
 ```
 
-の順で各境界へ到達できる設定とします。
+の順で各境界へ到達できる設定とします。Preview開始とCharge受付開始を同じ境界として保存する現行構造では、この2つの同時成立を許可します。
 
-不正な順序を設定できないようEditor validationを設けることは推奨しますが、具体実装はプログラム設計へ委譲します。
+この順序はMusicChart validationで必ず確認します。不正な順序を警告だけで黙認したり、RuntimeでOffsetを自動補正したりしません。具体的なEditor UIや検証コードの構成はプログラム設計へ委譲します。
 
 ### Offsetのデータ単位
 
@@ -526,6 +575,33 @@ MusicChart曲共通値を使用
 ```
 
 とします。
+
+### 最初のAttackEventとsystem pre-roll
+
+MusicChartは、最初のNormal AttackEventについて、曲共通値またはAttackEvent個別Overrideを解決した後の以下の位置を取得できる必要があります。
+
+- Preview開始位置
+- Charge受付開始位置
+- Charge受付終了位置
+- `Fire Music Position`
+
+最初のNormal AttackEventは、`Fire Music Position`が最も早いDefinitionとします。完全に同じ`Fire Music Position`を持つDefinitionが複数ある場合は、MusicChart定義順の最初を基準にします。同時刻に存在するほかのAttackEventも、それぞれ同じvalidationを通過する必要があります。
+
+各位置は、`TempoMap`、有効な`AttackEvent Timing Settings`、およびsystem pre-rollとの対応を使用して、Battle音楽runtime開始点を基準とするRuntime位置へ解決します。
+
+有効なMusicChartでは、少なくとも次を満たす必要があります。
+
+```text
+Battle音楽runtime開始点
+<= 最初のPreview開始
+<= 最初のCharge受付開始
+<= 最初のCharge受付終了
+<= 最初のAttackEvent発火
+```
+
+現行構造では、最初のPreview開始とCharge受付開始が同時刻でも構いません。
+
+最初のPreview開始またはCharge受付開始がBattle音楽runtime開始点より前へはみ出す場合、system pre-rollが必要な先行時間を確保できていないためvalidation errorとします。RuntimeでPreviewを途中から開始したり、Charge受付時間を暗黙に短縮したりして成立させません。
 
 ---
 
@@ -1008,6 +1084,8 @@ MusicChartに存在する値の決定元は、以下を基本とします。
 | `BGM AudioClip`の元素材 | サウンド班 |
 | `TempoMap` | MIDIから生成 |
 | `NoteEvents` | MIDIから生成 |
+| system pre-roll時間 | Tuning項目。具体値と最終決定者は未確定 |
+| pre-roll終了点とBGM Audio／曲本編位置0の対応 | 本ページの固定データ契約 |
 | Gameplay利用候補Track | サウンド班が提示 |
 | `使用するTrack` | プランナー |
 | `InitialTargetCount` | プランナー |
@@ -1039,6 +1117,7 @@ MIDIから生成される値については、MusicChart上で別の担当者が
 | `BGM AudioClip` | プログラマー |
 | `TempoMap` | Import機構 |
 | `NoteEvents` | Import機構 |
+| system pre-rollとの対応 | プログラマー |
 | `Shaondama Settings` | プログラマー |
 | `AttackEvent Timing Settings` | プログラマー |
 | `Attack Events` | プログラマー |
@@ -1102,6 +1181,7 @@ NoteEventsには、MIDIから取得した、
 以下はMIDI Importによる自動生成対象としません。
 
 - `BGM AudioClip`
+- system pre-rollとの対応
 - `Shaondama Settings`
 - `AttackEvent Timing Settings`
 - `Attack Events`
@@ -1113,6 +1193,14 @@ AttackEventの`Music Requirement Entry`にexact MIDI Noteを保存すること�
 AttackEventは、サウンド班・プランナーが確定したGameplay用音楽情報を手動設定データとして保持します。
 
 AttackEventやRandom SectionをMIDIのゲーム専用Trackから自動生成する方式は、現段階では採用しません。
+
+### Import後のvalidation
+
+MIDI Importによって`TempoMap`と`NoteEvents`を生成した後は、MusicChartに保持されている手動設定データと組み合わせて[MusicChart validation](#musicchart-validation)を実行します。
+
+Import直後にAttackEventがまだ設定されていない場合、最初のAttackEventに依存する項目は検証対象なしとします。その後、AttackEvent、Timing Settings、system pre-rollとの対応を設定・変更して保存する時点で、同じvalidationを実行します。
+
+Import処理は、validationを通すためにsystem pre-roll時間、AttackEvent Timing Settings、またはAttackEvent位置を自動変更しません。
 
 ---
 
@@ -1135,6 +1223,7 @@ MIDIを修正した場合は、MusicChartへ再Importします。
 
 保持
 ├─ BGM AudioClip
+├─ system pre-rollとの対応
 ├─ Shaondama Settings
 ├─ AttackEvent Timing Settings
 ├─ Attack Events
@@ -1216,6 +1305,8 @@ MIDI由来の音楽構造が変更された場合は、少なくとも以下を�
 - Random Candidate
 - `Shaondama Settings`の使用Track
 - AttackEvent Timing Settingsとの音楽的・Gameplay上の妥当性
+- system pre-roll終了点とBGM Audio／曲本編位置0の対応
+- 最初のAttackEventのPreview／Charge先行時間
 
 #### Track変更
 
@@ -1233,9 +1324,78 @@ AttackEventはMIDIから生成されないため、MIDI再ImportだけではAtta
 
 楽曲変更によってAttackEvent側も変更する必要がある場合は、サウンド班・プランナーで内容を再確認し、MusicChartの手動設定を更新します。
 
-将来的にEditor validation等で不整合検出を補助することは可能ですが、現段階で手動設定値の自動修正は仕様化しません。
+再Import後は、保持されたsystem pre-rollとの対応、AttackEvent Timing Settings、Attack Eventsを、更新後の`TempoMap`に対して再解決し、[MusicChart validation](#musicchart-validation)を実行します。
+
+不整合はvalidation errorとして検出しますが、手動設定値を自動修正しません。特に、最初のPreviewまたはCharge受付開始がBattle音楽runtime開始点より前へ移動した場合も、PreviewやCharge時間を暗黙に短縮して補正しません。
 
 再Export / 再Importを含む制作工程については、[サウンド班制作フロー](/spec/bgm/sound-production-workflow)を正とします。
+
+---
+
+## MusicChart validation
+
+MusicChartは、静的データを保存した時点と、MIDI Import／再Importが完了した時点で、同じvalidation規則を適用します。
+
+少なくとも、以下の契機で検証結果を更新できる必要があります。
+
+- MusicChartの保存
+- 初回MIDI Importの完了
+- MIDI再Importの完了
+- system pre-rollとの対応の変更
+- `AttackEvent Timing Settings`の変更
+- AttackEvent個別`Timing Override`の変更
+- `Fire Music Position`またはArpeggio Entry Timingの変更
+
+Editorの`OnValidate`、保存前処理、Import後処理、専用validation commandなど、具体的な実行方式はImplementation Decisionとします。ただし、保存・Import・再Importの経路によって検証内容を変えてはいけません。
+
+### 必須validation
+
+有効なMusicChartは、少なくとも以下をすべて満たす必要があります。
+
+1. system pre-roll時間と、Battle音楽runtime開始点・pre-roll終了点の対応を一意に取得できる
+2. system pre-roll終了点が、BGM Audioの音源位置0および曲本編`Music Position 0`と一致する
+3. `TempoMap`を用いて、各AttackEventのPreview開始、Charge受付開始、Charge受付終了、発火を同じBattle音楽runtime上へ解決できる
+4. 各AttackEventで、`Preview開始 <= Charge受付開始 <= Charge受付終了 <= 発火`の順序が成立する
+5. 各AttackEventのPreview開始がBattle音楽runtime開始点より前へはみ出さない。特に最初のAttackEventを必ず確認する
+6. 各AttackEventのCharge受付開始がBattle音楽runtime開始点より前へはみ出さない。特に最初のAttackEventを必ず確認する
+7. AttackEvent個別Overrideを使用する場合も、解決後の実効値で同じ条件を満たす
+
+Preview開始とCharge受付開始へ同じOffsetを使用する現行構造では、両者の同時成立を許可します。その他の境界についてもGameplay仕様が同時成立を許可する場合は等号を使用できますが、時間順を逆転させてはいけません。
+
+固定AttackEventだけでなく、最初のAttackEventになり得るRandom Candidateを含むすべてのNormal AttackEvent Definitionを検証対象とします。Runtime抽選によって選ばれない可能性があることを理由に、不正なCandidateを有効データとして残しません。
+
+### 最初のPreview／Charge lead
+
+最初のAttackEventについて、system pre-rollはPreviewとCharge準備に必要な先行時間を確保できる必要があります。
+
+```text
+最初のAttackEvent Fire Music Position
++ 有効なPreview / Charge Start Offset
++ system pre-rollとの対応
+↓
+最初のPreview開始・Charge受付開始のRuntime位置
+↓
+Battle音楽runtime開始点以後か確認
+```
+
+この検証は、具体的なpre-roll秒数やOffset値を本ページで固定するものではありません。設定されたTuning値の組み合わせが、最初のAttackEventに必要な時間関係を満たしているかを確認するものです。
+
+### validation error時の扱い
+
+必須validationを満たさないMusicChartは、対象Battleで使用可能な有効データとして扱いません。
+
+不足または不整合を検出した場合、以下の暗黙補正を行ってはいけません。
+
+- 最初のPreviewをBattle音楽runtime開始時点から途中表示する
+- 最初のCharge受付開始を遅らせ、受付時間を短縮する
+- 最初のAttackEventだけPreviewなしで発火させる
+- Battle音楽runtime開始点より前のPreview／Charge処理を黙って破棄する
+- `Fire Music Position`またはTiming OffsetをRuntimeで自動移動する
+- BGM AudioまたはMIDIへ無音を自動挿入して辻褄を合わせる
+
+validation errorは、system pre-roll時間、AttackEvent Timing Settings、個別Override、Fire Music Position、または元の音楽データを明示的に修正して解消します。
+
+具体的なError表示、保存を拒否するか警告付きで保存可能にするか、Build validationへ接続するかはEditor／Implementation Decisionとします。ただし、errorを無視してRuntimeで暗黙補正した状態を正式挙動にしてはいけません。
 
 ---
 
@@ -1324,6 +1484,9 @@ BGM上の再生位置
 
 以下のデータは、同一の音楽時間基準へ接続できる必要があります。
 
+- Battle音楽runtime開始点
+- system pre-roll終了点
+- BGM Audio／曲本編の`Music Position 0`
 - NoteEventのMusic Position
 - Normal AttackEventの`Fire Music Position`
 - Arpeggio EntryのTiming
@@ -1337,13 +1500,16 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 
 ## 他仕様との責務境界
 
-本ページは、MusicChartへ保存する静的データ構造とImport境界だけを正とします。
+本ページは、MusicChartへ保存する静的データ構造、Import境界、および保存・Import・再Import後のvalidationを正とします。
 
 | 内容 | 正とする仕様 |
 | --- | --- |
 | MusicChart全体データ構造 | 本ページ |
 | TempoMap / NoteEvents保存構造 | 本ページ |
 | MIDI Import / 再Import | 本ページ |
+| system pre-roll時間と、pre-roll終了点・BGM Audio／曲本編位置0の対応を保存する静的データ契約 | 本ページ |
+| MusicChart保存・Import・再Import後のpre-roll／AttackEvent Timing validation | 本ページ |
+| 最初のPreview／Charge開始に必要なleadを確保できているかのvalidation | 本ページ |
 | AttackEvent Timing Settings保存構造 | 本ページ |
 | AttackEvent Entry / exact MIDI Note保存契約 | 本ページ |
 | Random Section保存構造 | 本ページ |
@@ -1353,7 +1519,7 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 | AttackEventの音楽的意味・3 ProgressのGameplay上の意味 | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) |
 | Current Normal AttackEvent / Pitch Class照合 / Slot Allocation / Weak Allocation / Reserved | [Charge Allocation仕様](/spec/draw-system/charge-allocation) |
 | Complete / Incomplete / Zero Charge / Palette Bullet化 | [BGM 攻撃判定仕様](/spec/bgm/bgm-attack-judgement) |
-| BGMとGameplayの発音・同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
+| 3時計の開始、system pre-rollのRuntime進行、BGM Audio再生開始、およびBGMとGameplayの発音・同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | NoteEventからのシャオンダマ生成 | [BGM シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama) |
 | Random Sectionの候補・抽選ルール | [BGM Random Section仕様](/spec/bgm/bgm-random-section) |
 | PlayerのCharge入力・Action | Player仕様 |
@@ -1373,6 +1539,8 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 - Palette Bullet化
 - Palette Bulletの発射対象
 - 発音処理
+- system pre-rollのRuntime進行
+- BGM Audioの実際の再生開始処理
 - Buff効果
 - Random抽選アルゴリズム
 - BGM Loop時のShaondama Lifecycle
@@ -1412,6 +1580,16 @@ octave
 
 小節・拍・Tick等の音楽位置をどのstruct / classで表現するかは未確定です。
 
+### system pre-rollの保存形式
+
+system pre-roll時間をMusicChart直下、専用Settings、または等価な時間対応データのどれで保持するかはImplementation Decisionです。
+
+秒、Tick、Beat、専用時間型のどれを使用するかも固定しません。ただし、Battle音楽runtime開始点、pre-roll終了点、および曲本編位置0の対応を一意に取得できる必要があります。
+
+### system pre-roll具体値
+
+system pre-rollの具体的な長さは未定です。最初のPreview／Charge leadを確保できる範囲で調整するTuning項目とします。
+
 ### Offset型
 
 `Preview / Charge Start Offset`、`Charge Close Offset`を、
@@ -1432,6 +1610,12 @@ Gameplay調整パラメータとします。
 ### Timing Override UI
 
 Inspector上で`Use Override`等をどのように入力させるかは、プログラム / Editor設計へ委譲します。
+
+### validationの実装方式
+
+保存時、Import後、再Import後のvalidationを、`OnValidate`、専用Editor、Import pipeline、Build validation等のどこで実行するかはImplementation Decisionです。
+
+ただし、どの経路でも同じ必須条件を検証し、Runtimeで暗黙補正しないことは確定仕様です。
 
 ---
 
