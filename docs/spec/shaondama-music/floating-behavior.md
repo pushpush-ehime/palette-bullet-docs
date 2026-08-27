@@ -32,7 +32,7 @@ status: 仮仕様
 - 未使用Normal Shaondamaがsource NoteEvent時刻へ到達した際の自然破裂と小範囲Weak攻撃
 - Charge成功と自然破裂が同一フレームに成立する場合の優先順位
 - 一般Lifetimeおよび各終了条件が競合した場合の一回終了処理
-- Battle終了・Room RetryにおけるGameplay無効化と旧Battle個体の破棄
+- Battle結果確定時のGameplay無効化、表示専用演出、およびRetry／次Battleへの持ち越し禁止
 
 個体が保持するBattle ID、source NoteEvent occurrence、source music time、基本色・RGB値などのデータは[玉のデータ](/spec/shaondama-music/orb-data)、生成対象・生成タイミング・最低保証数・Wildcard生成要求は[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、出現演出完了までの状態遷移と制御移譲は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、Charge成功と`Reserved`へのcommitは[Charge Allocation](/spec/draw-system/charge-allocation)を正本とします。
 
@@ -371,24 +371,77 @@ Parry成功した邪音玉1弾が、そのworld位置でWildcard 1個へ変換�
 
 変換条件、1弾1個、生成位置、および生成元区分は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とします。
 
-### Battle終了
+### Battle結果確定時
 
-ClearまたはGame Overの結果が確定した時点で、対象Battleの全シャオンダマをGameplay上無効化します。
+ClearまたはGame Overの結果が確定した時点で、対象Battleの全Shaondamaを即座にGameplay上無効化します。
 
 - 新しいCharge対象として公開しません。
+- Charge判定中の選択対象、Allocation候補、Slot割り当て対象として使用しません。
+- Battle結果確定後に新しいAllocation commitや`Reserved`への遷移を成立させません。
+- AttackEventの使用対象やPalette Bullet化の対象にしません。
 - 最低保証数へ算入せず、個体の算入状態を無効化します。
-- 一般Lifetimeとsource NoteEvent時刻の自然破裂判定を停止します。
-- 新しいWeak攻撃、Damage、AttackEvent、Palette Bulletを発生させません。
-- 遅延した選択可能化、`Reserved`、自然破裂、Lifetime終了のcallbackをGameplayへ適用しません。
-- 終了通知を複数回受けても、同じ個体の終了処理を重複実行しません。
+- 浮遊移動、一般Lifetime、source NoteEvent時刻の自然破裂判定を停止します。
+- 新しいWeak攻撃、Hit、Damage、AttackEvent、Palette Bulletを発生させません。
+- 遅延した選択可能化、`Reserved`、自然破裂、Lifetime終了、消費、Palette Bullet化のcallbackをGameplayへ適用しません。
 
-Clear時に残っているシャオンダマは、終了演出として一斉に割れて構いません。この破裂は通常の自然破裂とは別のBattleEndPresentationとして扱い、Weak攻撃要求・Damage・AttackEventを発生させません。
+Battle結果確定時点で未確定のCharge、Allocation候補、選択中のShaondamaを後からcommitしません。未確定Chargeの破棄とAllocation関係の解消は[Charge Allocation](/spec/draw-system/charge-allocation)、未発射AttackEventと未消費`Reserved`の取消・解放は[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正本とします。
 
-Game Over時もGameplay上の無効化は同じです。残存objectを即時消去するか、Game Over演出として表示を残すかは演出仕様として未決ですが、いずれの場合もGameplay出力を発生させません。
+本ページは、浮遊中またはworld上に残るShaondama objectと、そのGameplay参照の無効化を所有します。AttackEvent側が所有する未消費`Reserved`を本ページから重複解放しません。
 
-### Room Retry
+#### Clear時
 
-Room Retry開始時は旧Battleに属するShaondama runtimeを破棄し、新しいBattle IDに付け替えません。
+Clear時に残っているShaondamaは、終了演出として一斉に割れて構いません。
+
+この破裂は通常の自然破裂とは別の`BattleEndPresentation`として扱い、次を一切発生させません。
+
+- 自然破裂Weak攻撃
+- Hit／Damage候補
+- 爆発範囲などのGameplay query
+- AttackEventまたはAllocation
+- `Reserved`への遷移
+- Palette Bullet化
+- 最低保証数の不足通知や補充要求
+
+Clear演出として見た目とSEだけを発生させる場合も、演出開始前に対象個体のGameplay参照を無効化します。
+
+#### Game Over時
+
+Game Over時は、全Shaondamaについて次のGameplay参照を無効化します。
+
+- 選択可能個体としての参照
+- 最低保証数への算入参照
+- Charge／Allocation候補としての参照
+- AttackEvent／`Reserved`／Palette Bullet化に使用する参照
+- 浮遊、Lifetime、source NoteEvent時刻監視の更新参照
+- 自然破裂、Hit、Damage、消費に関する予約通知とcallback
+
+残存objectを即時消去するか、Game Over演出として表示を残すかは演出仕様として未決です。どちらの場合もGameplay出力を発生させません。
+
+#### 表示専用の残留演出
+
+Clear／Game Over後にShaondama object、破裂VFX、SEを表示専用として残すことはできます。
+
+表示専用objectには、選択、Charge、Allocation、衝突、Hit、Damage、自然破裂、Palette Bullet化、Target提供などのGameplay機能を持たせません。見た目として浮遊や破裂が継続していても、Gameplay状態が継続している根拠にしません。
+
+表示専用objectの消滅、VFX、SEの終了は必須cleanup完了条件に含めず、Result操作の解禁を妨げません。
+
+#### cleanupの冪等性と完了条件
+
+同じBattle IDに対する終了通知を複数回受けても、同じ個体のGameplay無効化、参照解除、終了処理を重複実行しません。現在と異なるBattle IDの終了通知によって、現在のBattleのShaondamaを無効化してはいけません。
+
+次のすべてを満たした時点を、Shaondama Floating Ownerの必須cleanup完了とします。
+
+- 終了したBattleの全Shaondamaを選択、Charge、Allocation、AttackEvent、Palette Bullet化の対象外にしている
+- 終了したBattleの全Shaondamaを最低保証数から除外し、旧Battleの不足通知や補充要求を発生させない
+- 浮遊、一般Lifetime、source NoteEvent時刻監視、自然破裂、Hit、Damageに関するGameplay更新を停止している
+- 選択可能化、`Reserved`、自然破裂、Lifetime終了、消費、Palette Bullet化に関する発行待ちcallbackを無効化している
+- 旧Battle IDのShaondama objectと参照が現在または次のBattleへ影響できない
+
+上記をすべて満たした時点で内部cleanup完了とし、Shaondama Floating Ownerの必須cleanup完了を一度だけ通知します。表示専用object、VFX、SEの終了は待ちません。
+
+### Retry／次Battle
+
+Game Over ResultからのRetryまたは次のBattle開始時は、旧Battleに属するShaondama runtimeを破棄し、新しいBattle IDに付け替えません。
 
 少なくとも次を新Battleへ持ち越しません。
 
@@ -401,7 +454,7 @@ Room Retry開始時は旧Battleに属するShaondama runtimeを破棄し、新�
 - 旧Battleの個体識別情報、source occurrence、Allocation参照
 - 遅延した終了callback・Damage通知
 
-新しいBattle IDを受領した後、新Battleの生成要求と出現演出完了通知から状態を構築し直します。旧Battle IDを持つ個体や通知は、選択可能化、最低保証算入、Charge、自然破裂、Damageへ接続しません。
+新しいBattle IDを受領した後、新Battleの生成要求と出現演出完了通知から状態を構築し直します。旧Battle IDを持つ個体や通知は、選択可能化、最低保証算入、Charge、Allocation、`Reserved`、自然破裂、Palette Bullet化、Damageへ接続しません。
 
 Retry地点とPlayer／Enemy／BGM等の再初期化値はGame・Stage／Room側へ委譲します。本ページは、旧BattleのShaondama状態をGameplay上無効化し、新Battleへ持ち越さないことを保証します。
 
@@ -419,7 +472,7 @@ Retry地点とPlayer／Enemy／BGM等の再初期化値はGame・Stage／Room側
 | 一般Lifetime到達・Wildcard | 不可 | 算入しない | 終了 | 固定sourceなし | 割れて消滅 | 発生しない |
 | 一般Lifetime到達・未使用Normal | 可 | 算入する | source時刻まで終了を保留 | source時刻で自然破裂 | source時刻まで維持 | source時刻に発生 |
 | source時刻自然破裂 | 不可 | 算入しない | 終了 | 一回だけ解決 | 演出後に消滅 | 小範囲Weak攻撃を1回要求 |
-| Battle終了cancel／演出 | 不可 | 算入しない | 停止 | 停止 | 即時消去または終了演出後に消滅 | 発生しない |
+| Battle結果確定／表示演出 | 不可 | 算入しない | 停止 | 停止 | 即時消去または表示専用演出後に消滅 | 発生しない |
 
 どの終了条件が同時に成立しても、個体の最終終了処理は1回だけ実行します。
 
@@ -508,7 +561,8 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 | 自然破裂の元RGB使用・同一Enemy一回 | 本ページ |
 | Normalの基本色・RGB data | 玉のデータ |
 | EnemyへのRGB加算・clamp・浄化 | Enemy Damage |
-| Battle結果確定・Room Retry境界 | Game／Combat／Stage・Room |
+| Battle結果確定・Result接続・Retry／次Battle境界 | Game／Combat／Stage・Room |
+| Battle結果確定後のShaondama固有のGameplay無効化とcleanup | 本ページ |
 | Parry由来Wildcardの選択可能化timing | 未確定。Wildcard／Parry／邪音玉／本ページへ同期して確定 |
 
 ## 責務外
@@ -573,7 +627,7 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 - Normalの自然破裂は範囲内の同一Enemyへ1回だけ命中する
 - 自然破裂Damageには発生元NormalのRGB値を使用する
 - 同一フレームではCharge成功commitを自然破裂より優先する
-- Battle終了・Room Retry時は旧BattleのShaondamaをGameplay上無効化し、持ち越さない
+- Battle結果確定時は旧BattleのShaondamaをGameplay上無効化し、Retryまたは次のBattleへ状態・参照を持ち越さない
 - Parry由来Wildcardの選択可能化timingは未確定のまま扱う
 
 ## 関連タスク
