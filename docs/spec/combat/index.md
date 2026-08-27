@@ -119,6 +119,8 @@ system pre-rollは、音源、完成曲、またはMIDIへ挿入した無音で�
 - 準備未完了、またはすでに`Combat`である場合は、新しいBattleを開始しません。
 - 同じBattleに対するBattle ID配布またはCombat受付開始を複数回成立させません。
 
+Enemy Readyは「Enemyが1体以上存在する」という意味ではありません。対象Battleの初期Enemy／Spawn準備と、初期配置のClear対象Enemy登録がStage側で完了したことを表します。初期Enemyが0体の場合でも、これらの準備が完了していればEnemy Readyは成立できますが、それだけを理由にClear候補を発生させません。
+
 ## Combat中の処理受付
 
 Combat Systemは、以下のすべてを満たす場合にのみ、新しい戦闘進行または遅延結果を受け付けます。
@@ -142,7 +144,12 @@ Battle開始gate成立後のsystem pre-roll中も、上記条件を満たす現�
 | 遅延結果 | `battleId`を照合して受け付ける | 適用しない。保持が必要な場合は所有者が保留し、Resume後に全受付条件を再照合する | Gameplayへ適用せず、新しいHit・Damage・浄化・Parry判定・Target確定・結果候補を発生させない | 破棄し、現在のBattleへ適用しない |
 | 終了演出通知 | Gameplay処理とは分離して扱う | 各演出のPause規則に従う | 表示・音響だけ継続可能。Damage等へ変換しない | 現在のBattleのGameplayへ適用しない |
 
-- Clear候補はEnemy／Stage側から、Game Over候補はPlayer側から、ゲーム全体の結果確定処理へ渡します。
+- Enemy Spawnは、Combat Systemが明示的に受付可否を管理するGameplay処理です。Spawn要求の発行、StageによるSpawn確定、`PendingSpawn`登録、Enemyの生成・初期化、登録済み記録との対応付け、およびEnemyのGameplay有効化は、現在の`battleId`と一致し、Battle結果が未確定で、Pause中ではなく、Battle終了処理開始前である場合だけ進行できます。
+- Pause中は、新しいEnemy Spawnの要求、確定、登録、生成・初期化、およびGameplay有効化を進行させません。Pause中に到着したSpawn完了通知を保留する場合は、Resume後に`battleId`、Battle結果、Combat受付、およびBattle終了処理開始状態を再照合してから適用します。
+- Battle結果確定後は、新しいEnemy Spawn、Clear対象登録、`PendingSpawn`から`Active`への移行、およびEnemyのGameplay有効化を成立させません。
+- Spawn完了通知、初期化完了通知、または予約済みcallbackが遅延して届いた場合、現在と異なる`battleId`であるか、対象Battleの結果が確定済みであれば拒否します。旧BattleのEnemyを現在または次のBattleへ登録・有効化しません。
+- Clear候補はStageが確定します。Combat SystemはStageから受け取った対象`battleId`付きClear候補を変更せず、ゲーム全体の結果候補収集へ渡します。Stage内部のobjective、wave進行、pending Spawn数、Clear対象Enemy記録、またはworld上のEnemy数からClear条件を再判定しません。
+- Game Over候補はPlayer側から、ゲーム全体の結果確定処理へ渡します。
 - Clear／Game Overの条件、Unity上の同一フレームを単位とする候補収集、同一フレームでのClear優先、および最終結果の一回確定は、[ゲーム全体](/spec/game/)を参照します。
 - Combat Systemは、独自のClear／Game Over条件や優先順位を追加せず、確定結果を再判定しません。
 - Battle結果確定後は、飛行中または処理途中のobjectが残っていても、新しいHit、Damage、Parry判定、Target決定、Projectile／Marker生成、Enemy Spawnを成立させません。
@@ -161,6 +168,7 @@ Pause可能なゲーム段階は、[ゲーム全体](/spec/game/)を正本とし
 - Battle識別情報を維持します。
 - Battle ID配布、Combat受付開始、およびBattle終了の通知を発行しません。
 - 戦闘進行とBattle結果の確定処理を進めません。
+- Stage／Enemy Spawnは、新しいwave、Spawn要求、Spawn確定、Clear対象登録、Enemy生成・初期化、およびGameplay有効化を進行させません。
 - Resume時は再初期化を行わず、同じBattle識別情報とCombat stateでBattleを継続します。
 
 拠点滞在中のPauseでは、Combat stateを`NonCombat`のまま維持し、Battle ID配布、Combat受付開始、またはBattle終了の通知を発行しません。
@@ -174,12 +182,12 @@ BGM、AttackEvent、および未完了ArpeggioのPause／Resume時の停止・�
 1. Gameから、確定したBattle結果と対象`battleId`を含むBattle終了通知を受け取る
 2. 通知の`battleId`が現在Battleと一致し、同じBattleの終了通知をまだ受理していないことを確認する
 3. 対象Battleの確定結果を一度だけ受理し、Battle終了処理開始済みとして記録する
-4. 新規Gameplay処理の受付と、Hit／Damage／浄化／Parry／Targetを含む遅延結果のGameplay適用を即座に閉じる
+4. 新規Gameplay処理の受付と、Hit／Damage／浄化／Parry／Target／Enemy Spawn完了を含む遅延結果のGameplay適用を即座に閉じ、新しいSpawn、Clear対象登録、およびEnemy有効化を成立させない
 5. Game／UIによるResult表示開始を妨げない。ただし、この時点ではResult操作解禁可能を通知しない
-6. 対象`battleId`と確定結果を含むcleanup要求を、対象Battleの各必須Ownerへ一度だけ通知する
+6. 対象`battleId`と確定結果を含むcleanup要求を、`Stage／Enemy Spawn`を1つの論理Ownerとして含む対象Battleの各必須Ownerへ一度だけ通知する
 7. 各Ownerが未発火処理をcancelし、既存objectをGameplay上無効化し、必要な参照・予約・callbackを解消する
-8. 現在Battleと一致する各必須Ownerのcleanup完了通知を集約する
-9. 必須Ownerすべてのcleanup完了後、Combat stateを`Combat`から`NonCombat`へ遷移させ、GameへCombat cleanup完了を一度だけ通知する
+8. 現在Battleと一致する各必須Ownerのcleanup完了通知を、`battleId`と通知元Ownerの組み合わせごとに一度だけ集約する
+9. Stage／Enemy Spawn Ownerを含む各必須Ownerすべてのcleanup完了後、Combat stateを`Combat`から`NonCombat`へ遷移させ、GameへCombat cleanup完了を一度だけ通知する
 10. Game／UIは、この完了通知をResult操作解禁条件へ接続する。実際の`Continue`／`Retry`入力とroute遷移はCombat Systemでは処理しない
 
 | 段階 | Combat System | Result画面 |
@@ -211,17 +219,25 @@ Combat Systemは、対象Battleについて少なくとも以下のOwnerを必�
 | Marker | 飛行中／付着済みにかかわらずTarget公開を停止し、現在BattleのTarget候補として利用不能になっている | [Marker](/spec/combat/marker) |
 | Jaon Bullet／Enemy Projectile | 飛行中objectのDamage、衝突、およびParry対象としての機能がGameplay上無効化されている | [Jaon Bullet](/spec/enemy/jaon-bullet) |
 | 浮遊中Shaondama | Charge、Allocation、Palette Bullet化、およびDamage発生元として利用不能になり、次のBattleへ参照を持ち越さない状態になっている | [浮遊中の挙動](/spec/shaondama-music/floating-behavior) |
-| Enemy／Spawn | 新しいEnemy Spawnが停止し、旧Battleの生成完了通知が現在または次のBattleへ参加できない状態になっている | Enemy／Spawnの各所有ページ |
+| Stage／Enemy Spawn | Spawn programと新しいwave開始が停止し、未実行のSpawn要求・予約・生成／初期化callback・遅延Spawn完了通知がcancel済みまたはGameplayへ適用不能になっている。`PendingSpawn`からのEnemy有効化、新規Clear対象登録、Clear条件評価、およびClear候補通知が停止し、旧`battleId`の通知やcallbackを現在または次のBattleへ適用できない | [ステージ](/spec/stage/) |
+| Enemy | 対象BattleのAI、攻撃、Hit／Damage受付、Target提供、およびSpawn連携がGameplay上停止し、旧BattleのEnemyを現在または次のBattleへ参加させられない | [敵](/spec/enemy/)、[Enemy基本挙動](/spec/enemy/basic-behavior) |
 
 - cleanup要求とcleanup完了通知には、最低限`battleId`と通知元Ownerを識別できる情報を含めます。
 - 現在Battleと異なる`battleId`のcleanup完了通知は破棄し、現在Battleの完了数へ算入しません。
 - 同じOwnerから同じBattleのcleanup完了通知が複数回届いても、完了は1回だけとして扱います。
+- cleanup完了状態は、`battleId`と通知元Ownerの組み合わせで管理します。同じOwnerの重複完了通知を、別Ownerの完了として数えてはいけません。Stageの完了通知でEnemy Spawnを完了扱いにしたり、Enemy Spawnの完了通知でStageを完了扱いにしたりしません。
 - cleanup対象が存在しないOwnerも、何も処理せずに完了したことを対象Battleについて一度だけ通知します。
 - 各Ownerのcleanup処理は冪等とし、同じcleanup要求を複数回受けても同じ予約・参照・objectを二重に解放または破棄しません。
 - Reserved Shaondamaの実際の解放OwnerとAttackEvent側との受け渡しは、[Charge Allocation](/spec/draw-system/charge-allocation)を正本とします。Combat SystemはReservedを直接解放しません。
 - Combat Systemは、必須Ownerの一部だけが完了した段階でCombat cleanup完了を通知しません。
+- StageとEnemy Spawnのいずれか一方でもcleanup未完了である間は、Combat cleanup完了およびResult操作解禁可能を通知しません。
 - VFX、SE、画面内に残る非Gameplay演出、およびDamageや衝突判定を持たない表示専用objectの終了は、必須cleanup完了条件へ含めません。
+- 表示専用Enemy object、Enemy退場演出、およびSpawn演出の表示終了は、Stage／Enemy Spawnの必須cleanup完了条件へ含めません。
 - 表示専用objectを残したままcleanup完了とする場合、そのobjectからDamage、Hit、Parry、Target提供、Chargeへの再利用、または状態変更を発生させてはいけません。
+- StageとEnemy Spawnは、内部実装上は別のSubsystemとして処理してもよい。ただし、Combatの必須cleanup集約上は`Stage／Enemy Spawn`を1つの論理Ownerとして扱う。
+- Stage／Enemy Spawn内部のcleanupがすべて完了した後に、対象`battleId`と通知元Ownerを識別できる情報を含むcleanup完了通知を、Combatへ一度だけ送る。
+- Combat Systemは、StageとEnemy Spawnの内部完了通知を別Owner分として直接加算しない。
+- 同じBattleの`Stage／Enemy Spawn` cleanup完了通知が複数回届いても、完了は1回だけとして扱う。
 
 ## Battle終了時の既存object
 
@@ -260,13 +276,17 @@ Combat Systemは、Retry時に以下を行います。
 3. 旧BattleのBattle ID配布済み・Combat受付開始済み・Battle終了通知済み状態を破棄する
 4. 旧BattleのBattle識別情報を現在のBattleとして扱わない状態にする
 5. 保留中のCombat処理、遅延命中、および結果通知を破棄する
-6. 旧Battleのcleanup要求済み・Owner完了済み・Combat cleanup完了通知済み状態を破棄する
-7. 旧Battleに属するPalette Bullet、Marker、Jaon Bullet、および表示専用objectを次のBattleへ持ち越さない
-8. Stageなどの再構築完了後、通常のBattle開始lifecycleを`NonCombat`からやり直す
+6. 旧BattleのEnemy Spawn要求、予約、生成・初期化callback、および遅延Spawn完了通知を破棄または現在・次Battleへ適用不能にする
+7. Combat側が保持する旧BattleのStage／Enemy Spawn受付状態、Clear対象登録との連携状態、およびEnemy有効化待ち状態を破棄する
+8. 旧Battleのcleanup要求済み・Owner完了済み・Combat cleanup完了通知済み状態を破棄する。Stage／Enemy Spawn Ownerのcleanup完了済み状態を新Battleへ持ち越さない
+9. 旧Battleに属するPalette Bullet、Marker、Jaon Bullet、Enemy、および表示専用objectを次のBattleへ持ち越さない
+10. StageおよびEnemy Spawnを含む各システムの再構築完了後、通常のBattle開始lifecycleを`NonCombat`からやり直す
 
 Retry後に開始するBattleは、新しいBattle識別情報を持ちます。Scene Reloadまたはin-place resetのどちらを使用するかは本ページでは規定しません。
 
 新しいBattle識別情報は、Retry後の対象Battleの初期化、初期Shaondama生成、および3時計を開始する前に割り当てて配布します。旧Battle IDを持つ処理は、新しいBattleの開始後も受け付けません。
+
+Stageは旧Battleのobjective、wave進行、Spawn program進行位置、Clear対象Enemy記録、`PendingSpawn`、登録状態、および通知済み状態を破棄し、Stage定義から再構築します。Enemy Spawnは旧BattleのSpawn要求、予約、callback、Enemy／Spawn参照を破棄します。Combat Systemはこれらの完了を新Battleの準備条件へ接続しますが、各Ownerの内部状態を直接再構築しません。
 
 Player、Enemy、BGM／MusicChart、AttackEvent、Stage、UIなどの内部リセットは、それぞれの所有ページを正本とします。
 
@@ -275,24 +295,27 @@ Player、Enemy、BGM／MusicChart、AttackEvent、Stage、UIなどの内部リ�
 | 対象 | 本ページが定義すること | 正本・詳細ページ |
 |---|---|---|
 | Game | Battle ID配布、Battle開始gate成立、pre-roll終了の境界を区別し、確定結果の一回通知、Combat cleanup完了、およびResult操作解禁条件をGame全体lifecycleへ接続する | [ゲーム全体](/spec/game/) |
-| Stage／Enemy Ready | 対象RoomのEnemy ReadyをBattle開始gateの入力として受け取り、Battle終了後のStage進行・Retry再構築へ接続する | [ステージ](/spec/stage/) |
+| Stage／Enemy Ready | 初期Enemy／Spawn準備とClear対象登録が完了したEnemy ReadyをBattle開始gateの入力として受け取り、Stageが確定したClear候補を結果候補収集へ渡す。Stage objective、wave、Clear対象Enemy記録をCombat側で再判定せず、Stage cleanupとRetry再構築へ接続する | [ステージ](/spec/stage/) |
+| Enemy Spawn | 現在BattleのCombat受付が有効な場合だけSpawn要求、確定、登録、生成・初期化、Enemy有効化、および遅延Spawn完了を受け付ける。Battle終了cleanupとRetry時の旧Spawn処理破棄を集約する | [ステージ](/spec/stage/)、[Enemy基本挙動](/spec/enemy/basic-behavior) |
 | Player死亡 | Game Over候補と確定結果をCombat終了へ接続する | [Player死亡](/spec/player/player-death) |
 | BGM／MusicChart | Battle ID受領、3時計の同時開始、system pre-roll、BGM Audio開始、およびBattle終了・Pause・Retry通知との接続境界を示す | [BGM｜Gameplayとの接続](/spec/bgm/bgm-gameplay-connection) |
 | 初期Shaondama／Supply Ready | 時計停止中の初期生成と、選択可能かつ非Reservedの最低保証到達通知をBattle開始gateへ接続する | [BGM｜シャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
 | RadioWhale hand-off | 出現演出完了後のGameplayへの制御移譲と選択可能化をSupply Readyへ接続する | [ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning) |
 | Charge／Allocation | 現在Battleの受付gateが有効な場合だけ新規処理を受け付け、BGM Audioの再生状態を条件にしない境界を示す | [Playerアクション｜Charge](/spec/player/player-action-charge)、[Charge Allocation](/spec/draw-system/charge-allocation) |
 | AttackEvent | Combat中の実行境界と、結果確定後の新規開始停止を示す | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
-| Enemy Damage／浄化 | Clear候補をゲーム全体の結果確定へ渡す境界を示す | [Damage・浄化](/spec/enemy/damage-and-purify) |
+| Enemy Damage／浄化 | 現在Battleの浄化成立通知をStageへ渡す受付境界を示す。Enemy DamageからClear候補を直接確定・通知しない | [Damage・浄化](/spec/enemy/damage-and-purify)、[ステージ](/spec/stage/) |
 | Palette Bullet | Battle終了・Retry通知を受ける境界を示す | [Palette Bullet](/spec/combat/palette-bullet) |
 | Marker | Battle終了・Retry通知を受ける境界を示す | [Marker](/spec/combat/marker) |
 | Jaon Bullet | Battle終了後にDamage・衝突・Parry判定を停止する共通境界を示す | [Jaon Bullet](/spec/enemy/jaon-bullet) |
 | 浮遊中Shaondama | Battle終了後にCharge・Allocation・Bullet化対象から外す共通境界を示す | [浮遊中の挙動](/spec/shaondama-music/floating-behavior) |
 | UI／演出 | Combat state、Pause、確定結果、Result操作lock、およびCombat cleanup完了の通知境界を示す | [UI](/spec/ui/)、[演出](/spec/effects/) |
 
+StageとEnemy Spawnは機能上それぞれの処理を持つが、Battle終了時のCombat必須cleanup集約では、両者を`Stage／Enemy Spawn`という1つの論理Ownerとして扱う。機能上の責務分離によって、Combatが待つ必須Owner数を増やさない。
+
 本ページでは、以下を再定義しません。
 
 - Clear／Game Overの条件、候補収集、同時成立時の優先順位
-- StageのEnemy集合、初期配置、進行、ギミック
+- Stage objective、Spawn program、Clear対象Enemy記録、初期配置、動的Spawn登録、Clear条件、進行、ギミック
 - PlayerのHP、Dead、死亡モーション
 - 3時計の同期方法、system pre-rollの進行、およびBGM Audioの開始・同期処理
 - 初期Shaondamaの生成方法、選択可能数の集計、および最低保証判定
@@ -314,8 +337,11 @@ Player、Enemy、BGM／MusicChart、AttackEvent、Stage、UIなどの内部リ�
 - Combat Systemが、BGM Audioを開始したり、選択可能Shaondama数または最低保証数を再計算したりしてはいけません。
 - BGM Audioが再生されていないことだけを理由に、system pre-roll中のAttackEvent PreviewまたはChargeを無効にしてはいけません。
 - Charge開始条件へ、BGM Audioが再生中であることを追加してはいけません。
+- Pause中に、新しいEnemy Spawn、Clear対象登録、Enemy生成・初期化、またはGameplay有効化を進行させてはいけません。
 - 同じBattleに対してBattle ID配布、Combat受付開始、Battle終了通知の受理、またはBattle終了処理を複数回成立させてはいけません。
 - Battle結果確定後に、新しい戦闘操作、Charge、生成要求、Enemy Spawn、AttackEvent、Arpeggio、Allocation、Target決定、Projectile／Marker生成、攻撃、Hit、Damage、Parry判定、または浄化を開始してはいけません。
+- Battle結果確定後に、旧Spawn要求や遅延Spawn完了通知からClear対象登録、`PendingSpawn → Active`、またはEnemy有効化を成立させてはいけません。
+- Combat Systemが、Stage内部のobjective、wave進行、pending Spawn数、Clear対象Enemy記録、またはworld上のEnemy数からClear候補を再判定してはいけません。
 - GameからのBattle終了通知を同じBattleについて複数回受理したり、各Ownerへcleanup要求を重複発行したりしてはいけません。
 - 現在Battleと異なる`battleId`のDamage、Hit、Target、結果通知、またはcleanup完了通知を現在Battleへ適用してはいけません。
 - 同じOwnerから届いた重複cleanup完了通知を複数Owner分として数えてはいけません。
@@ -324,7 +350,7 @@ Player、Enemy、BGM／MusicChart、AttackEvent、Stage、UIなどの内部リ�
 - 終了演出として残したobjectに、Damage、Hit、Parry、Target提供、Chargeへの再利用、またはResult操作の妨害を許可してはいけません。
 - Pauseを`NonCombat`への遷移、Battle終了、または新しいBattle開始として扱ってはいけません。
 - 現在のBattleと一致しないBattle識別情報を持つ遅延処理を、現在のBattleへ適用してはいけません。
-- Retry後に、旧Battleの識別情報、確定結果、通知済み状態、cleanup進捗、遅延命中、Palette Bullet、Marker、Jaon Bulletを持ち越してはいけません。
+- Retry後に、旧Battleの識別情報、確定結果、通知済み状態、Spawn要求、予約、callback、登録状態、cleanup進捗、遅延命中、Palette Bullet、Marker、Jaon Bullet、Enemyを持ち越してはいけません。
 - Palette Bullet／Markerの未確定な内部lifecycleを本ページで推測して補完してはいけません。
 
 ## パラメータ
