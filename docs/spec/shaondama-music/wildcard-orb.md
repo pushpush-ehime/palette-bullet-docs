@@ -439,7 +439,8 @@ Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle
 | Parry成立位置での即時変換・変換commitと同時の選択可能化・最低保証算入条件 | 本ページ |
 | 対象ごとの弾き方向の確定・受け渡し | Player Parry／邪音玉 |
 | 変換後のWildcardへ対象ごとの弾き方向の力を一度だけ加える契約 | 本ページ |
-| 弾き移動の力・減衰・最大移動量・落ち着くまでの時間の調整データと、実際の移動挙動 | [浮遊・挙動](/spec/shaondama-music/floating-behavior) || Wildcardの共通runtime data | Orb data |
+| 弾き移動の力・減衰・最大移動量・落ち着くまでの時間の調整データと、実際の移動挙動 | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
+| Wildcardの共通runtime data | Orb data |
 | 通常Slot／Weak Allocationと実効値解決 | Charge Allocation |
 | 選択可能化後の衝突・浮遊・Lifetime・`Reserved`・消費・終了lifecycle | Floating |
 | Wildcard専用Damage調整項目 | 本ページ |
