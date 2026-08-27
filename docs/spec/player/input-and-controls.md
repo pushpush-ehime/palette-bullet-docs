@@ -18,6 +18,7 @@ status: 仮仕様
 - 入力割当を変更できるか
 - 拠点や戦闘ステージなど、場面ごとに使用できる操作
 - 長押しや切り替えなど、操作ごとの入力方法
+- Battle終了時のGameplay入力とResult入力の切り替え
 
 ## 対応デバイス
 
@@ -78,6 +79,44 @@ Player概要に記載している主要行動について、デフォルトの�
 ポーズメニューの表示中にもう一度`Esc`を押すと、ポーズメニューを閉じます。
 
 画面上の×ボタンを左クリックした場合も、現在の画面を閉じます。
+
+## Battle終了時の入力切り替え
+
+Battle結果の確定規則とResultからの遷移先は、`docs/spec/game/index.md`を正本とします。
+
+このページでは、Gameから通知された確定済みのBattle結果を受けた後の入力受付gateを定義します。入力側でClear／Game Overを再判定しません。
+
+### 入力受付gate
+
+| Phase | Gameplay入力 | Result入力 |
+| --- | --- | --- |
+| Battle進行中 | 受け付ける | 受け付けない |
+| Battle結果確定直後～必須Ownerのcleanup完了前 | 即座に停止する | Result表示を開始していても受け付けない |
+| 必須Ownerのcleanup完了後 | 停止を維持する | 確定結果に対応する操作だけを受け付ける |
+| Result操作受理後～route遷移完了まで | 受け付けない | 再度受け付けない |
+
+Battle結果が確定した時点でGameplay入力受付gateを閉じ、`Move`、`Jump`、`Dash`、`Charge`、`Aim`、`Marker`、`Parry`などの新しいGameplay操作を成立させません。実行中のPlayer Stateを停止する規則は、`docs/spec/player/states.md`を正本とします。
+
+Result画面は、必須Ownerのcleanup完了を待たずに表示開始して構いません。ただし、cleanupが完了するまでは、Resultのボタン操作、`Navigate`、`Submit`を無効にします。必須Ownerすべてのcleanup完了が通知された後に、Result入力受付gateを解禁します。
+
+VFX、SE、Damageや衝突判定を持たない表示専用オブジェクトなど、任意演出の終了はResult入力の解禁条件に含めません。
+
+誤操作防止用の最小待ち時間を設ける場合は、値をハードコードせずTuning値として管理します。この場合は、必須Ownerのcleanup完了と最小待ち時間の経過が両方成立した後にResult入力を解禁します。
+
+### 無効期間中の入力
+
+Gameplay入力またはResult入力が無効な期間に行われた入力は、その場で破棄します。入力buffer、予約入力、押下中の入力として保持し、受付再開後に実行してはいけません。
+
+入力受付gateを解禁した時点ですでにボタンが押下中であっても、その押下を新しいResult操作として扱いません。解禁後に行われた新しい入力から受け付けます。
+
+### Battle結果ごとのResult操作
+
+| 確定したBattle結果 | 受け付ける操作 | route |
+| --- | --- | --- |
+| `Clear` | `Continue` | 拠点／Stage選択へ戻る |
+| `Game Over` | `Retry` | 現在のStageを最初から再開する |
+
+`Clear`では`Retry`を、`Game Over`では`Continue`を受け付けません。Result操作を1回受理した時点でResult入力受付gateを再度閉じ、同じ入力や連続入力による複数のroute遷移要求を発生させません。
 
 ## 入力方法の詳細
 
