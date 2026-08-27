@@ -25,10 +25,12 @@ relatedTasks: []
 * 通常Shaondama / 万能ShaondamaをWeak AttackEventへどう割り当てるか
 * Charge成功後のShaondama実体をどの状態でAttackEvent発火まで保持するか
 * Charge成功と自然破裂が同一フレームで競合した場合に、どちらを先に確定するか
+* Battle結果確定時に未確定Charge、Allocation、Slot、`Reserved`をどのようにcleanupするか
+* 消費済み／未消費の`Reserved`をどのOwnerが判別・解放するか
 
 を定義します。
 
-本ページを、**Current AttackEventの決定、通常AttackEventのSlot割り当て、Weak AttackEventへの割り当て、Allocation結果、Charge成功後の`Reserved`確定、およびCharge commitと自然破裂の競合順の正本**とします。
+本ページを、**Current AttackEventの決定、通常AttackEventのSlot割り当て、Weak AttackEventへの割り当て、Allocation結果、Charge成功後の`Reserved`確定、Charge commitと自然破裂の競合順、およびBattle結果確定時のAllocation関係解消の正本**とします。
 
 Click / Dragそのものの入力、ActionState、対象選択、Release検出、キャンセル、Actionとしてのsuccess / miss通知等は、`player/player-action-charge.md` を正とします。
 
@@ -1201,7 +1203,7 @@ Drag全体がmissの場合、どのShaondamaもそのbatchによってReserved�
 
 Charge成功と、通常Shaondamaのsource NoteEvent時刻到達による自然破裂候補が同一フレームに成立した場合は、**Charge成功のcommitを先に確定**します。
 
-ただし、同一フレームですでにBattle終了またはRoom Retryが確定している場合は、後述する旧Battle状態の破棄を優先し、そのBattleへ新しいCharge commitを残しません。
+ただし、同一フレームですでにBattle結果が確定している場合は、後述する旧Battle状態のcleanupを優先し、そのBattleへ新しいCharge commitを残しません。
 
 ```text
 同一フレーム
@@ -1277,20 +1279,117 @@ AttackEvent発火時にどのReserved Shaondamaを使用し、どのようにPal
 
 ---
 
-## Battle終了・Room Retry時の破棄
+## Battle結果確定時のcleanup
 
-Battle終了またはRoom Retryが確定した場合は、旧Battle IDに属する次のruntime dataと待機状態を破棄します。
+Battle結果確定通知を受けた時点で、現在のBattle IDに対する新しいCharge判定とAllocation commitの受付を停止し、旧BattleのCharge、Allocation、Slot、`Reserved`をcleanupします。
 
-* 通常AttackEvent / Weak AttackEventへのAllocation結果
+Battle結果の確定規則、cleanup開始通知、およびResult操作解禁までの全体lifecycleは、`game/index.md`と`combat/index.md`を正とします。本ページでは、Charge Allocation Ownerが担当するcleanup契約を定義します。
+
+現在と異なるBattle IDの終了通知、Charge判定、commit要求、解放結果通知、遅延callbackは破棄します。同じBattle IDについてBattle結果確定通知が複数回届いた場合も、cleanupは一度だけ開始し、同じShaondamaの解放や同じ関係の削除を繰り返しません。
+
+### 未確定Chargeの破棄
+
+Battle結果確定時に、まだAllocation commitが完了していないChargeは破棄します。
+
+対象には、少なくとも次を含みます。
+
+* Charge判定Eventの発行待ちであるClick Charge
+* Release済みでもbatch検証またはatomic commitが完了していないDrag Charge
+* Drag中に保持している選択Shaondama群
+* Current AttackEvent決定待ち、Slot照合待ち、Weak解決待ちの処理
+* commit待ちの予約通知、遅延callback、一時的なAllocation候補
+
+未確定Chargeは`Reserved`ではないため、`Reserved`解放処理へ送らず、Slotを充填した状態も残しません。破棄したChargeをBattle終了後またはRetry後に再評価し、success、miss、Allocation commitへ変換してはいけません。
+
+Player Actionとして実行中のClickCharging／DragChargingおよび入力bufferの停止は、`player/player-action-charge.md`と`player/states.md`を正とします。
+
+### 消費済み／未消費Reservedの区別
+
+Allocation commit後のShaondamaは、対応AttackEvent／Slotに属する`Reserved`として扱います。Battle結果確定時には、各Shaondamaを次の状態に区別してcleanupします。
+
+| Battle結果確定時の状態 | cleanup |
+| --- | --- |
+| Allocation commit前 | 未確定Chargeとして破棄する。`Reserved`解放は行わない |
+| commit済み・AttackEventで未消費 | 未消費`Reserved`として一度だけ解放する |
+| AttackEventで消費済み | `Reserved`として再解放しない |
+| すでに解放済み | 再解放しない |
+
+ここでいう**消費済み**とは、AttackEvent側でそのShaondamaを使用対象として確定し、Palette Bullet化などの消費処理をcommit済みである状態を指します。単にAttackEventが発火済みであることやsnapshotへ含まれていたことだけでは、全Shaondamaを一括して消費済みとは扱いません。
+
+Arpeggio AttackEventでは、すでに発射処理をcommitしたEntryのShaondamaだけを消費済みとします。Battle結果確定時点で残っている未発射EntryのShaondamaは未消費`Reserved`として扱います。
+
+### Reserved解放のOwner
+
+AttackEventへcommit済みの`Reserved`について、消費済み／未消費を判別し、未消費分を解放する唯一のOwnerは、`bgm/bgm-attack-judgement.md`で定義する**AttackEvent cleanup Owner**とします。
+
+Charge Allocation Ownerは、AttackEventへcommit済みの`Reserved`を独自に解放しません。AttackEvent cleanup Ownerから各Shaondamaについて、
+
+* 消費済みのため解放対象外
+* 未消費分を解放済み
+* 以前のcleanupですでに解放済み
+
+のいずれかが確定した通知を受けた後に、Allocation、Slot、`Reserved`の対応関係を解消します。
+
+`Reserved`へのcommitと同時に、Battle終了時の解放OwnerもAttackEvent側へ移ります。commit前のShaondamaは`Reserved`ではなく、Charge Allocation Ownerが未確定Chargeとして破棄します。これにより、同じ`Reserved`をAttackEvent側とAllocation側の両方から解放する状態を作りません。
+
+AttackEvent cleanup Ownerによる未消費`Reserved`の解放が完了していない場合、Charge Allocation Ownerは対象関係のcleanup完了を通知しません。解放失敗時にAllocation側が代わりに同じShaondamaを解放するfallbackは設けず、AttackEvent側のcleanup未完了として扱います。
+
+### Allocation関係の解消
+
+AttackEvent cleanup Ownerによる消費状態の確定と必要な解放が完了した後、Charge Allocation Ownerは旧Battle IDに属する次のruntime dataと対応関係を解消します。
+
+* 通常AttackEvent／Weak AttackEventへのAllocation結果
 * 各Slotの充填状態とShaondama対応
-* `Reserved`状態と予約関係
+* ShaondamaからAttackEvent／Slotを引く逆参照
+* `Reserved`状態を示すAllocation側の参照と予約関係
 * 未発火のWeak AttackEvent
-* Wildcardの解決済みNoteEvent definition / loop occurrence / 実効値
-* commit待ち・解決待ちの通知や参照
+* Wildcardの解決済みNoteEvent definition／loop occurrence／実効値
+* commit待ち・解決待ちの通知、callback、一時snapshot
 
-AttackEvent発火待ち、Arpeggioの途中、または次loop occurrenceを参照するWildcard Weakであっても、旧Battleの状態を次Battleへ持ち越しません。Room Retry後は、新しいBattle IDと新しいMusicChart runtime occurrenceからAllocation状態を再構築します。
+AttackEvent発火待ち、Arpeggioの途中、または次loop occurrenceを参照するWildcard Weakであっても、これらを次のBattleへ持ち越しません。
 
-破棄後に旧BattleのSlotや`Reserved`参照を使ってPalette Bullet化・発音・Damage通知を行いません。Battle終了判断とRoom Retryの高レベルlifecycleは`game/index.md`および`combat/index.md`を正とします。
+関係解消後に、旧Battle IDのSlotや`Reserved`参照を使ってPalette Bullet化、発音、Damage通知、Slot再充填を行いません。
+
+### cleanup順序
+
+Charge Allocation Ownerのcleanupは、次の順序で行います。
+
+1. 現在のBattle IDに対するcleanup開始を一度だけ受理する
+2. 新しいCharge判定とAllocation commitの受付gateを閉じる
+3. 未確定Charge、Drag batch、一時候補、遅延callbackを破棄する
+4. commit済みのAllocation関係を固定し、AttackEvent cleanup Ownerが消費済み／未消費を判別できる状態を維持する
+5. AttackEvent cleanup Ownerによる未消費`Reserved`の一度だけの解放完了を受け取る
+6. Allocation、Slot、`Reserved`、Weak AttackEvent、Wildcard解決情報の関係を解消する
+7. Charge Allocation Ownerの必須cleanup完了を一度だけ通知する
+
+AttackEvent cleanup Ownerが参照する前にAllocation／Slot関係を削除し、未消費`Reserved`を判別不能にしてはいけません。
+
+### cleanup完了条件
+
+次のすべてを満たした時点を、Charge Allocation Ownerの必須cleanup完了とします。
+
+* 現在のBattleに対する新しいCharge判定とAllocation commitを受け付けない
+* すべての未確定Charge、Drag batch、一時候補、commit待ちcallbackを破棄している
+* commit済みShaondamaが消費済み／未消費のどちらかに確定している
+* 未消費`Reserved`がAttackEvent cleanup Ownerによって一度だけ解放されている
+* 消費済みまたは解放済みのShaondamaを再解放していない
+* 旧Battle IDのAllocation、Slot、`Reserved`、Weak AttackEvent、Wildcard解決情報の関係をすべて解消している
+* 旧Battle IDの遅延通知やcallbackが状態を変更できない
+
+上記をすべて満たした時点で内部cleanup完了とし、Charge Allocation Ownerの必須cleanup完了を一度だけ通知します。cleanup完了通知は、Combat側が必須Ownerすべての完了を集約し、Result操作を解禁するために使用します。
+
+### Retry時の再初期化
+
+Game Over Resultから`Retry`が選択された場合は、終了したBattleのAllocation状態を再利用せず、新しいBattle IDで次を空の状態から初期化します。
+
+* Current AttackEventの評価状態
+* 通常AttackEvent／Weak AttackEventへのAllocation結果
+* Slot充填状態
+* `Reserved`関係
+* Drag batchや一時的なAllocation候補
+* Wildcard Weakの解決済みNoteEvent occurrenceと実効値
+
+Retry後は、新しいMusicChart runtime occurrenceからAllocation状態を再構築します。旧Battle IDの通知や参照が後から届いても、新しいBattleのSlot、`Reserved`、Shaondamaへ接続しません。
 
 ---
 
@@ -1819,8 +1918,11 @@ Weak時にClick / Drag入力をどのように許可・制限するかはPlayer 
 * 使用するReserved Shaondama実体
 * Palette Bullet化
 * Palette Bullet発射
+* Battle結果確定時の消費済み／未消費`Reserved`の判別
+* 未発射分を含む未消費`Reserved`の一度だけの解放
+* AttackEvent cleanup完了と各`Reserved`の処理結果の通知
 
-本ページでは、発火時にSlotを再割り当てしません。
+本ページでは、発火時にSlotを再割り当てしません。また、Battle結果確定時にはAttackEvent側をcommit済み`Reserved`の唯一の解放Ownerとし、本ページのCharge Allocation Ownerはその処理結果を受けてAllocation関係だけを解消します。
 
 ---
 
@@ -1859,9 +1961,9 @@ Weak時にClick / Drag入力をどのように許可・制限するかはPlayer 
 
 ## `game/index.md`・`combat/index.md`
 
-Battle終了とRoom Retryの高レベル通知、および新しいBattle IDでのruntime再構築開始を正とします。
+Battle結果確定、各Ownerへのcleanup開始通知、cleanup完了の集約、Result操作解禁、およびRetry時の新しいBattle IDによるruntime再構築開始を正とします。
 
-本ページはその通知を受け、旧BattleのAllocation、Slot、`Reserved`、Weak AttackEvent、および解決済みoccurrenceを破棄します。
+本ページは現在のBattle IDに対するcleanup通知を一度だけ受理し、未確定Chargeを破棄したうえで、AttackEvent側の`Reserved`解放完了後に旧BattleのAllocation、Slot、`Reserved`、Weak AttackEvent、および解決済みoccurrenceの関係を解消します。完了条件を満たした後、Charge Allocation Ownerの必須cleanup完了を一度だけ通知します。
 
 ---
 
@@ -1924,6 +2026,14 @@ Battle終了とRoom Retryの高レベル通知、および新しいBattle IDで�
 * Charge commit済みで`Reserved`となったShaondamaへ自然破裂を発生させる
 * Reserved中も通常Lifetimeを進行させ、AttackEvent解決前にShaondamaを通常Lifetimeで消滅させる
 * Slotから物理Palette BulletをCharge時点で新規生成する
-* Battle終了・Room Retry後も旧BattleのAllocation、Slot、`Reserved`、Weak AttackEvent、解決済みoccurrenceを保持・再利用する
+* Battle結果確定後も新しいCharge判定、Drag batch検証、Allocation commitを成立させる
+* Battle結果確定時に未確定Chargeを`Reserved`として扱い、解放処理へ送る
+* AttackEvent側で消費済みのShaondamaを未消費`Reserved`として再解放する
+* 同じ未消費`Reserved`をAttackEvent cleanup OwnerとCharge Allocation Ownerの両方から解放する
+* AttackEvent cleanup Ownerの処理前にAllocation／Slot関係を削除し、消費済み／未消費を判別不能にする
+* 未消費`Reserved`の解放やAllocation関係の解消が終わる前にcleanup完了を通知する
+* 同じBattle IDへの重複cleanup通知によって、同じShaondamaの解放や同じ関係の削除を繰り返す
+* Battle結果確定後またはRetry後も旧BattleのAllocation、Slot、`Reserved`、Weak AttackEvent、解決済みoccurrenceを保持・再利用する
+* Retry後の新しいBattleへ、旧Battle IDの遅延通知、callback、Allocation参照を接続する
 * 本ページの契約として具体的なC#型、enum名、field名、ID形式を固定する
 * 本ページ内でAttackEvent発火時の成立判定・使用Bullet決定を再定義する
