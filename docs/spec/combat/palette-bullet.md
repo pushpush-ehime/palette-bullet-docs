@@ -19,11 +19,11 @@ relatedTasks: []
 - Chord / Arpeggio AttackEventとの関係
 - 直線飛行と飛行終了条件
 - 衝突対象と除外対象
-- Direct Contact RGB Damage
-- 爆発とExplosion RGB Damage
+- Direct Contact／Explosionの判定
+- Damage種別ごとの倍率を適用した最終RGB Damage payload生成
+- Direct Contact／Explosion RGB Damage候補の出力
 - 壁・地形による爆風遮蔽
 - Markerとの相互作用
-- Enemy Damage処理へ渡すDamage候補
 - Battle終了時のGameplay無効化とcleanup完了条件
 - 調整パラメータ
 
@@ -32,18 +32,24 @@ relatedTasks: []
 | 項目 | 正本 |
 |---|---|
 | AttackEventの発動条件、発射対象Shaondama、Chord / Arpeggioの発射タイミング | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
-| Palette Bullet化、発射開始位置、Target決定規則、飛行、衝突、爆発、Damage候補 | 本ページ |
-| Shaondamaの個体情報・有効RGB情報 | [シャオンダマのデータ](/spec/shaondama-music/orb-data) |
+| Palette Bullet化、発射開始位置、Target決定規則、飛行、衝突、爆発 | 本ページ |
+| Direct Contact／Explosionの判定、倍率適用済み最終RGB Damage payload生成、候補出力 | 本ページ |
+| Colliderなどによる不要なDamage候補生成の抑制 | 本ページ |
+| Shaondamaの個体情報・`effective RGB基礎値` | [シャオンダマのデータ](/spec/shaondama-music/orb-data) |
 | Shaondamaの浮遊状態とReserved状態 | [シャオンダマの浮遊挙動](/spec/shaondama-music/floating-behavior) |
 | Markerの有効条件・現在座標・置換・飛行・付着・消滅 | [マーカー](/spec/combat/marker) |
 | レティクルRayの起点・方向・狙点 | [エイム時のカメラ](/spec/camera/aim) |
-| Damage候補の集約、丸め、Clamp、HP反映、RGB浄化判定 | [Damageと浄化](/spec/enemy/damage-and-purify) |
+| Damage候補の基本的な有効性確認、最終重複除外、同一frame集約、丸め、RGB加算、Clamp、浄化判定、Stage通知 | [Damageと浄化](/spec/enemy/damage-and-purify) |
 | Battle結果の確定、同一frameの終了候補とDamageの扱い、Result接続 | [ゲーム全体](/spec/game/)・`combat/index.md` |
 | Battle結果確定後のPalette Bullet固有の無効化とcleanup | 本ページ |
 
 AttackEvent成立判定は、本ページで定義する規則に従い、AttackEvent発動時にTarget座標を確定します。
 
-本ページは、Palette BulletからEnemy Damage処理へDamage候補を渡すところまでを扱います。候補を受け取った後の集約・反映処理は、本ページで再定義しません。
+本ページは、Palette BulletがDamage発生源固有の倍率を適用して最終RGB Damage payloadを生成し、Enemy Damage処理へ共通RGB Damage候補として出力するところまでを扱います。
+
+Enemy Damageは、受け取った最終RGB Damage payloadへDirect Contact／Explosion倍率を再適用しません。候補を受け取った後の最終重複除外、同一frame集約、丸め、RGB加算、Clamp、浄化判定、およびStage通知は、本ページで再定義しません。
+
+Palette BulletのRGB DamageからEnemyのHP Damageを暗黙に生成しません。本ページもEnemy Damage側も、RGB Damageを単一HP Damageへ変換する責務を持ちません。
 
 ## Palette Bullet化
 
@@ -54,7 +60,7 @@ Reserved Shaondama
 ↓
 AttackEventで定められた発射タイミング
 ↓
-個体情報・有効RGB情報を引き継ぐ
+個体情報・effective RGB基礎値を引き継ぐ
 ↓
 浮遊状態を終了
 ↓
@@ -67,12 +73,14 @@ Palette Bulletは、弾丸化の対象となったShaondamaから、少なくと
 
 - 個体識別情報
 - `battleId`
-- 有効RGB情報
-- Palette BulletのDamage計算に必要な調整値への参照
+- `effective RGB基礎値`
+- Direct Contact／Explosionの最終RGB Damage payload生成に必要な調整値への参照
 
 弾丸化したShaondamaは、同じ時点で浮遊状態を終了します。同一個体をShaondamaとPalette Bulletの両方としてGameplay上に残しません。
 
 同じobjectを状態遷移させるか、情報を引き継いだ別objectへ置き換えるかは実装方式とし、Gameplay仕様では固定しません。どちらの方式でも、同一個体の二重存在・二重消費・二重発射を発生させてはなりません。
+
+`effective RGB基礎値`は、AllocationやWildcard置換などを反映した、Damage発生源固有倍率を適用する前のRGB値です。Damage倍率適用後にEnemy Damageへ渡す値は`最終RGB Damage payload`と呼び、両者を混同しません。
 
 ## 発射開始位置
 
@@ -259,17 +267,23 @@ Palette Bulletは最初に接触した有効な衝突対象の位置で終了し
 
 ## 直接接触Damage
 
-Palette Bulletが有効かつ未浄化のEnemyへ直接接触した場合、そのEnemyに対するDirect Contact RGB Damage候補を生成します。
+Palette BulletがDirect Contact候補の生成条件を満たすEnemyへ直接接触した場合、そのEnemyに対するDirect Contact RGB Damage候補を生成します。
 
-Direct Contact RGB Damageは、Palette Bulletが引き継いだ有効RGB値へ`DirectHitMultiplier`を適用して算出します。
+通常Shaondama由来のDirect Contact最終RGB Damage payloadは、Palette Bulletが引き継いだ`effective RGB基礎値`へ`DirectHitMultiplier`を適用して生成します。
 
 ```text
-Direct Contact RGB Damage
+Direct Contact 最終RGB Damage payload
 =
-Palette Bulletの有効RGB値
+Palette Bulletのeffective RGB基礎値
 ×
 DirectHitMultiplier
 ```
+
+発生元がWildcardである場合は、通常の`DirectHitMultiplier`の代わりに`WildcardDirectHitMultiplierOverride`を使用します。2つの倍率を重ねて適用しません。倍率適用後の値を最終RGB Damage payloadとし、Enemy Damage側では再適用しません。
+
+Direct Contact RGB Damage候補には、その接触作用を一意に識別できる作用またはEvent識別情報を含めます。同じDirect Contact作用から同じEnemyへColliderなどによって不要な候補を複数生成しないよう、Palette Bullet側でも候補生成を抑制します。
+
+対象Enemyが候補を最終的に受け付けるかは、[Damageと浄化](/spec/enemy/damage-and-purify)が`battleId`、Battle結果確定状態、および対象frameのEnemy Snapshotに基づいて確定します。Palette Bullet側の候補生成時判定を、Enemy Damage側の最終受付判定の代わりにしません。
 
 以下はPalette Bulletを爆発させますが、Direct Contact RGB Damageの対象にはなりません。
 
@@ -285,34 +299,40 @@ DirectHitMultiplier
 
 Palette Bulletは、Target座標への到達、物体との接触、最大飛行距離、最大飛行時間のいずれで終了した場合も、同じ爆発処理を実行します。
 
-爆発範囲内にいる有効かつ未浄化のEnemyに対して、Explosion RGB Damage候補を生成します。
+爆発範囲と遮蔽の条件を満たすEnemyに対して、Explosion RGB Damage候補を生成します。
 
-Explosion RGB Damageは、Palette Bulletが引き継いだ有効RGB値へ`ExplosionMultiplier`を適用して算出します。
+通常Shaondama由来のExplosion最終RGB Damage payloadは、Palette Bulletが引き継いだ`effective RGB基礎値`へ`ExplosionMultiplier`を適用して生成します。
 
 ```text
-Explosion RGB Damage
+Explosion 最終RGB Damage payload
 =
-Palette Bulletの有効RGB値
+Palette Bulletのeffective RGB基礎値
 ×
 ExplosionMultiplier
 ```
 
 `DirectHitMultiplier`と`ExplosionMultiplier`は、それぞれ独立した調整値として保持します。
 
-爆心からの距離によるDamage減衰は行いません。爆発範囲内にいて、遮蔽判定を通過した有効な対象には、爆心からの距離にかかわらず同じExplosion RGB Damageを与えます。
+発生元がWildcardであり、Explosionに対応するWildcard用倍率override（WildcardExplosionMultiplierOverride）を使用する場合は、Enemy Damageへ候補を出力する前の倍率決定時に適用します。override適用後の値を最終RGB Damage payloadとし、Enemy Damage側ではoverrideを再適用しません。
 
-1回の爆発につき、同一EnemyへのExplosion RGB Damage候補は最大1件とします。複数のColliderを持つEnemyは、Collider単位ではなく1体のEnemyとして重複を除外します。
+爆心からの距離によるDamage減衰は行いません。爆発範囲内にいて、遮蔽判定を通過した対象には、爆心からの距離にかかわらず同じExplosion最終RGB Damage payloadを使用します。
 
-有効かつ未浄化のEnemyへ直接接触した場合は、直接接触したEnemyに対して以下の両方を生成します。
+1回の爆発につき、同一EnemyへのExplosion RGB Damage候補は最大1件とします。複数のColliderを持つEnemyは、Collider単位ではなく1体のEnemyとしてまとめ、Palette Bullet側で不要な候補生成を抑制します。
+
+各爆発には、同じ爆発から同じEnemyへ発生した候補を識別できる爆発Event識別情報を付与します。Palette Bullet側で候補生成を抑制した後も、Enemy Damage側は受け取った候補について最終的な重複除外を行います。
+
+Palette BulletがDirect Contact候補の生成条件を満たすEnemyへ直接接触した場合は、直接接触したEnemyに対して以下の両方を生成します。
 
 - Direct Contact RGB Damage候補
 - Explosion RGB Damage候補
 
 直接接触したEnemyであっても、Explosion RGB Damageには爆発範囲と遮蔽の条件を適用します。
 
+同じPalette Bulletに由来する候補でも、Direct ContactとExplosionは異なるDamage発生源種別です。Enemy Damage側の重複除外によって、一方を他方の重複候補として削除してはいけません。
+
 ## 壁・地形による爆風遮蔽
 
-壁または地形によって爆心から遮られているEnemyには、Explosion RGB Damageを与えません。
+壁または地形によって爆心から遮られているEnemyには、Explosion RGB Damage候補を生成しません。
 
 爆発範囲内のEnemyごとに、爆心とEnemyのDamage判定点との間を物理的な遮蔽判定で確認します。
 
@@ -344,18 +364,38 @@ Markerは、Palette Bulletの爆風範囲に少しでも触れると、Damage量
 
 AttackEventがTarget座標をsnapshotした後にMarkerが爆風で消滅しても、確定済みTarget座標は変更しません。
 
-## Damage処理への出力
+## 最終RGB Damage payloadと候補出力
 
 Palette Bulletは、成立した条件に応じて以下のDamage候補をEnemy Damage処理へ出力します。
 
-| Damage候補 | 対象 | 算出基準 |
+| Damage発生源種別 | 対象 | 最終RGB Damage payload |
+
 |---|---|---|
-| Direct Contact RGB Damage候補 | 直接接触した有効かつ未浄化のEnemy | 有効RGB値 × `DirectHitMultiplier` |
-| Explosion RGB Damage候補 | 爆発範囲内かつ壁・地形に遮蔽されていない有効かつ未浄化の各Enemy | 有効RGB値 × `ExplosionMultiplier` |
 
-同一フレーム内のDamage集約順序、RGB値の丸め、Clamp、HPへの反映、RGB浄化判定は、[Damageと浄化](/spec/enemy/damage-and-purify)を正本とします。
+| Palette Bullet Direct Contact | Direct Contact候補の生成条件を満たす直接接触Enemy | 通常Shaondama由来：`effective RGB基礎値 × DirectHitMultiplier`／Wildcard由来：`effective RGB基礎値 × WildcardDirectHitMultiplierOverride` |
+| Palette Bullet Explosion | 爆発範囲内かつ壁・地形に遮蔽されていない各Enemy | 通常Shaondama由来：`effective RGB基礎値 × ExplosionMultiplier`／Wildcard由来：`effective RGB基礎値 × WildcardExplosionMultiplierOverride` |
 
-Palette Bullet側は、Damage候補を最終的なEnemy状態へ直接変換しません。
+各候補から、最低限、次の情報を識別できるようにします。
+
+- Damage発生源種別
+  - Palette Bullet Direct Contact
+  - Palette Bullet Explosion
+- 発生元となるDirect Contact作用またはExplosion Eventの識別子
+- 対象Enemy
+- 倍率またはoverride適用済みの最終RGB Damage payload
+- `battleId`
+
+Damage候補を出力した時点では、EnemyのR・G・B浄化値、表示、浄化状態、Stage側記録を更新しません。候補が生成された時点・順番と、Enemy Damageが同一frame分を確定処理する順番を区別します。
+
+Enemy Damage側の最終重複除外では、`Damage発生源種別 + Damage作用またはEvent識別情報 + 対象Enemy識別情報`を区別できる必要があります。Palette Bulletは、この判別に必要な情報を欠落させずに候補へ含めます。
+
+同一frame内の最終重複除外、候補集約、RGB値の丸め、加算、Clamp、浄化判定、Enemy状態更新、およびStageへの浄化通知は、[Damageと浄化](/spec/enemy/damage-and-purify)を正本とします。
+
+Enemy Damage側は、Palette Bulletから受け取った最終RGB Damage payloadへ`DirectHitMultiplier`、`ExplosionMultiplier`、`WildcardDirectHitMultiplierOverride`、または`WildcardExplosionMultiplierOverride`を再適用しません。
+
+Palette Bullet側の候補生成抑制と、Enemy Damage側の最終重複除外は別の責務です。Palette Bullet側でColliderなどによる不要な候補の乱造を抑えても、Enemy Damage側の最終重複除外を省略しません。
+
+Palette Bullet側は、Damage候補を最終的なEnemy状態へ直接変換せず、RGB DamageからHP Damageを生成しません。
 
 ## Battle結果確定時のGameplay無効化
 
@@ -367,11 +407,13 @@ Battle結果確定と同じframeにPalette Bulletの接触、爆発、Damage候�
 
 | Battle結果確定時点の状態 | 扱い |
 |---|---|
-| 結果確定前にCombat／Enemy Damage処理へ受理済みのDamage候補 | Game／Combatの同一frame結果確定規則へ委譲する。Palette Bullet側から巻き戻しや再送を行わない |
+| 結果確定前にEnemy Damage処理へ出力済みのDamage候補 | Enemy Damageの`battleId`・Battle結果・Snapshot確認と同一frame集約へ委譲する。Palette Bullet側から巻き戻しや再送を行わない |
 | 結果確定時点でPalette Bullet側に残っている未送信・未受理のDamage候補 | 破棄し、結果確定後に送信しない |
 | 結果確定後に届いた衝突、Overlap、爆発、Damage callback | 無効として破棄し、新しいGameplay結果を成立させない |
 
-結果確定前に受理されたDamage候補が最終Battle結果へどう反映されるかは、Game／Combat側の候補収集と確定順に従います。Palette Bullet Ownerは、受理済みDamageを取消して結果を変えたり、同じDamage候補を再送したりしません。
+結果確定前に出力された候補であっても、Enemy Damageの確定処理時点ですでにBattle結果が確定済みである場合は、RGB値へ反映されず、新しい浄化を成立させません。候補の最終受付・RGB反映・浄化はEnemy Damage、Clear条件評価はStage、最終Battle結果確定はGame／Battle進行を正本とします。
+
+Palette Bullet Ownerは、出力済み候補を取消して結果を変えたり、同じDamage候補を再送したりしません。
 
 ### 即時無効化
 
@@ -430,7 +472,7 @@ Gameplay無効化後に、Palette Bulletの軌跡、object、爆発VFX、SEを�
 - 終了したBattleのCollider、Trigger、Hit、Damage、爆発範囲query、Marker消滅処理を停止している
 - Palette Bullet側に残っていた未送信・未受理のDamage候補を破棄している
 - 発行待ちの衝突、爆発、Damage callbackを無効化している
-- 結果確定前にCombatへ受理済みのDamage候補を再送・再取消せず、Combat側へ処理を委譲している
+- 結果確定前にEnemy Damageへ出力済みのDamage候補を再送・再取消せず、Enemy Damage側へ処理を委譲している
 - 旧`battleId`のPalette Bulletと遅延通知が現在または次のBattleへ影響できない
 
 上記をすべて満たした時点で内部cleanup完了とし、Palette Bullet Ownerの必須cleanup完了を一度だけ通知します。表示専用の残留object、VFX、SEの終了は待ちません。
@@ -447,19 +489,22 @@ Gameplay無効化後に、Palette Bulletの軌跡、object、爆発VFX、SEを�
 | `PaletteBulletMaxFlightDuration` | 1発が飛行できる最大時間 |
 | `DirectHitMultiplier` | Direct Contact RGB Damageへ適用する倍率 |
 | `ExplosionMultiplier` | Explosion RGB Damageへ適用する倍率 |
+| `WildcardDirectHitMultiplierOverride` | Wildcard由来Palette BulletのDirect Contactで、`DirectHitMultiplier`の代わりに使用する専用倍率 |
+| `WildcardExplosionMultiplierOverride` | Wildcard由来Palette BulletのExplosionで、`ExplosionMultiplier`の代わりに使用する専用倍率 |
 | `TargetRayMaxDistance` | Target決定用Rayの最大距離と、未接触時にTargetを置く所定距離 |
 | `TargetRayLayerMask` | Target決定用Rayの判定対象Layer |
 | `PaletteBulletCollisionMask` | Palette Bulletの衝突対象Layer |
 | `EnemyExplosionDamagePoint` | Enemyごとの爆風遮蔽判定に使用するDamage判定点 |
 | `ExplosionQueryShape` | 爆発範囲の判定形状 |
-| `RGBDamageRoundingMode` | RGB Damageの丸め方式 |
 
 各値はハードコードせず、調整可能なデータとして保持します。
+
+`RGBDamageRoundingMode`は、同一frameの候補集約後にEnemy Damage側が使用する調整値です。Palette Bullet側では最終RGB Damage payloadを候補単位で丸めず、[Damageと浄化](/spec/enemy/damage-and-purify)へ委譲します。
 
 ## 基本ルール
 
 - Palette Bulletは、Reserved Shaondamaが発射タイミングに弾丸化したものとする
-- Palette Bullet化時に、Shaondamaの個体情報と有効RGB情報を引き継ぐ
+- Palette Bullet化時に、Shaondamaの個体情報と`effective RGB基礎値`を引き継ぐ
 - Palette Bullet化した個体をShaondamaとPalette Bulletの両方として残さない
 - 発射開始位置は、弾丸化した瞬間の対象Shaondamaの現在World座標とする
 - Target座標は、AttackEvent発動時に1回だけ確定する
@@ -471,13 +516,17 @@ Gameplay無効化後に、Palette Bulletの軌跡、object、爆発VFX、SEを�
 - Palette Bulletは確定済みTarget座標へ直線飛行し、重力・追尾・反射・貫通を使用しない
 - 最初に成立した終了条件の位置で、1発につき最大1回だけ爆発する
 - 最大飛行距離または最大飛行時間による終了でも、同じ爆発処理を使用する
-- 有効かつ未浄化のEnemyへの直接接触では、Direct ContactとExplosionの両方のRGB Damage候補を生成する
+- Palette Bullet側でDirect Contact／Explosionの判定と倍率適用済み最終RGB Damage payload生成を行い、共通RGB Damage候補としてEnemy Damageへ出力する
+- Direct Contact候補の生成条件を満たすEnemyへの直接接触では、Direct ContactとExplosionの両方のRGB Damage候補を生成する
 - Explosion RGB Damageは距離減衰なし、同一Enemyにつき1回、壁・地形による遮蔽ありとする
+- Palette Bullet側で不要な候補生成を抑制し、Enemy Damage側で受信候補の最終重複除外を行う
+- Enemy Damage側では、Palette Bulletが適用済みの`DirectHitMultiplier`、`ExplosionMultiplier`、`WildcardDirectHitMultiplierOverride`、`WildcardExplosionMultiplierOverride`を再適用しない
+- Palette BulletのRGB DamageからEnemyのHP Damageを暗黙に生成しない
 - MarkerはPalette Bulletの爆風に触れると、Damage量とRGB値にかかわらず消滅する
 - Damageの最終集約・反映・浄化判定はEnemy Damage仕様へ委譲する
 - Battle結果確定後は、飛行中・衝突処理中・爆発処理中のPalette Bulletを即座にGameplay無効化する
 - 結果確定後は、直接接触Damage、爆発判定、範囲Damage、Marker消滅を新しく成立させない
-- 結果確定と同一frameの受理済みDamage候補はGame／Combatの確定規則へ委譲し、未送信候補と確定後のcallbackは破棄する
+- 結果確定と同一frameの出力済みDamage候補はEnemy Damageの受付・集約規則へ委譲し、未送信候補と確定後のcallbackは破棄する
 - 旧`battleId`のPalette Bullet、Damage候補、遅延callbackを現在または次のBattleへ接続しない
 - 表示専用の残留object、VFX、SEの終了をcleanup完了やResult操作解禁の条件にしない
 
