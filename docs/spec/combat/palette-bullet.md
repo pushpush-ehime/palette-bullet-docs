@@ -24,7 +24,7 @@ relatedTasks: []
 - 壁・地形による爆風遮蔽
 - Markerとの相互作用
 - Enemy Damage処理へ渡すDamage候補
-- Battle終了時の無効化
+- Battle終了時のGameplay無効化とcleanup完了条件
 - 調整パラメータ
 
 ## 他ページとの責務境界
@@ -38,7 +38,8 @@ relatedTasks: []
 | Markerの有効条件・現在座標・置換・飛行・付着・消滅 | [マーカー](/spec/combat/marker) |
 | レティクルRayの起点・方向・狙点 | [エイム時のカメラ](/spec/camera/aim) |
 | Damage候補の集約、丸め、Clamp、HP反映、RGB浄化判定 | [Damageと浄化](/spec/enemy/damage-and-purify) |
-| Battle結果確定後の終了処理 | [ゲーム全体](/spec/game/) |
+| Battle結果の確定、同一frameの終了候補とDamageの扱い、Result接続 | [ゲーム全体](/spec/game/)・`combat/index.md` |
+| Battle結果確定後のPalette Bullet固有の無効化とcleanup | 本ページ |
 
 AttackEvent成立判定は、本ページで定義する規則に従い、AttackEvent発動時にTarget座標を確定します。
 
@@ -65,6 +66,7 @@ Palette Bullet化の前後で、見た目を変更する必要はありません
 Palette Bulletは、弾丸化の対象となったShaondamaから、少なくとも以下を引き継ぎます。
 
 - 個体識別情報
+- `battleId`
 - 有効RGB情報
 - Palette BulletのDamage計算に必要な調整値への参照
 
@@ -355,13 +357,83 @@ Palette Bulletは、成立した条件に応じて以下のDamage候補をEnemy 
 
 Palette Bullet側は、Damage候補を最終的なEnemy状態へ直接変換しません。
 
-## Battle終了時
+## Battle結果確定時のGameplay無効化
 
-Battle結果確定後は、飛行中のPalette Bulletと、まだEnemy Damage処理へ反映されていないDamage候補をGameplay上無効化します。
+Battle結果の確定規則、同一frame内の終了候補とDamageの扱い、およびResult接続は、`game/index.md`と`combat/index.md`を正本とします。本ページでは、確定したBattle結果の通知を受けた後にPalette Bullet Ownerが行う無効化とcleanupを定義します。
 
-結果確定後に、既存のPalette Bullet・爆発・未処理Damage候補から、新たなDamageや浄化を成立させてはなりません。
+### 結果確定と同一frameのDamage
 
-Palette Bulletや爆発演出を即座に消すか、Damage判定を停止したうえで演出だけを残すかは、Battle終了トランザクション仕様で決定します。
+Battle結果確定と同じframeにPalette Bulletの接触、爆発、Damage候補が発生した場合、Palette Bullet側で独自に結果を再判定しません。
+
+| Battle結果確定時点の状態 | 扱い |
+|---|---|
+| 結果確定前にCombat／Enemy Damage処理へ受理済みのDamage候補 | Game／Combatの同一frame結果確定規則へ委譲する。Palette Bullet側から巻き戻しや再送を行わない |
+| 結果確定時点でPalette Bullet側に残っている未送信・未受理のDamage候補 | 破棄し、結果確定後に送信しない |
+| 結果確定後に届いた衝突、Overlap、爆発、Damage callback | 無効として破棄し、新しいGameplay結果を成立させない |
+
+結果確定前に受理されたDamage候補が最終Battle結果へどう反映されるかは、Game／Combat側の候補収集と確定順に従います。Palette Bullet Ownerは、受理済みDamageを取消して結果を変えたり、同じDamage候補を再送したりしません。
+
+### 即時無効化
+
+現在の`battleId`に対するBattle結果確定通知を受けた時点で、飛行中、衝突処理中、爆発処理中のPalette Bulletを即座にGameplay無効へ移行します。
+
+Gameplay無効化後は、既存のPalette Bulletから次を新しく成立させません。
+
+- Target座標への到達、最大飛行距離、最大飛行時間によるGameplay上の飛行終了
+- 衝突、Hit、Trigger、Overlap
+- Direct Contact RGB Damage候補
+- Gameplay上の爆発判定と爆発範囲query
+- Explosion RGB Damage候補
+- 爆風によるMarker消滅
+- Enemyの浄化やその他のGameplay状態変更
+
+結果確定と同じ更新処理内であっても、結果確定後に評価された衝突や爆発から新しいDamage候補を生成しません。
+
+すでに爆発演出を開始している場合も、結果確定時点で残っているDamage判定、範囲query、MarkerへのGameplay効果を停止します。見た目として爆発していることを、Gameplay上の有効な爆発が継続している根拠にしません。
+
+Battle結果確定後に新しいPalette Bullet生成要求が届いた場合も拒否します。発射待ちのArpeggio Entryと未消費Reserved Shaondamaの取消・解放は、`bgm/bgm-attack-judgement.md`を正本とします。
+
+### `battleId`による旧Battleの拒否
+
+Palette Bulletは、生成元Battleの`battleId`を保持します。少なくとも次の通知、判定、候補には同じ`battleId`を引き継ぎます。
+
+- 衝突、Hit、Trigger、Overlap通知
+- 飛行終了と爆発開始通知
+- 爆発範囲queryの結果
+- Direct Contact／Explosion RGB Damage候補
+- 遅延callbackと非同期処理の完了通知
+
+保持している`battleId`が現在のBattleと一致しないPalette Bullet、およびそのPalette Bulletから届いた通知やDamage候補は破棄します。
+
+Retryや次のStageで新しいBattleを開始する場合は、新しい`battleId`を使用します。旧BattleのPalette Bullet object、衝突結果、爆発query、Damage候補、callbackを、新しいBattleのEnemy、Marker、Damage処理へ接続しません。
+
+### 表示専用の残留演出
+
+Gameplay無効化後に、Palette Bulletの軌跡、object、爆発VFX、SEを表示専用として残すことはできます。
+
+残留演出には、Gameplay上有効なCollider、Trigger、Hit判定、Damage判定、爆発範囲query、Marker消滅効果を持たせません。表示用objectが移動を続ける場合も、その位置をTarget、衝突、Damageの根拠にしません。
+
+表示専用objectの消滅、VFX、SEの終了はPalette Bullet Ownerの必須cleanup完了条件に含めず、Result操作の解禁を妨げません。
+
+### cleanupの冪等性
+
+同じ`battleId`に対するBattle結果確定通知が複数回届いた場合も、Gameplay無効化とcleanupは一度だけ行います。
+
+すでに無効化済みのPalette Bulletを再度終了処理へ入れたり、破棄済みDamage候補を再処理したり、cleanup完了通知を複数回送信したりしません。現在と異なる`battleId`の終了通知によって、現在のBattleのPalette Bulletを無効化してはいけません。
+
+### cleanup完了条件
+
+次のすべてを満たした時点を、Palette Bullet Ownerの必須cleanup完了とします。
+
+- 終了したBattleに対する新しいPalette Bullet生成要求を拒否している
+- 終了したBattleに属する飛行中・衝突処理中・爆発処理中の全Palette BulletをGameplay無効化している
+- 終了したBattleのCollider、Trigger、Hit、Damage、爆発範囲query、Marker消滅処理を停止している
+- Palette Bullet側に残っていた未送信・未受理のDamage候補を破棄している
+- 発行待ちの衝突、爆発、Damage callbackを無効化している
+- 結果確定前にCombatへ受理済みのDamage候補を再送・再取消せず、Combat側へ処理を委譲している
+- 旧`battleId`のPalette Bulletと遅延通知が現在または次のBattleへ影響できない
+
+上記をすべて満たした時点で内部cleanup完了とし、Palette Bullet Ownerの必須cleanup完了を一度だけ通知します。表示専用の残留object、VFX、SEの終了は待ちません。
 
 ## 調整パラメータ
 
@@ -403,6 +475,10 @@ Palette Bulletや爆発演出を即座に消すか、Damage判定を停止した
 - Explosion RGB Damageは距離減衰なし、同一Enemyにつき1回、壁・地形による遮蔽ありとする
 - MarkerはPalette Bulletの爆風に触れると、Damage量とRGB値にかかわらず消滅する
 - Damageの最終集約・反映・浄化判定はEnemy Damage仕様へ委譲する
-- Battle結果確定後は、飛行中の弾と未処理Damage候補をGameplay上無効化する
+- Battle結果確定後は、飛行中・衝突処理中・爆発処理中のPalette Bulletを即座にGameplay無効化する
+- 結果確定後は、直接接触Damage、爆発判定、範囲Damage、Marker消滅を新しく成立させない
+- 結果確定と同一frameの受理済みDamage候補はGame／Combatの確定規則へ委譲し、未送信候補と確定後のcallbackは破棄する
+- 旧`battleId`のPalette Bullet、Damage候補、遅延callbackを現在または次のBattleへ接続しない
+- 表示専用の残留object、VFX、SEの終了をcleanup完了やResult操作解禁の条件にしない
 
 <PageRelations />
