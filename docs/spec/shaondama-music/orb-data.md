@@ -13,15 +13,15 @@ status: 仮仕様
 
 - 対象担当：プログラム班・企画班（RGBダメージ値はプランナー成果物）
 - 出典：統合仕様書v3.2 §4.2.3・§5.2
-- 関連ページ：[BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[浮遊・挙動](/spec/shaondama-music/floating-behavior)、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)、[Charge Allocation](/spec/draw-system/charge-allocation)
+- 関連ページ：[BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[浮遊・挙動](/spec/shaondama-music/floating-behavior)、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)、[Charge Allocation](/spec/draw-system/charge-allocation)、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet)
 
 ## 目的
 
 シャオンダマ1個が持つruntime dataと、攻撃へ使用するときの実効値を定義し、生成・出現演出・浮遊・Charge・Allocation・発音・Damageの各システムが参照する共通契約を作ります。
 
-本ページは、Normal Shaondama（通常シャオンダマ）／Wildcard Shaondama（万能シャオンダマ）の種別、個体識別情報、Battleへの帰属、生成元区分、選択可能性・出現演出・`Reserved`を判定するための情報、Normalのsource NoteEvent occurrence、元の音楽情報、元RGB値、およびAllocation後の実効値payloadの正本です。
+本ページは、Normal Shaondama（通常シャオンダマ）／Wildcard Shaondama（万能シャオンダマ）の種別、個体識別情報、Battleへの帰属、生成元区分、選択可能性・出現演出・`Reserved`を判定するための情報、Normalのsource NoteEvent occurrence、元の音楽情報、元RGB値、Allocation後の実効値payload、およびPalette Bullet化時のデータ引き継ぎ契約の正本です。
 
-生成対象・生成タイミング・重複防止は[BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、状態遷移・Lifetime・自然破裂は[浮遊・挙動](/spec/shaondama-music/floating-behavior)、Allocationと実効値の解決手順は[Charge Allocation](/spec/draw-system/charge-allocation)、発音は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)、Damage適用は[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。
+生成対象・生成タイミング・重複防止は[BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、状態遷移・Lifetime・自然破裂は[浮遊・挙動](/spec/shaondama-music/floating-behavior)、Allocationと実効値の解決手順は[Charge Allocation](/spec/draw-system/charge-allocation)、Palette Bullet化と発射情報の受け渡しは[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、飛行・衝突・Damage候補生成は[パレットブレット](/spec/combat/palette-bullet)、発音は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)、Damage適用は[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。
 
 ## プレイヤーから見た挙動
 
@@ -137,7 +137,7 @@ WildcardはAllocation時に、割当先から攻撃ごとの実効値を解決�
 | Normal AttackEvent Slot | そのSlotが要求するpitch class、octave込みMIDI Note、および音程に対応する色・RGB |
 | Weak AttackEvent | Charge Allocationで解決した次のNoteEventのpitch class、octave込みMIDI Note、および対応する色・RGB |
 
-Wildcardの攻撃力はNormalとは別枠です。実効音程・実効色・実効RGBはAllocation結果から解決しますが、Palette Bullet攻撃時にDamageへ適用する値または倍率はWildcard専用の調整データを参照します。Wildcardは通常より強めに調整する予定ですが、具体的なDamage量・倍率は未決です。
+Wildcardの攻撃力はNormalとは別枠です。実効音程・実効色・実効RGBはAllocation結果から解決しますが、Palette Bullet攻撃時に倍率overrideを使用する場合は、Wildcard専用の調整データから`DirectHitMultiplier`と`ExplosionMultiplier`を別々に参照します。Wildcardは通常より強めに調整する予定ですが、各Multiplierの具体値は未決です。
 
 Wildcardは固定のsource RGB値を持ちません。虹色は表示だけを表し、RGB payloadではありません。また、WildcardはLifetime終了時に破裂して消滅しますが、その破裂からDamage payloadを生成しません。Allocation後のPalette Bullet攻撃と、Lifetime終了時の破裂を混同してはいけません。
 
@@ -155,12 +155,51 @@ Palette Bullet化またはDamage通知へ進む前に、攻撃へ使用する個
 | effective MIDI Note／octave | その攻撃の発射時に鳴らす正確な音高 |
 | effective color参照 | その攻撃で使用する音程対応色 |
 | effective RGB payload | その攻撃でEnemyへ渡すR／G／B値。Normalはsource RGB値、WildcardはAllocation結果から解決する |
-| Damage調整データ参照 | Damage調整データの具体的な構造、適用条件、倍率、および最終計算式は未確定とする。ただし、Damage発生時にはsource／effective RGB値と、確定済みのDamage規則から最終RGB Damage payloadを一意に解決しなければならない。 |
+| `DirectHitMultiplier`参照 | Direct Contact RGB Damageへ適用する倍率。Explosion用倍率とは独立して参照できること |
+| `ExplosionMultiplier`参照 | Explosion RGB Damageへ適用する倍率。Direct Contact用倍率とは独立して参照できること |
 | effective NoteEvent occurrence参照 | Normalでは自身のsource occurrence、WildcardではAllocation時に解決したNoteEvent occurrence。該当しない用途では空にできる |
 
 これらの実効値は、元個体の不変なsourceデータとは分けて保持します。特にWildcardへ恒久的な固有音程・固有色を付与せず、攻撃単位の解決結果として扱います。
 
-実効値の解決前、Battle ID不一致、または必要な参照が欠けている状態でPalette Bullet化・発音・Damage通知へ進めません。最終的なDamage payloadと加算計算は、Palette BulletおよびEnemy Damage側の正本で定義します。
+実効値の解決前、Battle ID不一致、または必要な参照が欠けている状態でPalette Bullet化・発音・Damage通知へ進めません。Direct ContactとExplosionの最終RGB Damage候補は[パレットブレット](/spec/combat/palette-bullet)、同一フレーム集約・丸め・Clamp・浄化判定は[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。
+
+### Palette Bullet化時のデータ引き継ぎ
+
+Reserved ShaondamaをPalette Bullet化する場合は、物理objectの生成方式にかかわらず、同じGameplay上の個体として次の情報を引き継ぎます。
+
+| 引き継ぐ情報 | 規則 |
+|---|---|
+| Battle ID | 元Shaondamaと同じBattleへの帰属を維持し、別Battleへ付け替えない |
+| 個体識別情報 | 元Shaondamaと同じ個体を示す識別情報を維持し、Palette Bullet化を理由に別個体IDへ変更しない |
+| Shaondama種別 | `Normal`または`Wildcard`の種別を維持する |
+| sourceデータ | Normalのsource NoteEvent occurrence、音楽情報、source RGB値を失わない |
+| Allocation後の実効値 | effective pitch、MIDI Note、color、RGB payloadを欠落なく引き継ぐ |
+| `DirectHitMultiplier`参照 | Direct Contact RGB Damage用の独立した倍率参照を引き継ぐ |
+| `ExplosionMultiplier`参照 | Explosion RGB Damage用の独立した倍率参照を引き継ぐ |
+
+```text
+Reserved Shaondama
+├─ Battle ID
+├─ 個体識別情報
+├─ source RGB値
+├─ effective RGB payload
+├─ DirectHitMultiplier参照
+└─ ExplosionMultiplier参照
+↓
+Palette Bullet化
+↓
+同じGameplay個体情報を維持
+```
+
+Palette Bullet化によって、Normalのsource RGB値または攻撃に使用するeffective RGB payloadを失ったり、表示用色だけからRGB値を再生成したりしません。
+
+同じ物理objectをShaondamaからPalette Bulletへ状態遷移させる方式と、必要な情報を別objectへ渡して置き換える方式のどちらを採用しても構いません。
+
+別objectへ置き換える場合も、新しいGameplay個体を生成したものとして扱いません。元ShaondamaのBattle ID、個体識別情報、sourceデータ、解決済み実効値、およびDamage倍率参照を新しいobjectへ引き継ぎます。
+
+Palette Bullet化が成立した時点で、元個体のShaondamaとしての浮遊状態と`Reserved`状態を終了します。同一個体をShaondamaとPalette Bulletの両方としてGameplay上に残しません。
+
+物理objectの再利用・置換方式は実装詳細ですが、Gameplay上の個体同一性とデータの連続性は本ページの契約として固定します。
 
 ## 状態別の挙動
 
@@ -172,7 +211,7 @@ Palette Bullet化またはDamage通知へ進む前に、攻撃へ使用する個
 | world object作成 | 個体識別情報を割り当て、生成要求のBattle／source／生成元データを引き継ぐ | [ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
 | 出現演出・浮遊・選択可能 | 同じ個体識別情報を維持し、出現演出と選択可能性を区別できる状態にする | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
 | Allocation／Reserved | 元sourceデータを保持したまま、割当参照と実効値を別に保持する | [Charge Allocation](/spec/draw-system/charge-allocation) |
-| Palette Bullet化 | 解決済み実効値とBattle IDを弾側へ渡す | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
+| Palette Bullet化 | Battle ID、個体識別情報、source／effective RGB、解決済み実効値、`DirectHitMultiplier`参照、`ExplosionMultiplier`参照を欠落なく弾側へ渡し、Gameplay上の個体同一性を維持する | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet) |
 | Battle終了／Room Retry | 旧Battle IDの個体・通知・`Reserved`・実効値・参照・状態をすべて破棄し、次Battleへ持ち越さない | [ゲーム全体](/spec/game/)、[戦闘](/spec/combat/) |
 
 ## 他システムとの接続
@@ -185,7 +224,7 @@ Palette Bullet化またはDamage通知へ進む前に、攻撃へ使用する個
 | 浮遊・挙動 | source music time、出現演出、選択可能性、`Reserved`、Battle終了を使ってlifecycleを解決する |
 | Charge Allocation | pitch classとsource occurrenceを参照し、Allocation後の実効値を解決する |
 | BGMとGameplayの接続 | effective MIDI Note／octaveを使って発射時の音程音を鳴らす |
-| Palette Bullet | Battle ID、個体識別情報、種別、実効音程・色・RGB payload・Damage調整参照を受け取る |
+| Palette Bullet | Battle ID、個体識別情報、種別、source／effective RGB payload、実効音程・色、`DirectHitMultiplier`参照、`ExplosionMultiplier`参照を受け取り、物理object方式にかかわらずGameplay上の個体情報を維持する |
 | Enemy Damage／浄化 | 解決済みDamage payloadを受け取り、Enemy側の最大値・計算規則に従って適用する |
 
 廃止済みの[MIDI駆動生成（旧ページ）](/spec/shaondama-music/midi-driven-spawning)は移行案内であり、本ページの属性・生成・色対応の正本として参照しません。
@@ -201,8 +240,9 @@ Palette Bullet化またはDamage通知へ進む前に、攻撃へ使用する個
 | Wildcard生成trigger・生成位置 | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
 | 7色・度数対応・Normal source RGB定義 | 本ページで契約を定義し、具体値は企画班の調整データ |
 | Wildcardの実効値解決 | [Charge Allocation](/spec/draw-system/charge-allocation) |
-| Wildcard攻撃用Damage値・倍率 | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb)で企画調整し、本ページのAllocation後payloadで参照 |
-| EnemyのR／G／B最大値・最終Damage計算 | [敵の被弾と浄化](/spec/enemy/damage-and-purify) |
+| `DirectHitMultiplier`・`ExplosionMultiplier`の適用規則 | [パレットブレット](/spec/combat/palette-bullet) |
+| Wildcard攻撃用の倍率override | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb)で企画調整し、本ページのAllocation後payloadから各倍率を別々に参照 |
+| EnemyのR／G／B最大値・集約・丸め・Clamp・浄化判定 | [敵の被弾と浄化](/spec/enemy/damage-and-purify) |
 | 音程音・Gameplay SEの再生規則 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 
 ## 例外・禁止事項
@@ -222,9 +262,14 @@ Palette Bullet化またはDamage通知へ進む前に、攻撃へ使用する個
 - Parry由来Wildcardの未確定な選択開始timingを、実装都合で確定仕様として補完してはいけません。
 - 出現演出中、選択不可、または`Reserved`中の個体を最低保証数へ算入してはいけません。
 - Wildcardの実効値が未解決のまま、Palette Bullet化・発音・Damage通知へ進めてはいけません。
+- Palette Bullet化を理由に個体識別情報を再採番し、元Shaondamaとは別のGameplay個体として扱ってはいけません。
+- Palette Bullet化によってNormalのsource RGB値またはeffective RGB payloadを失ってはいけません。
+- object置換時にBattle ID、個体識別情報、sourceデータ、実効値、またはDamage倍率参照を欠落させてはいけません。
+- `DirectHitMultiplier`と`ExplosionMultiplier`を1つの区別できない倍率参照へ統合してはいけません。
+- 同一個体をShaondamaとPalette Bulletの両方としてGameplay上に残してはいけません。
 - 旧Battle IDに属する個体、通知、`Reserved`、Allocation結果、または状態をRoom Retry後へ持ち越してはいけません。
 - 旧仕様の3色前提のRGB Damage値`(510, 255, 510)`を使用してはいけません。
-- 7色のRGB Damage値、Wildcard倍率、Enemy最大値、および最終計算式をコードへハードコードしてはいけません。企画班が調整可能なデータ参照を使用します。
+- 7色のsource RGB値、`DirectHitMultiplier`、`ExplosionMultiplier`、Wildcard用override、Enemy最大値、および丸め方式をコードへハードコードしてはいけません。企画班が調整可能なデータ参照を使用します。
 - 廃止済み`midi-driven-spawning.md`を現在の個体属性または色対応の正本として使用してはいけません。
 
 ## パラメータ
@@ -233,20 +278,25 @@ Palette Bullet化またはDamage通知へ進む前に、攻撃へ使用する個
 |---|---|---|
 | 7色分のNormal source RGB値 | 未決 | Gameplayテストで調整予定 |
 | EnemyのR／G／B最大値 | 未決 | Enemy側の調整データ |
-| Wildcard攻撃用Damage値・倍率 | 未決 | Palette Bullet攻撃用。Gameplayテストで調整予定 |
-| 想定浄化Hit数 | 未決 | 上記値と最終計算式に合わせて調整予定 |
+| `DirectHitMultiplier` | 未決 | Direct Contact RGB Damage用。Gameplayテストで調整予定 |
+| `ExplosionMultiplier` | 未決 | Explosion RGB Damage用。Gameplayテストで調整予定 |
+| Wildcard攻撃用の倍率override | 未決 | 必要な場合もDirect／Explosionを別々に調整する |
+| 想定浄化Hit数 | 未決 | source RGB値、各Multiplier、Enemy最大値、丸め方式に合わせて調整予定 |
 
 ## 未決事項
 
 - 7色それぞれのNormal source RGB値
-- Enemy側のR／G／B最大値と最終Damage計算式
+- Enemy側のR／G／B最大値と`RGBDamageRoundingMode`の具体設定
 - 想定浄化Hit数
-- Wildcard攻撃用の具体的なDamage値・倍率
+- `DirectHitMultiplier`と`ExplosionMultiplier`の具体値
+- Wildcard攻撃用に各Multiplierのoverrideを設ける場合の具体値
 - Parry由来Wildcardを変換直後から選択可能にするか、出現演出完了後に選択可能にするか
 
-RGB・Damage・浄化Hit数はQ-12・Q-13で意図的に未決とされた調整用パラメータです。Parry由来Wildcardは変換自体、1弾1個、Battle ID継承、Normal／Just Parryで同じWildcardとして扱うことまで確定しており、選択開始timingだけが未確定です。
+RGB・Damage倍率・浄化Hit数はQ-12・Q-13で意図的に未決とされた調整用パラメータです。Direct ContactとExplosionで別々のMultiplierを使用する構造は確定済みであり、未決なのは各具体値です。Parry由来Wildcardは変換自体、1弾1個、Battle ID継承、Normal／Just Parryで同じWildcardとして扱うことまで確定しており、選択開始timingだけが未確定です。
 
 source NoteEvent occurrenceの識別要件、最低保証への算入条件、Wildcardの2種類の生成元、Allocation結果からの実効音程・実効色・実効RGBの解決、およびWildcardのLifetime終了破裂でDamageを発生させない規則は決定済みです。
+
+Palette Bullet化時にBattle ID・個体識別情報・source／effective RGBを維持すること、`DirectHitMultiplier`と`ExplosionMultiplier`を別々に参照できること、および物理objectの再利用・置換方式にかかわらずGameplay上の個体同一性を維持することも決定済みです。
 
 ## 関連タスク
 
