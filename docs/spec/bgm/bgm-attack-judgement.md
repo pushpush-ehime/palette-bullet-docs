@@ -1,6 +1,6 @@
 ---
 title: "AttackEvent成立判定"
-description: Palette BulletにおけるAttackEvent発火時のGameplay結果判定・使用実体・発射開始位置・Target共有仕様
+description: Palette BulletにおけるAttackEvent発火時のGameplay結果判定・使用実体・発射開始位置・Target共有・Battle終了時取消仕様
 pageType: spec
 category: "BGM"
 status: 仮仕様
@@ -30,6 +30,11 @@ relatedTasks:
 - Weak AttackEvent発火時の使用実体・終了処理
 - Complete Chord時のバフ発生条件
 - AttackEvent発火時のTarget座標snapshotと同一AttackEvent内での共有
+- Battle結果確定後のAttackEvent発火gate停止
+- 未発火AttackEventとArpeggio残Entryの取消
+- AttackEventが保持するsnapshotの無効化
+- 未消費Reserved Shaondamaの一度だけの解放
+- AttackEvent判定Ownerの必須cleanup完了条件・通知
 
 一方、本ページでは、以下を再定義しません。
 
@@ -46,6 +51,8 @@ relatedTasks:
 - Palette Bullet発射後の飛翔・命中・Damage・消滅
 - Markerの有効条件・Lifecycle
 - Target候補の優先順位・座標計算・Raycast条件
+- Battle結果の判定・同一frame終了候補の優先順位
+- Result表示・Result操作解禁・Result後のroute
 
 これらは、それぞれの正本ページへ委譲します。
 
@@ -80,6 +87,14 @@ Target座標snapshot
 Palette Bullet化
 個体単位の1回消費
 Weak発火時処理
+→ bgm/bgm-attack-judgement.md
+
+Battle結果確定後
+AttackEvent発火gate停止
+未発火AttackEvent / Arpeggio残Entry取消
+snapshot無効化
+未消費Reserved Shaondama解放
+必須cleanup完了通知
 → bgm/bgm-attack-judgement.md
 ```
 
@@ -684,7 +699,9 @@ G Reserved Shaondama
 
 発火後に、Slot状態やAllocation結果を再評価しません。
 
-snapshotした結果とTarget座標を、最後のArpeggio timingの処理が完了するまで維持します。
+通常解決では、snapshotした結果とTarget座標を、最後のArpeggio timingの処理が完了するまで維持します。
+
+ただし、その前にBattle結果が確定した場合は例外です。Battle終了cleanupで残Entryを取り消し、未消費Reserved Shaondamaの解放対象を確定した後、結果・Slot・使用対象・Target座標のsnapshotを無効化します。
 
 各Arpeggio timingでTargetを再取得しません。
 
@@ -797,7 +814,7 @@ Arpeggioでsnapshot時に`Empty`だったSlotは、そのSlotの音楽タイミ�
 
 ## Arpeggio AttackEventの解決完了タイミング
 
-Arpeggio AttackEventは、
+通常進行中のArpeggio AttackEventは、
 
 > **最後のArpeggio timingの処理が完了した時点**
 
@@ -828,6 +845,8 @@ AttackEvent / Slot破棄
 `Zero Charge`で発射対象が存在しなくても、Arpeggio AttackEventの解決完了は最後のArpeggio timing処理後です。
 
 AttackEvent発火直後にArpeggio全体を破棄しません。
+
+ただし、最後のArpeggio timingより前にBattle結果が確定した場合は、残Entryを取り消してBattle終了cleanupを行います。この場合は最後のtimingを待たず、通常解決完了ではなくBattle終了による取消完了として破棄します。
 
 ---
 
@@ -1063,6 +1082,318 @@ Weak AttackEventを、発火後に通常AttackEventの蓄積枠へ残しませ�
 
 ---
 
+# Battle終了時のAttackEvent取消とcleanup
+
+## 本節の責務
+
+Battle結果の確定規則、同一frameに複数の終了候補が成立した場合の優先順位、Resultへの接続は、`game/index.md`を正本とします。
+
+本ページでは、現在のBattleについて確定済みのBattle結果を受け取った後に、AttackEvent判定Ownerが行う以下の処理を定義します。
+
+- 新しいAttackEvent発火の受付停止
+- 発火前AttackEventの取消
+- 発火済みArpeggio AttackEventの未処理Entry取消
+- AttackEventが保持するsnapshotの無効化
+- 未消費Reserved Shaondamaの解放
+- 旧Battleの発火通知・遅延callbackの拒否
+- AttackEvent判定Ownerの必須cleanup完了通知
+
+本ページではBattle結果を再判定しません。Gameから通知された確定結果だけを使用し、`Clear / Game Over`のどちらであっても同じGameplay cleanupを行います。
+
+---
+
+## Battle結果確定後の発火gate
+
+現在のBattleについて結果が確定した時点で、AttackEvent発火gateを閉じます。
+
+```text
+Battle結果確定通知
+↓
+AttackEvent発火gateを閉じる
+↓
+新しいAttackEvent発火を受け付けない
+↓
+発火通知・Arpeggio Entry callbackによる新しいGameplay処理を開始しない
+```
+
+結果確定後は、以下を新しく成立させません。
+
+- Normal Chord AttackEventの発火
+- Normal Arpeggio AttackEventの発火
+- Weak AttackEventの発火
+- `Complete / Incomplete / Zero Charge`の新規判定
+- 新しいTarget座標snapshotの取得
+- 新しい使用Slot / Reserved Shaondama snapshotの取得
+- Reserved ShaondamaのPalette Bullet化
+- Arpeggioの次Entryの発射
+- Complete Chord用バフ発生条件の新規成立
+
+発火予定時刻がBattle結果確定と同じframe内に存在していても、Gameによる最終結果確定後に発火処理へ到達したものは開始しません。同一frame内のBattle終了候補と結果確定の順序自体は、`game/index.md`の規則に従います。
+
+Battle結果確定より前にPalette Bullet化まで完了し、すでに`Consumed`となったReserved Shaondamaを、結果確定後に未消費へ巻き戻しません。
+
+---
+
+## `battleId`による受付判定
+
+AttackEvent、発火通知、Arpeggio Entryの予約callback、Target snapshot、使用Slot / Reserved Shaondama snapshotには、所属するBattleを識別できる`battleId`を対応付けます。
+
+各発火通知・予約callbackを処理する前に、少なくとも次を確認します。
+
+```text
+通知のbattleId
+==
+現在のBattleのbattleId
+
+かつ
+
+現在のBattleが結果未確定
+```
+
+いずれか一方でも満たさない場合、その発火通知・予約callbackを無視します。Battle結果確定通知とcleanup完了通知は、このGameplay発火gateとは別の終了処理用経路で扱います。
+
+旧`battleId`の通知によって、以下を行ってはなりません。
+
+- AttackEventを発火する
+- Arpeggioの残Entryを発射する
+- Targetを再取得する
+- Reserved Shaondamaを消費または解放する
+- Slot / Allocation状態を変更する
+- cleanup完了状態を現在のBattleへ反映する
+
+Retryでは新しいBattleとして新しい`battleId`を使用します。前BattleのAttackEvent、snapshot、Reserved参照、遅延callbackを次のBattleへ持ち越しません。
+
+---
+
+## Battle終了cleanupの処理順
+
+AttackEvent判定Ownerは、現在の`battleId`に対するBattle結果確定通知を一度だけ受理し、次の順序でcleanupします。
+
+```text
+1. AttackEvent発火gateを閉じる
+↓
+2. 発行待ちの発火通知・遅延callbackを無効化する
+↓
+3. 発火前AttackEventを取り消す
+↓
+4. 発火済みArpeggioの残りの未処理Entryを取り消す
+↓
+5. Reserved ShaondamaをConsumed / 未消費Reservedへ分類する
+↓
+6. 未消費Reserved Shaondamaだけを一度だけ解放する
+↓
+7. Targetおよび使用対象に関する全snapshotを無効化する
+↓
+8. AttackEvent / Slot / ReservedのOwner側参照を終了する
+↓
+9. 必須cleanup完了条件を確認する
+↓
+10. battleId付きで必須cleanup完了を通知する
+```
+
+Reserved Shaondamaの消費状態を判別するために必要なsnapshotは、分類と解放対象の確定が終わるまで保持します。先にsnapshotを破棄して解放対象を不明にしてはなりません。
+
+cleanup処理は、同じ終了通知を複数回受け取っても安全な冪等処理とします。
+
+```text
+Active
+↓ Battle結果確定通知を初回受理
+Cleaning
+↓ 必須cleanup完了
+CleanupCompleted
+```
+
+`Cleaning`または`CleanupCompleted`のBattleに同じ終了通知が届いても、取消・解放・snapshot破棄・完了通知を最初から重複実行しません。
+
+---
+
+## 発火前AttackEventの取消
+
+Battle結果確定時点でまだ発火していないAttackEventは、Normal / Weakを問わず取り消します。
+
+取消対象には、少なくとも次を含みます。
+
+- 発火待ちのNormal Chord AttackEvent
+- 発火待ちのNormal Arpeggio AttackEvent
+- 発火待ちのWeak AttackEvent
+- 発火処理を開始していない予約済み発火通知
+- 旧Battleから遅れて到着する発火callback
+
+発火前AttackEventを取り消した場合、次を行いません。
+
+- 結果判定
+- Target座標snapshot
+- Palette Bullet化
+- 発射
+- Complete Chord用バフ発生条件の成立
+
+そのAttackEventへcommit済みで、まだPalette Bullet化されていないReserved Shaondamaは、すべて未消費として一度だけ解放します。
+
+---
+
+## 発火済みArpeggioの残Entry取消
+
+Arpeggio AttackEventの発火後、最後のArpeggio timingへ到達する前にBattle結果が確定した場合、未処理の残Entryをすべて取り消します。
+
+例えば、
+
+```text
+C timing
+→ C Reserved ShaondamaをPalette Bullet化・消費済み
+
+Battle結果確定
+
+E timing
+→ 未処理のため取消
+
+G timing
+→ 未処理のため取消
+```
+
+とします。
+
+この場合、
+
+- Cに対応するShaondamaは`Consumed`のままとし、再解放しない
+- E / Gに対応する未消費Reserved Shaondamaが存在する場合だけ解放する
+- E / GのPalette Bullet化・発射は行わない
+- 残Entryの音楽的タイミングが後から到達しても処理しない
+- 通常の「最後のArpeggio timing処理完了」は待たない
+
+ものとします。
+
+Battle終了cleanupによって取り消されたArpeggio AttackEventは、通常解決完了ではなく、Battle終了による取消完了として破棄します。
+
+snapshot時に`Empty`だった残Entryもcallback対象から取り消します。発射対象が存在しないことを理由に、不要なcallbackをBattle終了後まで維持しません。
+
+---
+
+## Reserved Shaondamaの消費・解放状態
+
+AttackEventへcommit済みのReserved Shaondamaは、Battle終了cleanup時に次の状態で区別します。
+
+```text
+Reserved
+├─ Palette Bullet化成立
+│   → Consumed
+│
+└─ Battle終了による取消
+    → Released
+```
+
+`Consumed`と`Released`は、同じReserved関係に対する排他的な終了状態です。
+
+### 未消費Reserved Shaondama
+
+Battle結果確定時点でまだPalette Bullet化されていないShaondamaだけを、`Reserved → Released`へ遷移させます。
+
+対象には、少なくとも次を含みます。
+
+- 発火前に取り消されたAttackEventのReserved Shaondama
+- 発火済みArpeggioの未発射Entryに対応するReserved Shaondama
+
+解放処理では、AttackEvent / Slot / Reservedの対応関係を終了し、同じ予約を後から消費できない状態にします。
+
+Battle自体が終了済みであるため、`Released`にしたShaondamaを新しいChargeへ再利用可能にするという意味ではありません。Battle終了後のShaondama実体の表示・消滅処理は、[浮遊・挙動](/spec/shaondama-music/floating-behavior)へ委譲します。
+
+### 消費済みReserved Shaondama
+
+すでにPalette Bullet化したShaondamaは`Consumed`です。
+
+`Consumed`なShaondamaについて、以下を行いません。
+
+- `Reserved`へ戻す
+- `Released`へ遷移させる
+- Shaondama実体として再生成する
+- 同じ予約を再解放する
+- 別AttackEventへ再割り当てする
+
+発射後のPalette BulletをBattle終了時にGameplay無効化する処理は、[パレットブレット](/spec/combat/palette-bullet)の責務です。
+
+### 二重解放の防止とOwner境界
+
+AttackEventへcommit済みのReserved Shaondamaについては、本ページのAttackEvent判定Ownerが、発射済みか未発射かを判別し、未消費分の解放を一度だけ実行します。
+
+[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)側は、この終了状態を参照してAllocation / Slot / Reserved関係を解消し、本Ownerが解放済みの同じ予約を再解放しません。
+
+一方、Battle結果確定時点でAttackEventへcommitされていない未確定Chargeや一時選択は、Allocation / Charge側のcleanup対象です。本ページから解放処理を行いません。
+
+実装上は、1つの予約に対する終了遷移が一度だけ成功するようにします。終了通知やOwner cleanupが重複しても、`Consumed`または`Released`になった予約へ同じ処理を再適用しません。
+
+---
+
+## snapshotの無効化
+
+Reserved Shaondamaの消費状態・解放対象を確定した後、AttackEventが保持するGameplay用snapshotをすべて無効化します。
+
+対象には、少なくとも次を含みます。
+
+- AttackEvent Target Position Snapshot
+- Arpeggioの`Complete / Incomplete / Zero Charge`結果snapshot
+- Arpeggioの`Occupied / Empty` Slot snapshot
+- Arpeggioの使用Reserved Shaondama snapshot
+- 遅延callbackが参照できるAttackEvent / Slot / Reserved参照
+
+無効化後は、snapshotを使用して以下を行えません。
+
+- Target座標をPalette Bulletへ渡す
+- Arpeggioの残Entryを発射する
+- Reserved Shaondamaを消費する
+- Damageやバフへ接続する
+- 次のBattleへ状態を引き継ぐ
+
+表示上AttackEventやSlotの消去演出を残す場合も、Gameplay用snapshotと参照は使用できない状態にします。表示演出の完了は、このOwnerの必須cleanup完了条件に含めません。
+
+---
+
+## AttackEventの状態別cleanup
+
+| Battle結果確定時の状態 | 取消・無効化 | Reserved Shaondama |
+| --- | --- | --- |
+| 発火前のNormal / Weak AttackEvent | AttackEventと発火予約を取消。snapshot処理を開始しない | commit済みの全Reservedを未消費として一度だけ解放 |
+| 発火・解決済みChord | Target snapshotとOwner側参照を無効化 | Palette Bullet化済みのため再解放しない |
+| 発火・解決済みWeak | Target snapshotとOwner側参照を無効化 | Palette Bullet化済みのため再解放しない |
+| 発火途中のArpeggio | 残Entryとcallbackを取消。Target・結果・Slot・使用対象snapshotを無効化 | 発射済みEntryは再解放せず、未発射Entry分だけ一度だけ解放 |
+| 解決済みArpeggio | 残存するsnapshotとOwner側参照を無効化 | 全使用対象が処理済みのため再解放しない |
+| 発火済み`Zero Charge` | 残るEntry / callbackとsnapshotを取消・無効化 | Reserved Shaondamaが存在しないため解放なし |
+
+---
+
+## 必須cleanup完了条件と通知
+
+AttackEvent判定Ownerの必須cleanupは、現在の`battleId`について次のすべてを満たした時点で完了とします。
+
+- AttackEvent発火gateが閉じている
+- 発火前AttackEventがすべて取り消されている
+- 発行待ちの発火通知・遅延callbackが無効化されている
+- 発火済みArpeggioの未処理Entryがすべて取り消されている
+- 未消費Reserved Shaondamaが一度だけ解放されている
+- 消費済みReserved Shaondamaへ再解放を行っていない
+- Target snapshotを含むGameplay用snapshotがすべて無効化されている
+- AttackEvent判定Ownerが保持する旧BattleのSlot / Reserved参照が終了している
+- 旧`battleId`からの通知でGameplay状態を変更できない
+
+すべてを満たした後、上位のcleanup集約Ownerへ、`battleId`付きでAttackEvent判定Ownerの必須cleanup完了を一度だけ通知します。
+
+```text
+AttackEvent必須cleanup完了
+↓
+CleanupCompleted(battleId)
+↓
+上位cleanup集約Ownerへ通知
+```
+
+以下の完了は待ちません。
+
+- AttackEvent / Slot UIの消去演出
+- VFX
+- SE
+- Damage・Target・発射機能を持たない表示専用objectの終了
+
+Result操作の解禁は、本Owner単独では判断しません。各必須Ownerのcleanup完了を集約した上位Ownerが、`game/index.md`の規則に従って判断します。
+
+---
+
 # 発射後の責務
 
 本ページが扱うのは、
@@ -1119,6 +1450,8 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | AttackEventの必要音・Type・Harmony | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) |
 | Arpeggio順序・音楽的タイミング | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) |
 | AttackEventの予告・発火タイミング | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) |
+| Battle結果の確定・同一frame終了候補の優先順位 | `game/index.md` |
+| Result表示・Result操作解禁・Result後のroute | `game/index.md` / `ui/index.md` |
 | 通常AttackEventの`Complete / Incomplete / Zero Charge` | **本ページ** |
 | 発火時に使用するReserved Shaondama | **本ページ** |
 | Chordの発射対象・発射タイミング | **本ページ** |
@@ -1138,6 +1471,12 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | Target候補の優先順位・座標計算 | [パレットブレット](/spec/combat/palette-bullet) |
 | AttackEvent発火時のTarget座標snapshot | **本ページ** |
 | 同一AttackEvent内でのTarget座標共有 | **本ページ** |
+| Battle結果確定後のAttackEvent発火gate停止 | **本ページ** |
+| 発火前AttackEvent・Arpeggio残Entryの取消 | **本ページ** |
+| AttackEventが保持するGameplay用snapshotの無効化 | **本ページ** |
+| AttackEventへcommit済みの未消費Reserved Shaondama解放 | **本ページ** |
+| 未確定Charge・未commit選択のBattle終了cleanup | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) / `player/player-action-charge.md` |
+| AttackEvent判定Ownerの必須cleanup完了条件・通知 | **本ページ** |
 | Palette Bulletの発射開始位置に使用する座標の規則 | [パレットブレット](/spec/combat/palette-bullet) |
 | Direct Contact / Explosion RGB Damage候補の生成 | [パレットブレット](/spec/combat/palette-bullet) |
 | Damage候補の集約・丸め・Clamp・浄化判定 | [敵の被弾と浄化](/spec/enemy/damage-and-purify) |
@@ -1219,6 +1558,36 @@ Weak AttackEvent解決完了
 
 ---
 
+## Battle終了時
+
+```text
+Battle結果確定通知(battleId)
+↓
+現在のBattleかつ初回通知であることを確認
+↓
+AttackEvent発火gateを閉じる
+↓
+発火前AttackEventを取消
+↓
+Arpeggio残Entry / 遅延callbackを取消
+↓
+Reserved状態を分類
+│
+├─ Consumed
+│   → 再解放しない
+│
+└─ 未消費Reserved
+    → 一度だけReleasedへ遷移
+↓
+Target・結果・Slot・使用対象snapshotを無効化
+↓
+Owner側参照を終了
+↓
+必須cleanup完了をbattleId付きで一度だけ通知
+```
+
+---
+
 # 基本ルール
 
 - 本ページをAttackEvent発火時のGameplay結果判定・使用Reserved Shaondama決定の正本とする
@@ -1250,7 +1619,8 @@ Weak AttackEvent解決完了
 - ArpeggioはAttackEvent側の音楽的順序・タイミングを使用する
 - ArpeggioではPlayerのCharge順・Drag選択順を発射順へ使用しない
 - ArpeggioのEmpty Slot timingでは何も発射しない
-- Arpeggioは最後のArpeggio timing処理完了時に解決完了・破棄する
+- 通常進行中のArpeggioは最後のArpeggio timing処理完了時に解決完了・破棄する
+- Battle結果確定で取り消されたArpeggioは残Entryを処理せず、最後のtimingを待たずに取消完了・破棄する
 - 同音を複数要求する場合は、同一Slotへの重複ではなく独立した複数Slotとして扱う
 - 万能ShaondamaはAllocation時に確定したSlot / Weak発火情報・実効値を使用する
 - オクターブによって発火時にSlot成立を再判定しない
@@ -1260,6 +1630,18 @@ Weak AttackEvent解決完了
 - Weak用NoteEvent解決を本ページでやり直さない
 - Weak待機中にNormal AttackEventがCurrentになっても再割り当てしない
 - Weak AttackEventは発火・使用後に解決完了し、破棄する
+- Battle結果確定後は新しいNormal / Weak AttackEventを発火しない
+- Battle結果確定時に発火前AttackEventを取り消す
+- 発火途中のArpeggioは残りの未処理Entryと遅延callbackを取り消す
+- Battle結果確定後は新しい結果判定・Target snapshot・Palette Bullet化・バフ条件成立を開始しない
+- AttackEventへcommit済みの未消費Reserved Shaondamaだけを一度だけ解放する
+- Palette Bullet化済みの`Consumed` Shaondamaを再解放しない
+- Reservedの`Consumed / Released`を排他的な終了状態として扱う
+- Reserved解放対象の確定後、Target・結果・Slot・使用対象を含むGameplay用snapshotを無効化する
+- AttackEvent判定Ownerのcleanupは重複通知に対して冪等とする
+- 発火通知・Arpeggio Entry callback・snapshotへ`battleId`を対応付け、旧Battleの処理を無視する
+- 必須cleanup完了後、`battleId`付きの完了通知を一度だけ上位Ownerへ送る
+- 表示専用VFX・SE・UI消去演出の完了を必須cleanup完了条件に含めない
 - Target候補の優先順位・座標計算は`combat/palette-bullet.md`を正本とする
 - AttackEvent発火時のTarget座標snapshotは本ページを正本とする
 - Direct Contact / Explosion RGB Damage候補の生成は`combat/palette-bullet.md`を正本とする
