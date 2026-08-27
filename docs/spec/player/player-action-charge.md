@@ -119,9 +119,32 @@ Charge入力判定を開始する基本条件は以下です。
 
 * `RootState = Gameplay`
 * `ReactionState = None`
-* 戦闘BGMが再生されている
+* 対象BattleのBattle IDが現在のBattleと一致している
+* 現在BattleのCombat受付gateが有効である
+* Playerの戦闘操作受付gateが有効である
+* Battle結果が未確定である
+* Pause中およびBattle終了処理中ではない
 * 現在の`ActionState`でCharge入力判定を開始できる
 * Charge入力Press時に、レティクル上から選択可能なCharge対象を1つ取得できる
+
+Battle ID配布直後の準備phaseでは、Combat受付gateとPlayer戦闘操作受付gateがまだ無効であるため、Charge入力判定を開始しません。
+
+Battle開始gate成立後は、Combat受付とPlayer戦闘操作受付が有効になった時点からCharge入力判定を開始できます。BGM Audioの再生状態はCharge開始条件に使用しません。
+
+system pre-roll中は、BGM Audioが音源位置0で停止しており、実際の戦闘BGMはまだ鳴っていません。ただし、現在Battleの両受付gateと本節のCharge固有条件を満たしていれば、Charge入力判定を開始できます。
+
+```text
+Battle開始gate成立
+↓
+Combat受付gate・Player戦闘操作受付gateを有効化
+↓
+system pre-roll開始
+BGM Audioは音源位置0で停止中
+↓
+Charge入力判定可能
+```
+
+Battle IDとCombat受付の詳細は[戦闘](/spec/combat/)、Battle開始gate・3時計・system pre-roll・BGM Audioの関係は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。
 
 **Normal AttackEventが存在することはCharge開始条件ではありません。**
 
@@ -282,7 +305,12 @@ Charge入力PressによってClick / Drag入力判定を開始できるのは、
 ```text
 RootState = Gameplay
 ReactionState = None
-戦闘BGM再生中
+対象Battle ID = 現在Battle ID
+Combat受付gate = 有効
+Player戦闘操作受付gate = 有効
+Battle結果 = 未確定
+Pause中ではない
+Battle終了処理中ではない
 +
 ActionState = None
 または
@@ -290,6 +318,8 @@ ActionState = Dashing
 ```
 
 さらにPress時に選択可能なShaondamaを1個取得できる必要があります。
+
+BGM Audioが再生中かどうかは、このState判定へ含めません。system pre-roll中も、上記条件を満たしていれば入力判定を開始できます。
 
 `ActionState = None`では、判定結果に応じてChargeを通常開始します。
 
@@ -1722,6 +1752,9 @@ Chargeに関係する仕様は、以下のように管理します。
 
 | 内容 | 管理ページ |
 | --- | --- |
+| Charge開始時に現在BattleのCombat／Player受付gateを参照すること | 本ページ |
+| Battle ID、Combat受付gate、Battle結果・Pause・終了処理による受付可否 | [戦闘](/spec/combat/) |
+| Battle開始gate、3時計、system pre-roll、BGM Audioの再生開始 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | Charge Press時の開始対象取得 | 本ページ |
 | `ClickCharging`の開始・対象保持・判定・終了 | 本ページ |
 | `DragCharging`の開始・選択・Atomic判定・終了 | 本ページ |
