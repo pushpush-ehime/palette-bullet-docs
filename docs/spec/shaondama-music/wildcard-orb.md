@@ -306,7 +306,7 @@ Battle結果確定後、または現在Battleと異なる`battleId`の要求・c
 
 正確な弾き方向の算出方法は現時点では未確定です。入力方向、Playerの向き、接触方向などから本ページで独自に補完せず、[Playerアクション｜パリィ](/spec/player/player-action-parry)の実装・調整検討事項とします。
 
-弾き移動の力の強さ、減衰、移動量、および落ち着くまでの時間は調整項目です。力を受けた後の衝突、浮遊、Lifetime、`Reserved`、消費、およびBattle終了は、通常のWildcard／Shaondamaと同じ共通規則へ接続します。
+本ページは、変換後のWildcardへ対象ごとの弾き方向の力を1回だけ適用する契約を定義します。力の強さ、減衰、最大移動量、落ち着くまでの時間、および実際の弾き移動は、[浮遊・挙動](/spec/shaondama-music/floating-behavior)を正本とします。力を受けた後の衝突、浮遊、Lifetime、`Reserved`、消費、およびBattle終了も、同ページの共通規則へ接続します。
 
 ## 選択可能化後の挙動
 
@@ -418,7 +418,7 @@ Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle
 |---|---|---|
 | BGM側のShaondama生成 | 最低保証不足数を算出し、要求中数を管理して補充要求を送る。Parry由来Wildcardは、変換commit後の再評価から選択可能かつ非`Reserved`の個体として数える | [BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
 | RadioWhale Spawn | 最低保証補充のWildcardだけを通常受付し、出現演出完了後に選択可能化する。Parry由来Wildcardの変換・選択可能化・弾き移動は管理しない | [ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning) |
-| 浮遊・挙動 | Parry由来Wildcardの弾き移動後を含む衝突、浮遊、Lifetime、`Reserved`、終了競合を管理する | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
+| 浮遊・挙動 | Parry由来Wildcardの弾き移動に関する調整データと実際の移動、およびその後の衝突、浮遊、Lifetime、`Reserved`、終了競合を管理する | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
 | Orb data | 種別、Battle ID、個体ID、生成元、変換元邪音玉ID、一時的な弾き情報、表示、実効値payloadを保持する | [玉のデータ](/spec/shaondama-music/orb-data) |
 | Player Parry | 同一Physics Stepの邪音玉をbatchとして収集し、batch全体の成功とNormal／Just評価、および対象ごとの弾き方向を確定する | [Playerアクション｜パリィ](/spec/player/player-action-parry) |
 | 邪音玉 | Parry成功時にDamageを無効化し、攻撃projectileとして終了して、Parry成立位置・`battleId`・変換元邪音玉ID・弾き方向を1弾ごとの変換要求として渡す | [邪音玉](/spec/enemy/jaon-bullet) |
@@ -438,8 +438,8 @@ Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle
 | 成功batch内の1弾1個変換・変換元邪音玉IDと`battleId`による重複防止 | 本ページ |
 | Parry成立位置での即時変換・変換commitと同時の選択可能化・最低保証算入条件 | 本ページ |
 | 対象ごとの弾き方向の確定・受け渡し | Player Parry／邪音玉 |
-| 変換後のWildcardへ一度だけ力を加える契約と弾き移動の調整値 | 本ページ。力適用後の共通挙動はFloating |
-| Wildcardの共通runtime data | Orb data |
+| 変換後のWildcardへ対象ごとの弾き方向の力を一度だけ加える契約 | 本ページ |
+| 弾き移動の力・減衰・最大移動量・落ち着くまでの時間の調整データと、実際の移動挙動 | [浮遊・挙動](/spec/shaondama-music/floating-behavior) || Wildcardの共通runtime data | Orb data |
 | 通常Slot／Weak Allocationと実効値解決 | Charge Allocation |
 | 選択可能化後の衝突・浮遊・Lifetime・`Reserved`・消費・終了lifecycle | Floating |
 | Wildcard専用Damage調整項目 | 本ページ |
@@ -479,19 +479,16 @@ Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle
 | 選択可能Shaondamaの最低保証数 | 未決 | 調整予定 | BGM側のShaondama生成 |
 | 最低保証補充の出現演出時間 | 未決・一定値 | 調整予定 | RadioWhale Spawn |
 | Parry弾き方向の具体的な算出規則 | 未決 | 実装・操作感検証で決定 | Player Parry |
-| Parry由来Wildcardへ加える力の強さ | 未決 | Gameplayテストで調整予定 | 本ページ |
-| Parry由来Wildcardの弾き移動の減衰 | 未決 | Gameplayテストで調整予定 | 本ページ（共通物理挙動はFloating） |
-| Parry由来Wildcardの弾き移動量 | 未決 | Gameplayテストで調整予定 | 本ページ（共通物理挙動はFloating） |
-| Parry由来Wildcardが落ち着くまでの時間 | 未決 | Gameplayテストで調整予定 | 本ページ（共通物理挙動はFloating） |
 | Wildcard専用Damage値または倍率 | 未決 | Gameplayテストで調整予定 | 本ページ |
 | 虹色表示の演出値 | 未決 | Presentation調整予定 | 表示・Effects側 |
+
+Parry由来Wildcardの弾き移動に関する力の強さ、減衰、最大移動量、および落ち着くまでの時間は、[浮遊・挙動](/spec/shaondama-music/floating-behavior)のパラメータ表を正本とします。本ページでは同じ調整値を重複管理しません。
 
 値が未決であっても、最低保証不足数分を生成すること、最低保証補充を出現演出完了後に選択可能化すること、および同一Physics Stepの成功batch内で邪音玉1弾につき各Parry成立位置へWildcard 1個を即時変換することは変更しません。Parry由来Wildcardを変換commitと同時に選択可能にし、その後、対象ごとの弾き方向へ一度だけ力を加える処理順も変更しません。
 
 ## 未決事項
 
 - Parry結果として対象ごとの弾き方向を算出する具体的な方法
-- Parry由来Wildcardへ加える力の強さ、減衰、移動量、および落ち着くまでの時間の具体値
 - 最低保証補充に使用する出現演出時間の具体秒数
 - 選択可能Shaondamaの最低保証数の具体値
 - Wildcard専用の具体的なDamage値または倍率
