@@ -26,7 +26,8 @@ status: 仮仕様
 - 邪音玉のParry成功からの変換契機と生成個数
 - Battle IDと生成元区分の引き継ぎ
 - 虹色表示
-- 選択可能化への接続
+- 生成元ごとの選択可能化と最低保証数への算入
+- Parry変換後の弾き移動
 - WildcardをWeakへ割り当てる際のloop境界規則
 - Wildcard専用Damage調整値の所有境界
 - Battle終了・Room Retry時の破棄境界
@@ -40,7 +41,9 @@ status: 仮仕様
 - Current Normal AttackEventが存在しない場合は、Weak Attackへ使用できます。
 - Battle中に選択可能なShaondamaが最低保証数を下回ると、不足数分のWildcardが補充されます。
 - 最低保証補充のWildcardは、出現演出中には選択できず、出現演出完了後に選択可能になります。
-- 同一Physics Stepの成功batchに含まれる邪音玉は、Normal／Justのどちらでも、成功した1弾につき各Parry位置でWildcard 1個へ変換されます。
+- 同一Physics Stepの成功batchに含まれる邪音玉は、Normal／Justのどちらでも、成功した1弾につき各Parry成立位置でWildcard 1個へ即時変換されます。
+- Parry由来Wildcardは、変換commitと同時に選択可能になり、その後、各弾のParry結果として確定した弾き方向へ一度だけ力を受けます。
+- Parry由来Wildcardは、弾き移動中もCharge対象として選択できます。
 - 体当たり、接触攻撃など、邪音玉ではない攻撃からWildcardは生成されません。
 
 ## 用語
@@ -51,7 +54,9 @@ status: 仮仕様
 | 最低保証不足 | 現在選択可能かつ非`Reserved`のShaondama数が、設定された最低保証数を下回っている状態 |
 | 最低保証補充 | 最低保証不足を解消するため、不足数分のWildcardを生成する処理 |
 | Parry判定batch | 同一Physics StepでPlayerのParry判定へ入った有効な邪音玉をまとめ、1つの成功単位として判定する集合 |
-| Parry変換 | 成功batch内の邪音玉1弾を、その弾がParryされたworld位置でWildcard 1個へ変換する処理 |
+| Parry変換 | 成功batch内の邪音玉1弾を、その弾のParry成立時点のworld位置でWildcard 1個へ即時変換する処理 |
+| 変換commit | 邪音玉としての攻撃projectile終了、Wildcard個体の成立、および選択可能化をGameplay上の確定結果として反映した時点 |
+| 弾き方向 | Parry結果として対象ごとに確定し、変換後のWildcardへ一度だけ力を加える方向 |
 | 生成元区分 | 最低保証補充とParry変換を区別するruntime情報 |
 | 選択可能 | PlayerのCharge対象検索に含められるGameplay状態 |
 | source occurrence | 特定Battle・特定loopにおけるNoteEventの発生回 |
@@ -63,7 +68,7 @@ Wildcardの生成元は、次の2種類だけです。
 | 生成元区分 | Trigger | 生成数 | 生成位置 | 選択可能化 |
 |---|---|---:|---|---|
 | 最低保証補充 | BGM生成側から不足数を指定した補充要求を受信 | 要求された不足数分 | 床・世界からの出現、もしくはRadioWhaleの出現経路 | 各個体の出現演出完了後 |
-| Parry変換 | 同一Physics StepのParry判定batch内で、邪音玉に対する通常ParryまたはJust Parryが成功 | 成功した邪音玉1弾につき1個 | 各邪音玉がParryされたworld位置 | 未確定 |
+| Parry変換 | 同一Physics StepのParry判定batch内で、邪音玉に対する通常ParryまたはJust Parryが成功 | 成功した邪音玉1弾につき1個 | 各邪音玉のParry成立時点のworld位置 | 変換commitと同時 |
 
 現在定義済みの標準生成元は、最低保証不足とParry変換である。イベント、特殊Battle、別のラジクジラなどによる追加生成元を禁止しない。追加する場合は、生成理由、生成個数、生成位置、Battle ID、重複防止、選択可能化タイミングを対応する正本で定義する。
 
@@ -86,7 +91,13 @@ Wildcardの生成元は、次の2種類だけです。
 ↓
 batch内の各邪音玉のDamageを無効化し、攻撃projectileとして終了
 ↓
-成功した邪音玉1弾につき、各Parry位置でWildcard 1個へ変換
+成功した邪音玉1弾につき、各Parry成立位置でWildcard 1個へ即時変換
+↓
+変換commitと同時に選択可能化
+↓
+各弾のParry結果として確定した弾き方向へ、変換後のWildcardに一度だけ力を加える
+↓
+選択可能なWildcardとして移動・浮遊を継続
 ```
 
 固定周期による自然発生は、現在のWildcard生成元ではありません。最低保証不足ともParry成功とも関係なく、一定時間ごとに少量のWildcardを生成する経路は設けません。
@@ -102,6 +113,7 @@ batch内の各邪音玉のDamageを無効化し、攻撃projectileとして終�
 | 個体識別情報 | Wildcard個体を一意に識別する情報 | `Battle ID + 個体識別情報`で一意にする |
 | 生成元区分 | 最低保証補充またはParry変換 | 生成後も追跡できるようにする |
 | 生成元識別情報 | 補充要求ID、または変換元邪音玉ID | 重複生成を防止できるようにする |
+| Parry弾き情報 | Parry結果として対象ごとに確定した弾き方向、または力の適用に必要な一時情報 | Parry変換時だけ引き継ぎ、攻撃性能や恒久的な固有属性として扱わない |
 | 表示用種別 | Wildcardの虹色表示を解決する参照 | 攻撃時の実効色・RGB Damageとは分離する |
 
 フィールド名、型、採番方法、およびdataの分割単位は固定しません。Shaondama共通dataとAllocation後のpayloadは、[玉のデータ](/spec/shaondama-music/orb-data)を正本とします。
@@ -118,7 +130,9 @@ Wildcardは生成時点では、特定のNoteEventに由来しません。その
 - Normal用の固定RGB Damage値
 
 これらを仮値で埋めたり、生成時点で将来のAllocation先を予約したりしません。攻撃に使用する実効Note・実効色はAllocation時に解決します。
+
 Wildcard自身は固有音を持たず、発音時の実効Noteおよび使用する音は、Allocation先のAttackEventまたはNoteEvent occurrenceに基づいて解決する。
+
 ## 最低保証不足による補充
 
 ### 不足判定の所有者
@@ -216,7 +230,7 @@ Wildcardへ変換できるParry対象は**邪音玉だけ**です。
 - 通常Parry
 - Just Parry
 
-同じParry判定batch内の有効な邪音玉はすべてParry成功となり、batch判定時点の同じNormal／Just評価を適用します。Normal／Justのどちらでも、生成数、Wildcard種別、およびGameplay上の性能に差を設けません。Just Parryだけの追加報酬としてWildcardを増やしたり、別種別・高性能のWildcardへ変換したりしません。
+同じParry判定batch内の有効な邪音玉はすべてParry成功となり、batch判定時点の同じNormal／Just評価を適用します。Normal／Justのどちらでも、生成数、Wildcard種別、選択可能化条件、および弾き移動の基本性能に差を設けません。Just Parryだけの追加報酬としてWildcardを増やしたり、別種別・高性能のWildcardへ変換したり、より強い弾き移動を適用したりしません。Just ParryのStamina返却、強い演出、およびHitStopの強さ・長さは、[Playerアクション｜パリィ](/spec/player/player-action-parry)を正本とします。
 
 同一Physics StepでPlayerのParry判定へ入った有効な邪音玉の収集、batch全体の成功、およびNormal／Just評価は、[Playerアクション｜パリィ](/spec/player/player-action-parry)を正本とします。本ページは、成功結果を受け取った各邪音玉からWildcardへの変換を定義します。
 
@@ -236,18 +250,22 @@ Wildcardへ変換できるParry対象は**邪音玉だけ**です。
 
 ### 変換位置と結果
 
-成功した各邪音玉は、Parry成立時に確定した自身のworld位置でWildcard 1個へ変換します。この変換成立と、変換後のWildcardをPlayerが選択可能になるtimingは分離して扱います。
+成功した各邪音玉は、Parry成立時点の自身のworld位置でWildcard 1個へ即時変換します。邪音玉を弾いて移動させた後にWildcardへ変換するのではなく、変換commitと同時にPlayerのCharge対象として選択可能にし、その後、変換済みWildcardへ弾き方向の力を加えます。
 
 変換成立時は次の結果を一体として扱います。
 
 1. 対象邪音玉のParry成功を確定する
 2. 対象邪音玉からPlayer Damageを発生させない
 3. 対象邪音玉を攻撃projectileとして終了する
-4. 変換元と同じ`battleId`を持つWildcard 1個へ変換する
-5. 生成元区分をParry変換とし、変換元邪音玉を追跡可能にする
-6. 変換位置をParry成立時の邪音玉world位置とする
+4. Parry成立時点のworld位置で、変換元と同じ`battleId`を持つWildcard 1個へ即時変換する
+5. 生成元区分をParry変換とし、変換元邪音玉IDとWildcard個体IDを追跡可能にする
+6. 変換commitと同時に、変換後のWildcardを選択可能にする
+7. 対象ごとに確定した弾き方向へ、変換後のWildcardに一度だけ力を加える
+8. 選択可能なWildcardとして移動・浮遊を継続する
 
-邪音玉を反射projectileとして飛ばし続ける中間stateは設けません。邪音玉の移動、Collision、Damage、およびParry要求の送信は、[邪音玉](/spec/enemy/jaon-bullet)を正本とします。
+邪音玉を反射projectileとして飛ばし続ける中間stateは設けません。実際に力を受けて移動する対象は、邪音玉ではなく変換後のWildcardです。この移動を反射された邪音玉、攻撃projectile、Player／EnemyへのDamage源、Parry対象、または追加のWildcard変換triggerとして扱いません。
+
+Gameplay上の変換結果が同じであれば、既存objectをWildcardへ変換するか、新しいWildcard objectへ置換するかは実装詳細とします。いずれの場合も、邪音玉としての移動、Collision、Damage、およびParry要求の送信は変換commit前に終了します。邪音玉側の終了処理は、[邪音玉](/spec/enemy/jaon-bullet)を正本とします。
 
 同じ邪音玉から重複してWildcardを作らないよう、**変換元邪音玉IDと`battleId`の組み合わせ**に対して変換を一度だけ成立させます。同じ成功結果や変換要求を複数回受信した場合も、新しいWildcardを追加生成しません。
 
@@ -263,24 +281,38 @@ Wildcardへ変換できるParry対象は**邪音玉だけ**です。
 
 Parrying中であっても、非邪音玉攻撃をWildcard生成triggerへ変換しません。これらの攻撃がPlayerへ与えるDamageやReactionは、各攻撃とPlayer被弾側の仕様に従います。
 
-### Parry変換後の選択可能化
+### Parry変換commitと即時選択可能化
 
-Parry変換自体、同一Physics Stepの成功batch内で1弾につき1個、各邪音玉のParry位置、および通常／Justの両方で同じ変換結果になることは決定済みです。
+Parry由来Wildcardは、変換commitと同時にPlayerのCharge対象として選択可能になります。変換commitと選択可能化の間に、出現演出待ち、RadioWhaleからの制御移譲、timer、遅延callback、または別frameの通知待ちを挟みません。
 
-一方で、変換されたWildcardを次のどちらで選択可能にするかは未確定です。
+Parry由来Wildcardには、最低保証補充用の次の経路を適用しません。
 
-1. 変換成立と同時に選択可能にする
-2. 最低保証補充と同じ一定時間の出現演出後に選択可能にする
+- RadioWhaleの通常受付
+- RadioWhaleの背中側Spawn
+- 最低保証補充用の生成位置
+- 一定時間の出現演出
+- 出現演出完了通知
+- Gameplayへの制御移譲
 
-この未決事項が確定するまでは、最低保証補充のRadioWhale出現経路、背中側からの生成位置、一定の出現演出時間、または出現演出完了通知をParry由来Wildcardへ自動適用しません。
+表示上の変換演出を継続することはできますが、その演出をGameplay上の選択可能化gateとして使用しません。変換後のWildcardは、弾き移動中もレティクル検索、Click Charge、Drag Charge、およびAllocation候補へ含められます。
 
-最低保証数へ算入できるのは、選択可能化timingの決定後、実際に選択可能かつ非`Reserved`となった時点からです。変換成立だけを理由に最低保証数へ先行算入しません。
+Parry由来Wildcardが現在のBattleに属し、選択可能であり、非`Reserved`かつ終了処理中でなければ、変換commit時点から最低保証数へ算入します。変換commitより前に完了したCharge対象検索や最低保証数snapshotへ遡って追加せず、commit後に開始または再評価される検索から取得可能とします。
+
+Battle結果確定後、または現在Battleと異なる`battleId`の要求・callbackからは、変換commit、選択可能化、最低保証算入、または力の付与を行いません。
+
+### 変換後の弾き移動
+
+力を加える対象は、変換commit後のWildcardです。固定の「Playerから離れる方向」を使用せず、Parry結果として対象ごとに確定した弾き方向を受け取り、その方向へ一度だけ力を加えます。同一batchに複数の邪音玉が含まれる場合も、各弾に対応する弾き結果を、それぞれから変換されたWildcardへ個別に適用します。
+
+正確な弾き方向の算出方法は現時点では未確定です。入力方向、Playerの向き、接触方向などから本ページで独自に補完せず、[Playerアクション｜パリィ](/spec/player/player-action-parry)の実装・調整検討事項とします。
+
+弾き移動の力の強さ、減衰、移動量、および落ち着くまでの時間は調整項目です。力を受けた後の衝突、浮遊、Lifetime、`Reserved`、消費、およびBattle終了は、通常のWildcard／Shaondamaと同じ共通規則へ接続します。
 
 ## 選択可能化後の挙動
 
-選択可能となったWildcardは、Normal Shaondamaと共通のPlayer選択、Charge、`Reserved`、消費、および終了規則へ接続します。
+選択可能となったWildcardは、生成元にかかわらず、Normal Shaondamaと共通のPlayer選択、Charge、`Reserved`、消費、および終了規則へ接続します。Parry由来Wildcardは変換commit時点でこの状態へ直接入り、選択可能なまま弾き移動と浮遊を継続します。
 
-選択可能化後の浮遊、一般Lifetime、`Reserved`、自然破裂の有無、Charge成功との競合、およびBattle終了時のGameplay無効化は、[浮遊・挙動](/spec/shaondama-music/floating-behavior)を正本とします。
+選択可能化後の衝突、浮遊、一般Lifetime、`Reserved`、自然破裂の有無、Charge成功との競合、およびBattle終了時のGameplay無効化は、[浮遊・挙動](/spec/shaondama-music/floating-behavior)を正本とします。
 
 最低保証数へ算入する条件は、生成元にかかわらず次のとおりです。
 
@@ -289,7 +321,7 @@ Parry変換自体、同一Physics Stepの成功batch内で1弾につき1個、�
 - `Reserved`ではない
 - 終了処理中ではない
 
-生成要求中、論理生成済み、出現演出中、選択可能化前、`Reserved`、旧Battle所属のWildcardは算入しません。
+最低保証補充の生成要求中、論理生成済み、出現演出中、選択可能化前の個体、および生成元にかかわらず`Reserved`、終了処理中、旧Battle所属のWildcardは算入しません。Parry由来Wildcardには、最低保証補充用の出現演出中・選択可能化前stateを設けません。
 
 ## Allocationへの接続
 
@@ -365,31 +397,31 @@ Battle結果が確定した後は、そのBattleに属するWildcardから新し
 - 論理生成済み・出現演出開始前のWildcard
 - 出現演出中のWildcard
 - 遅延している出現演出完了通知・選択可能化通知
-- Parry変換要求と未処理の変換callback
+- Parry変換要求、未処理の変換callback、および未適用の弾き移動処理
 - 選択可能なWildcard
 - `Reserved`中のWildcard
 - Wildcard由来の未確定Allocation参照・実効値参照
 
-見た目上の終了演出を行う場合も、Player選択、最低保証、Allocation、発音、Damageへ接続しません。
+Battle結果確定後は、現在Battleの邪音玉に対しても新しいWildcardへの変換、選択可能化、最低保証算入、または力の付与を行いません。見た目上の終了演出を行う場合も、Player選択、最低保証、Allocation、発音、Damageへ接続しません。
 
 ### Room Retry
 
 Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle runtimeを再構築します。
 
-旧BattleのWildcard個体、補充要求、生成元識別情報、出現演出、timer、完了通知、Parry変換状態、選択可能状態、`Reserved`状態、およびAllocation参照を新Battleへ持ち越しません。
+旧BattleのWildcard個体、補充要求、生成元識別情報、出現演出、timer、完了通知、Parry変換状態、弾き移動処理、選択可能状態、`Reserved`状態、およびAllocation参照を新Battleへ持ち越しません。
 
-新Battleでは、新しいBattle IDに属する最低保証判定と邪音玉からのみWildcard生成を開始します。旧Battle IDの要求や通知を受信しても、新しい個体の生成・選択可能化・最低保証算入へ使用しません。
+新Battleでは、新しいBattle IDに属する最低保証判定と邪音玉からのみWildcard生成を開始します。旧Battle IDの要求や通知を受信しても、新しい個体の変換・生成・選択可能化・最低保証算入・力の付与へ使用しません。
 
 ## 他システムとの接続
 
 | システム | 本ページとの接続 | 正本 |
 |---|---|---|
-| BGM側のShaondama生成 | 最低保証不足数を算出し、要求中数を管理して補充要求を送る | [BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
-| RadioWhale Spawn | 最低保証補充のWildcardを論理生成し、出現演出完了後に選択可能化する | [ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning) |
-| 浮遊・挙動 | 選択可能化後の浮遊、Lifetime、`Reserved`、終了競合を管理する | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
-| Orb data | 種別、Battle ID、個体ID、生成元、表示、実効値payloadを保持する | [玉のデータ](/spec/shaondama-music/orb-data) |
-| Player Parry | 同一Physics Stepの邪音玉をbatchとして収集し、batch全体の成功とNormal／Just評価を確定する | [Playerアクション｜パリィ](/spec/player/player-action-parry) |
-| 邪音玉 | Parry成功時にDamageを無効化し、攻撃projectileとして終了して1弾ごとの変換要求を渡す | [邪音玉](/spec/enemy/jaon-bullet) |
+| BGM側のShaondama生成 | 最低保証不足数を算出し、要求中数を管理して補充要求を送る。Parry由来Wildcardは、変換commit後の再評価から選択可能かつ非`Reserved`の個体として数える | [BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
+| RadioWhale Spawn | 最低保証補充のWildcardだけを通常受付し、出現演出完了後に選択可能化する。Parry由来Wildcardの変換・選択可能化・弾き移動は管理しない | [ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning) |
+| 浮遊・挙動 | Parry由来Wildcardの弾き移動後を含む衝突、浮遊、Lifetime、`Reserved`、終了競合を管理する | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
+| Orb data | 種別、Battle ID、個体ID、生成元、変換元邪音玉ID、一時的な弾き情報、表示、実効値payloadを保持する | [玉のデータ](/spec/shaondama-music/orb-data) |
+| Player Parry | 同一Physics Stepの邪音玉をbatchとして収集し、batch全体の成功とNormal／Just評価、および対象ごとの弾き方向を確定する | [Playerアクション｜パリィ](/spec/player/player-action-parry) |
+| 邪音玉 | Parry成功時にDamageを無効化し、攻撃projectileとして終了して、Parry成立位置・`battleId`・変換元邪音玉ID・弾き方向を1弾ごとの変換要求として渡す | [邪音玉](/spec/enemy/jaon-bullet) |
 | Charge Allocation | Normal SlotまたはWeakへの割当と実効Note／色を解決する | [Charge Allocation](/spec/draw-system/charge-allocation) |
 | MusicChart | loopを越えた次NoteEvent occurrenceを識別可能にする | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart) |
 | Game／Room | Battle終了とRoom Retryの破棄境界、新Battle IDを管理する | [ゲーム全体](/spec/game/)、[戦闘](/spec/combat/) |
@@ -404,10 +436,12 @@ Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle
 | 同一Physics StepのParry判定batch・通常／Just判定・Stamina・HitStop | Player Parry |
 | 邪音玉のprojectile lifecycle・Damage無効化・変換要求 | 邪音玉 |
 | 成功batch内の1弾1個変換・変換元邪音玉IDと`battleId`による重複防止 | 本ページ |
-| Parry由来Wildcardの選択可能化timing | 未確定。本ページ・Parry・邪音玉・Floatingへ同期して確定する |
+| Parry成立位置での即時変換・変換commitと同時の選択可能化・最低保証算入条件 | 本ページ |
+| 対象ごとの弾き方向の確定・受け渡し | Player Parry／邪音玉 |
+| 変換後のWildcardへ一度だけ力を加える契約と弾き移動の調整値 | 本ページ。力適用後の共通挙動はFloating |
 | Wildcardの共通runtime data | Orb data |
 | 通常Slot／Weak Allocationと実効値解決 | Charge Allocation |
-| 選択可能化後のlifecycle | Floating |
+| 選択可能化後の衝突・浮遊・Lifetime・`Reserved`・消費・終了lifecycle | Floating |
 | Wildcard専用Damage調整項目 | 本ページ |
 | RGB payloadと最終Damage計算 | Orb data／Palette Bullet／Enemy Damage |
 
@@ -416,21 +450,27 @@ Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle
 - Wildcardを固定周期または少量自然発生だけで補充してはいけません。
 - 最低保証不足と無関係な自動生成を、現行の補充経路へ混在させてはいけません。
 - 最低保証補充要求の個数をWildcard側で独自に増減してはいけません。
-- 生成要求中、論理生成済み、出現演出中のWildcardを選択可能または最低保証算入済みとして扱ってはいけません。
+- 最低保証補充の生成要求中、論理生成済み、出現演出中のWildcardを選択可能または最低保証算入済みとして扱ってはいけません。
 - 最低保証補充のWildcardを、出現演出完了前にChargeまたはAllocation対象へ含めてはいけません。
 - 邪音玉の通常Parry成功を変換対象から除外し、Just ParryだけでWildcardへ変換してはいけません。
-- Normal／JustによってWildcardの生成数、種別、またはGameplay上の性能を変えてはいけません。
+- Normal／JustによってWildcardの生成数、種別、選択条件、または弾き移動の基本性能を変えてはいけません。
 - 同一Physics Stepの成功batch内にある複数の邪音玉を、1個のWildcardへまとめてはいけません。
 - 変換元邪音玉IDと`battleId`が同じ変換要求から、Wildcardを重複生成してはいけません。
-- 邪音玉を反射弾へ変換してからWildcardを生成する中間経路を設けてはいけません。
+- 邪音玉を反射弾として移動させてからWildcardを生成する中間経路を設けてはいけません。
+- 変換後のWildcardを、反射された邪音玉、攻撃projectile、Player／EnemyへのDamage源、Parry対象、または追加のWildcard変換triggerとして扱ってはいけません。
+- 変換後のWildcardへ力を加える前に、邪音玉としての移動を挟んではいけません。
+- 弾き方向を固定の「Playerから離れる方向」と決め打ちしてはいけません。
 - 体当たり、接触攻撃、その他の非邪音玉攻撃からWildcardを生成してはいけません。
-- 未確定のParry由来選択可能化timingを、最低保証補充と同一であると決め打ちしてはいけません。
+- Parry由来Wildcardへ、RadioWhaleの通常受付、背中側Spawn、最低保証補充用の出現演出時間、演出完了通知、またはGameplayへの制御移譲を適用してはいけません。
+- Parry由来Wildcardの変換commitと選択可能化の間に、timer、遅延callback、別frame待ち、または表示演出の完了待ちを挟んではいけません。
+- 変換commitより前に完了したCharge対象検索へ、Parry由来Wildcardを遡って追加してはいけません。
 - 旧Chord IDや待機Chordの不足音を起点にWildcardのAllocation先を解決してはいけません。
 - Wildcard Weakの次NoteEvent検索をloop境界で打ち切ってはいけません。
 - 次loopのNoteEventを現loopと同じsource occurrenceとして扱ってはいけません。
 - Wildcardへ固定source NoteEvent、固有音程、固有基本色、Normal用RGB Damage値を設定してはいけません。
 - 虹色表示を実効色やRGB Damage payloadとして直接使用してはいけません。
-- Battle終了後またはRoom Retry後に、旧BattleのWildcard、要求、変換、timer、完了通知、Allocation参照をGameplayへ持ち越してはいけません。
+- Battle終了後またはRoom Retry後に、旧BattleのWildcard、要求、変換、timer、完了通知、弾き移動処理、Allocation参照をGameplayへ持ち越してはいけません。
+- Battle結果確定後、または現在Battleと異なる`battleId`の遅延処理から、変換・選択可能化・最低保証算入・力の付与を行ってはいけません。
 
 ## パラメータ
 
@@ -438,14 +478,20 @@ Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle
 |---|---|---|---|
 | 選択可能Shaondamaの最低保証数 | 未決 | 調整予定 | BGM側のShaondama生成 |
 | 最低保証補充の出現演出時間 | 未決・一定値 | 調整予定 | RadioWhale Spawn |
+| Parry弾き方向の具体的な算出規則 | 未決 | 実装・操作感検証で決定 | Player Parry |
+| Parry由来Wildcardへ加える力の強さ | 未決 | Gameplayテストで調整予定 | 本ページ |
+| Parry由来Wildcardの弾き移動の減衰 | 未決 | Gameplayテストで調整予定 | 本ページ（共通物理挙動はFloating） |
+| Parry由来Wildcardの弾き移動量 | 未決 | Gameplayテストで調整予定 | 本ページ（共通物理挙動はFloating） |
+| Parry由来Wildcardが落ち着くまでの時間 | 未決 | Gameplayテストで調整予定 | 本ページ（共通物理挙動はFloating） |
 | Wildcard専用Damage値または倍率 | 未決 | Gameplayテストで調整予定 | 本ページ |
 | 虹色表示の演出値 | 未決 | Presentation調整予定 | 表示・Effects側 |
 
-値が未決であっても、最低保証不足数分を生成すること、最低保証補充を出現演出完了後に選択可能化すること、および同一Physics Stepの成功batch内で邪音玉1弾につき各Parry位置へWildcard 1個を生成することは変更しません。
+値が未決であっても、最低保証不足数分を生成すること、最低保証補充を出現演出完了後に選択可能化すること、および同一Physics Stepの成功batch内で邪音玉1弾につき各Parry成立位置へWildcard 1個を即時変換することは変更しません。Parry由来Wildcardを変換commitと同時に選択可能にし、その後、対象ごとの弾き方向へ一度だけ力を加える処理順も変更しません。
 
 ## 未決事項
 
-- Parry変換したWildcardを、変換成立と同時に選択可能にするか、一定時間の出現演出完了後に選択可能にするか
+- Parry結果として対象ごとの弾き方向を算出する具体的な方法
+- Parry由来Wildcardへ加える力の強さ、減衰、移動量、および落ち着くまでの時間の具体値
 - 最低保証補充に使用する出現演出時間の具体秒数
 - 選択可能Shaondamaの最低保証数の具体値
 - Wildcard専用の具体的なDamage値または倍率
@@ -456,10 +502,14 @@ Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle
 - Wildcardの生成元は最低保証不足と邪音玉のParry成功の2種類である
 - 最低保証補充では要求された不足数分を生成する
 - 最低保証補充は出現演出完了後に選択可能になる
-- 出現演出中は選択不可・最低保証算入外である
+- 最低保証補充の出現演出中は選択不可・最低保証算入外である
 - 同一Physics StepでPlayerのParry判定へ入った有効な邪音玉は、1つの成功batchとして扱う
-- 通常Parry／Just Parryのどちらでも同じ種別・性能のWildcardへ変換し、生成数にも差を設けない
-- 成功batch内の邪音玉1弾につき、各弾のParry位置でWildcard 1個へ変換する
+- 通常Parry／Just Parryのどちらでも同じ種別・選択条件・弾き移動の基本性能のWildcardへ変換し、生成数にも差を設けない
+- 成功batch内の邪音玉1弾につき、各弾のParry成立位置でWildcard 1個へ即時変換する
+- Parry由来Wildcardは変換commitと同時に選択可能になり、選択可能かつ非`Reserved`なら同時点から最低保証数へ算入される
+- Parry由来WildcardはRadioWhaleの通常受付や最低保証補充用の出現演出を使用しない
+- 変換後のWildcardへ対象ごとの弾き方向の力を一度だけ加え、移動中も選択可能とする
+- 変換後の移動からDamage、再Parry、または追加のWildcard変換を発生させない
 - 変換元邪音玉IDと`battleId`によって重複生成を防ぐ
 - 邪音玉以外の攻撃からWildcardを生成しない
 - Wildcard Weakの次NoteEvent検索はloop境界を越える
