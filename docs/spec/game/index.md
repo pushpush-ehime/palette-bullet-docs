@@ -61,29 +61,40 @@ ClearまたはGame Over
 
 ゲーム全体における基本的な戦闘フローは、以下の通りです。
 
-1. Stage、Player、Enemy、およびBattle参加対象を初期化する
-2. Battle開始処理を開始し、新しいBattle IDを発行する
+1. Battle開始要求を受ける
+2. 新しいBattle IDを発行する
 3. Battle IDを必要な各システムへ配布する
-4. 同じBattle IDを使用して戦闘BGM／MusicChartを開始する
-5. 音楽時計を開始し、初期NoteEvent occurrenceと初期シャオンダマ生成要求を作成する
-6. 初期生成を含む必要な準備が完了した後、Combatの受付とPlayerの戦闘操作を開始する
-7. BGM／MusicChartが、生成するシャオンダマと生成タイミングを決定する
-8. 生成要求を受けたラジクジラが、シャオンダマを世界内へ出現させる
-9. AttackEventを予告する
-10. Playerが世界内の選択可能なシャオンダマからCharge対象を選択する
-11. Charge判定を行い、Normal AttackEventのCurrent／SlotまたはWeak AttackEventへAllocationする
-12. Charge successとなったシャオンダマをReservedとして保持する
-13. AttackEventを発火する
-14. Complete／Incomplete／Zero ChargeまたはWeakの結果を解決する
-15. 使用するReserved Shaondamaを確定し、Palette Bullet化する
-16. Chord／Arpeggio／Weakの規則に従ってPalette Bulletを発射する
-17. Palette Bulletの命中、Enemy Damage、および浄化を処理する
-18. 同一フレーム内のClear候補とGame Over候補を収集し、Battle結果を確定する
-19. Battle結果が未確定である間、7から18までを繰り返す
+4. `Battle／Gameplay／MusicChart`の3時計を停止したまま、Stage、Player、Enemy、およびBattle参加対象を初期化する
+5. MusicChartの初期位置を基準に、初期シャオンダマの生成を評価する
+6. 必要な初期シャオンダマを生成し、ラジクジラの出現演出完了後にGameplayへhand-offして選択可能にする
+7. 対象RoomのEnemy Readyと、選択可能かつ非ReservedのシャオンダマによるShaondama Supply Readyを確認する
+8. 必要なすべてのReady条件が成立した時点で、Combatの受付とPlayerの戦闘操作受付を開始する
+9. Combat／Player受付開始と同じ基準点から、`Battle／Gameplay／MusicChart`の3時計を同時に開始する
+10. system pre-rollへ入り、その期間中からAttackEvent PreviewとChargeを受け付ける
+11. system pre-roll終了時に、戦闘BGMを音源位置0から再生する
+12. BGM／MusicChartが、通常Battle中に生成するシャオンダマと生成タイミングを決定する
+13. 生成要求を受けたラジクジラが、シャオンダマを世界内へ出現させる
+14. AttackEventを予告する
+15. Playerが世界内の選択可能なシャオンダマからCharge対象を選択する
+16. Charge判定を行い、Normal AttackEventのCurrent／SlotまたはWeak AttackEventへAllocationする
+17. Charge successとなったシャオンダマをReservedとして保持する
+18. AttackEventを発火する
+19. Complete／Incomplete／Zero ChargeまたはWeakの結果を解決する
+20. 使用するReserved Shaondamaを確定し、Palette Bullet化する
+21. Chord／Arpeggio／Weakの規則に従ってPalette Bulletを発射する
+22. Palette Bulletの命中、Enemy Damage、および浄化を処理する
+23. 同一フレーム内のClear候補とGame Over候補を収集し、Battle結果を確定する
+24. Battle結果が未確定である間、12から23までを繰り返す
+
+Battle IDの配布は対象Battleの準備を開始する境界、Ready gateの成立はCombat／Player受付と3時計を開始する境界、system pre-rollの終了はBGM Audioを実際に鳴らし始める境界です。これらを同じ開始Eventとして扱いません。
+
+system pre-rollは音源、完成曲、またはMIDIへ挿入した無音ではありません。Battleの音楽runtimeが管理するシステム上の時間区間です。BGM Audioがまだ鳴っていないsystem pre-roll中も、対象Battleの受付gateが有効であればAttackEvent PreviewとChargeを開始できます。
 
 Charge success時には、シャオンダマを即座にPalette Bullet化しません。Charge success時の到達点はAllocationおよびReserved化であり、Palette Bullet化はAttackEvent発火時に、使用するReserved Shaondamaが確定した後で行います。
 
 Allocation、Reserved、AttackEvent結果、使用対象の選択、Chord／Arpeggio／Weakの各規則は、それぞれの正本となる仕様ページで定義します。
+
+3時計、BGM Audio、およびsystem pre-rollの詳細は[BGM｜Gameplay接続](/spec/bgm/bgm-gameplay-connection)、初期シャオンダマ生成と最低保証の詳細は[BGM｜シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)を正本とします。
 
 ## シャオンダマ生成の責務
 
@@ -112,8 +123,11 @@ BGM／MusicChart
 | 状態・段階 | 内容 | 状態中に動作する主なシステム |
 |---|---|---|
 | 拠点 | Playerが通常操作を行い、ステージ開始前の準備を行う | Player、カメラ、拠点、UI、BGM |
-| Battle開始前 | Stage、Player、Enemy、Battle参加対象を初期化する | Stage、Combat、Player、Enemy、BGM、UI |
-| 通常Battle | Playerが移動・回避・状況確認を行い、戦闘BGM／MusicChartが進行する | Player、カメラ、Enemy、Combat、BGM、UI |
+| Battle準備中 | Battle IDを配布し、3時計とBGM Audioを停止したまま、初期化、初期シャオンダマ生成、RadioWhaleからのhand-off、Enemy Ready、およびShaondama Supply Readyを待つ。Combat受付とPlayer戦闘入力は無効 | Stage、Combat、Player、Enemy、BGM、MusicChart、ラジクジラ、シャオンダマ、UI |
+| Ready gate成立時 | Combat受付とPlayer戦闘入力を有効化し、同じ基準点から3時計を同時に開始する。必要な初期シャオンダマは選択可能になっている | Game、Combat、Player、BGM、MusicChart、UI |
+| system pre-roll | 3時計は進行するがBGM Audioは音源位置0で停止する。Playerは戦闘操作を行え、AttackEvent PreviewとChargeを開始できる | Player、カメラ、Enemy、Combat、BGM、MusicChart、AttackEvent、Charge、UI |
+| 通常Battle | system pre-roll終了後、BGM Audioを音源位置0から再生し、MusicChart eventと同じ音楽時間関係でBattleを進行する | Player、カメラ、Enemy、Combat、BGM、MusicChart、UI |
+| Pause中 | Combat受付とPlayer戦闘入力を停止し、3時計を同時に停止する。BGM Audioは、未再生の場合は音源位置0、再生開始後の場合は現在位置で停止し、ShaondamaなどのGameplay状態を保持する | Game、Player、Combat、BGM、MusicChart、UI |
 | シャオンダマ生成 | BGM／MusicChartが生成対象を決定し、ラジクジラが世界内へ出現させる | BGM、MusicChart、ラジクジラ、シャオンダマ |
 | AttackEvent予告 | AttackEventに向けてPlayerが攻撃構成を準備する | BGM、AttackEvent、UI |
 | シャオンダマ選択・Charge | Playerが対象を選択し、Charge判定、Allocation、Reserved化までを行う | Player、シャオンダマ、Charge、チャージシステム |
@@ -129,33 +143,59 @@ Playerの具体的なRootState、ActionState、および遷移条件はPlayer仕
 Battle開始時は、以下の高レベルな順序で処理します。
 
 ```text
-Stageを準備する
+Battle開始要求を受ける
 ↓
-Player、Enemy、ラジクジラなどのBattle参加対象を初期化する
-↓
-Battle開始処理を開始し、新しいBattle IDを発行する
+新しいBattle IDを発行する
 ↓
 Battle IDを必要な各システムへ配布する
 ↓
-同じBattle IDで戦闘BGM／MusicChartを開始する
+3時計を停止したまま、対象Battleを初期化する
 ↓
-音楽時計を開始する
+MusicChartの初期位置を基準に初期シャオンダマ生成を評価する
 ↓
-初期NoteEvent occurrenceと初期シャオンダマ生成要求を作成する
+必要な初期シャオンダマを生成する
 ↓
-初期生成を含む必要な準備の完了を確認する
+RadioWhaleの出現演出完了後、Gameplayへhand-offして選択可能にする
 ↓
-Combatの受付を開始する
+対象RoomのEnemy Readyを確認する
 ↓
-Playerの戦闘操作を受け付ける
+選択可能かつ非ReservedのShaondama Supply Readyを確認する
+↓
+すべてのReady条件が成立する
+↓
+Combat受付とPlayer戦闘入力を有効化する
+↓
+同じ基準点から3時計を同時に開始する
+↓
+system pre-rollへ入る
+↓
+AttackEvent PreviewとChargeを受け付ける
+↓
+system pre-roll終了時にBGM Audioを音源位置0から再生する
 ```
 
-- Battle IDは、戦闘BGM／MusicChart、音楽時計、および初期シャオンダマ生成より前に存在しなければなりません。
+- Battle IDは、対象Battleの初期化、初期シャオンダマ生成、3時計、およびBGM Audioの開始より前に存在しなければなりません。
 - Battle IDは、Stage、Player、Enemy、Combat、BGM／MusicChart、AttackEvent、ラジクジラ、およびシャオンダマ生成処理など、対象Battleへ参加するシステムへ配布します。
 - 初期NoteEvent occurrence、生成要求、シャオンダマ、AttackEvent occurrence、Palette Bullet、Marker、およびDamage通知は、同じBattle IDへ帰属し、後続処理へその帰属を引き継ぎます。
-- Playerの戦闘操作は、必要なBattle参加対象の初期化とCombat開始が完了するまで受け付けません。
+- Battle IDの配布は準備開始を意味しますが、Combat受付、Player戦闘入力、または3時計の開始を意味しません。
+- Battle準備中は、`Battle／Gameplay／MusicChart`の3時計を停止したまま、初期化と初期シャオンダマ生成を進めます。
+- Ready gateには、少なくとも対象Battleの初期化完了、対象RoomのEnemy Ready、初期シャオンダマの出現演出完了とGameplayへのhand-off、および選択可能かつ非ReservedのShaondama Supply Readyを含めます。
+- 論理生成済み、生成要求中、出現演出中、またはGameplayへhand-offされる前のシャオンダマは、Shaondama Supply Readyの最低保証数へ算入しません。
+- 必要なすべてのReady条件が成立した時点で、Combat受付とPlayer戦闘入力を有効化し、同じ基準点から3時計を同時に開始します。
+- Ready通知後から3時計の開始前までにShaondama Supply Readyを満たさなくなった場合は、そのReady状態を解除し、再び必要条件の成立を待ちます。
+- system pre-roll中は3時計を進行させますが、BGM Audioは音源位置0で停止したままにします。
+- system pre-roll中もCombat受付とPlayer戦闘入力は有効であり、AttackEvent PreviewとChargeを開始できます。Charge開始条件はBGM Audioの再生状態ではなく、対象Battleの受付gateとPlayer Actionの条件によって決定します。
+- system pre-roll終了時に、BGM Audioを音源位置0から再生します。以降のBGM AudioとMusicChart eventは、BGM側で定義する同じ音楽時間関係に従って進行します。
 - Battle開始前に、前のBattleに属するRuntime状態を参照してはいけません。
-- 個々のシステムの内部初期化手順は各所有ページで定義しますが、Playerの操作受付開始より前に必要な初期化を完了させます。
+- 個々のシステムの内部初期化手順、Shaondama生成方法、Ready通知、時計同期、およびAudio開始方法は各所有ページで定義します。本ページでは、それらが満たすBattle開始全体の順序だけを定義します。
+
+Battle開始における3つの境界は、以下のとおりです。
+
+| 境界 | Gameplay上の意味 |
+|---|---|
+| Battle IDの発行・配布 | 対象Battleの準備を開始する |
+| Ready gate成立 | Combat受付、Player戦闘入力、および3時計を開始する |
+| system pre-roll終了 | BGM Audioを実際に鳴らし始める |
 
 ## Clear・Game Over
 
@@ -251,7 +291,7 @@ Scene Reloadまたはin-place resetのどちらを使用するかは実装上の
 | Player | HP／Staminaを全回復し、ステージ開始時のState、位置、向きへ戻す | Player、Stage |
 | Enemy | ステージ開始時のEnemy集合、位置、浄化値、HP、行動状態へ戻す | Enemy、Stage |
 | Combat | 新しいBattle IDを持つ未確定結果のBattleとして開始し、旧Battleの通知・判定状態を破棄する | Combat |
-| BGM／MusicChart | 旧Battleの音楽時計と同期イベントを停止・破棄し、0から再開始する | BGM／MusicChart |
+| BGM／MusicChart | 旧Battleの3時計、音楽同期イベント、およびAudio状態を停止・破棄し、新BattleのBattle開始lifecycleに従って時計停止状態から再構築する | BGM／MusicChart |
 | Normal AttackEvent occurrence | 旧Battle分を破棄し、新しいBattle用に最初から再生成する | BGM／AttackEvent |
 | Weak AttackEvent | 旧Battle分をすべて破棄する | BGM／AttackEvent、チャージシステム |
 | Shaondama | 旧Battleに属するworld objectを持ち越さず、新しい生成要求から出現させる | シャオンダマ、ラジクジラ |
@@ -319,6 +359,10 @@ Retry完了後は、Battle開始lifecycleに従って初期化し、必要な準
 - Palette Bullet化してからSlotへ登録してはいけません。
 - 所有者・更新規則が定義されていない汚染度をGame Over条件に使用してはいけません。
 - BGM／MusicChart開始後に、そのBattle用のBattle IDを発行してはいけません。
+- Ready gate成立前に、3時計、Combat受付、またはPlayer戦闘入力を開始してはいけません。
+- 論理生成済み、生成要求中、出現演出中、またはGameplayへのhand-off前のシャオンダマをShaondama Supply Readyの最低保証数へ算入してはいけません。
+- Ready gate成立時にBGM Audioを開始してはいけません。BGM Audioはsystem pre-roll終了時に音源位置0から開始します。
+- Charge開始可否をBGM Audioの再生状態だけで決定してはいけません。
 - Battle結果確定後に、後続の命中、Damageや浄化によって結果を変更してはいけません。
 - Battle結果確定後に、新しい戦闘操作、Charge、生成要求、AttackEvent、Arpeggio、攻撃、Damage、浄化を開始してはいけません。
 - Clear演出としてのシャオンダマ破裂から、Weak攻撃、Damage、またはAttackEventを発生させてはいけません。
