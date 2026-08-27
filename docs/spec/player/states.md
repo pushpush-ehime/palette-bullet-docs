@@ -1,6 +1,6 @@
 ---
 title: Player状態
-description: Palette BulletのPlayer状態仕様
+description: Palette BulletのPlayer State構造・Battle終了時停止・Result操作gate仕様
 pageType: spec
 category: Player
 order: 30
@@ -28,10 +28,14 @@ Playerの具体的なAction挙動、入力受付時間、モーション、判�
 * StateMachine間の基本的な連携
 * 強制State遷移と通常Action入力の優先関係
 * Gameplay開始・終了時のState
+* Battle結果確定時のGameplay State停止
+* Player StateとResult操作受付gateの分離
 
 ActionState同士の詳細な遷移可否、キャンセル、先行入力については「Playerアクション遷移」を正とします。
 
 各Action固有の開始条件、内部Phase、終了条件については、それぞれのAction仕様を正とします。
+
+Battle結果の確定、同一frameでClearとPlayer Deadが成立した場合の優先順位、およびResultへの接続順は「ゲーム全体」を正とします。本ページでは、Gameから確定結果を受け取った時点でPlayer Stateが行う停止処理と、Result操作受付gateとの構造上の分離を定義します。
 
 ---
 
@@ -65,7 +69,7 @@ Playerの主な行動について、State上の管理先と、他Stateとの関�
 | **BigHit** | `ReactionState` | 大きい被弾リアクション | Gameplay Actionとの同時継続なし | SmallHit → BigHitへ上書き | 通常のGameplay操作 | Actionを強制終了しAimも解除する。地上ノックバックを行うが、BigHitによってPlayerを空中へ打ち上げない |
 | **Conversation** | `RootState` | NPCとの会話を行う状態 | なし | `Gameplay → Conversation` | Gameplay中の全Action・通常移動 | `Grounded`かつ`ReactionState = None`の場合のみ開始可能。開始時にGameplay内部Stateを終了する。Conversation中は被弾しない |
 | **Interacting** | `RootState` | 宝箱・アイテム・ギミックなどを操作する状態 | なし | `Gameplay → Interacting` | Gameplay中の全Action・通常移動 | `Grounded`かつ`ReactionState = None`の場合のみ開始可能。開始時にGameplay内部Stateを終了する。被弾時はInteractionを中断する |
-| **Dead** | `RootState` | HPが0になりPlayer操作を停止する状態 | なし | 死亡条件成立 → **強制→ Dead** | すべてのPlayer操作 | Player State中で最優先。Gameplay内部Stateを終了する。空中でDeadへ入った場合も重力による落下は継続する |
+| **Dead** | `RootState` | HPが0になりPlayer操作を停止する内部状態 | なし | 死亡条件成立 → **強制→ Dead** | すべてのPlayer操作 | Player State中で最優先。Gameplay内部Stateを終了する。空中でDeadへ入った場合も重力による落下は継続する。Dead成立だけを理由に死亡演出やGame Over Resultを開始しない |
 
 この表はState間の関係を把握するための概要です。
 
@@ -200,6 +204,10 @@ ClickCharging + Dashing
 
 のように複数のActionStateが同時成立することはありません。
 
+Result操作の受付状態は、このPlayer State構造へ追加しません。`Result`という`RootState`または`ActionState`を設けるのではなく、Game／UI／入力側が管理する独立したResult操作受付gateとして扱います。
+
+したがって、Battle結果確定後も`RootState`の事実を保持したまま、Gameplay受付だけを停止し、Player Stateとは別にResult操作をlock／解禁できます。特に、同一frameでClearとDeadが成立した場合は`RootState = Dead`を維持したままClear Resultの操作を受け付けられます。
+
 ---
 
 ## Player仕様ページ構成
@@ -318,7 +326,7 @@ Interacting中に被弾が成立した場合はInteractionを中断し、Gamepla
 
 ### Dead
 
-Playerの死亡中に使用するRootStateです。
+HPが0になり、PlayerのGameplay操作を停止していることを表すRootStateです。
 
 死亡条件が成立した場合は、現在のRootStateやGameplay内部StateよりDeadを優先します。
 
@@ -336,7 +344,17 @@ Deadへ遷移した時点でGameplay内部の`MovementState`管理は終了し�
 
 ただし、空中で死亡した場合もPlayerに作用する重力は停止せず、Dead中も落下を継続します。
 
-Dead中の死亡モーション、死亡画面、Retryについては「Player死亡」を正とします。
+`RootState = Dead`は、HPが0になったこととPlayer操作を停止することを表す内部状態です。Dead成立だけで最終Battle結果を決定したり、死亡演出、Game Over表示、Retry受付を自動的に開始したりしません。
+
+最終Battle結果の確定後は、以下のように扱います。
+
+| 最終Battle結果 | `RootState` | 死亡演出／Game Over処理 |
+| --- | --- | --- |
+| ClearかつDead未成立 | 結果確定だけを理由にDeadへ変更しない | 開始しない |
+| Clearかつ同一frameでDead成立済み | `Dead`を維持し、HP 0や確定済みDamageを巻き戻さない | 開始しない。Clear Resultだけへ接続する |
+| Game Over | `Dead`を維持する | 「Player死亡」の契約に従って死亡演出とGame Over Resultへ接続する |
+
+死亡演出用のPhaseまたはStateを実装する場合も、Gameplay Stateとは分離し、Gameから最終結果としてGame Overが通知された場合だけ開始します。Dead中の死亡モーション、Game Over表示、Retryについては「Player死亡」を正とします。
 
 ---
 
@@ -834,6 +852,8 @@ Action入力
 Deadを優先
 ```
 
+ただし、Battle結果確定は新しい`RootState`へ遷移させるための通常Actionではありません。結果確定時は、現在の`RootState`を必要がない限り書き換えずにGameplay受付を閉じ、実行中のGameplay内部Stateを停止します。すでに`RootState = Dead`が成立している場合はDeadを維持し、Clear確定を理由に`Gameplay`へ戻しません。
+
 また、SmallHit / BigHitが成立した場合は、通常のActionState遷移よりReactionStateによる割り込みを優先します。
 
 本ページでは必要以上に細かな固定優先順位表を作成せず、個別の強制遷移条件は各仕様ページで定義します。
@@ -911,6 +931,8 @@ ReactionState = None
 
 となります。
 
+Battle開始時およびRetryによる新しいBattle開始時は、Result操作受付gateを閉じた状態にします。Result操作受付gateはPlayer Stateの初期値には含めず、Game／UI／入力側が新しい`battleId`に対応する受付状態として初期化します。
+
 ### Gameplay終了時
 
 Gameplayから別のRootStateへ遷移する場合、Gameplay内部StateMachineによる管理を終了します。
@@ -925,9 +947,77 @@ Gameplay内部State終了
 
 実行中のAction、Aim、Reaction、およびGameplay用の保留入力は、遷移先RootStateの仕様に従って終了・破棄します。
 
+Battle結果確定によるGameplay停止は、Conversation／Interacting／Deadへの通常のRootState遷移とは別の終了境界です。Battle結果確定時は、RootState遷移の有無にかかわらず、次の「Battle結果確定時のPlayer State停止」を適用します。
+
 Gameplayへ復帰した場合は、以前のGameplay内部Stateを自動的に再開せず、その時点のPlayer状態から再初期化します。
 
 Deadからの復帰については、Retryによるステージリスタート処理を使用します。
+
+### Battle結果確定時のPlayer State停止
+
+Gameから現在Battleの確定結果を受け取った時点で、PlayerはGameplay入力とGameplay Stateの新規進行を即座に停止します。
+
+`RootState = Gameplay`でGameplay内部StateMachineが有効な場合は、次のcleanupを行います。
+
+| 対象 | Battle結果確定時の処理 |
+| --- | --- |
+| `ActionState` | 実行中Actionを強制終了し、`None`へ戻す。Actionの正常終了や成功として扱わない |
+| `AimState` | Aimingを終了し、`Normal`へ戻す |
+| `ReactionState` | 進行中のSmallHit／BigHitを停止し、`None`へ戻す。結果確定後に新しいReactionを成立させない |
+| Gameplay用保留入力 | Action先行入力、Dashキャンセル入力バッファ、Hold中入力、未評価入力をすべて破棄する |
+
+`ActionState = None`、`AimState = Normal`、`ReactionState = None`への変更は、Battle終了cleanupのための強制停止です。新しいGameplay Actionや新しいReactionの開始として扱いません。
+
+`RootState = Dead`などの理由ですでにGameplay内部StateMachineの管理が終了している場合は、cleanupのためにGameplay Stateを再初期化しません。保留中のGameplay入力だけを破棄し、現在のRootStateを維持します。
+
+結果確定後は、以下を禁止します。
+
+* 新しい`ActionState`への遷移
+* Hold継続や入力Releaseを起点とするAction再開
+* 遅延callback、先行入力、入力バッファを起点とするAction開始
+* 新しいAim、Reaction、Jump、通常移動などのGameplay処理
+* 無効期間中のGameplay入力を保持し、後から実行すること
+
+Dead中に継続する重力・落下のように、各Ownerが表示または物理上の残留処理として明示したものは、新しいGameplay Actionとは扱いません。ただし、そこから新しいDamage、Hit、Action、Reaction、Parry、Target提供を発生させてはいけません。
+
+Battle結果確定通知またはcleanup通知を複数回受け取っても、同じAction、入力バッファ、参照を二重に終了・破棄しないよう、この停止処理は同じ`battleId`について一度だけ実行します。現在Battleと異なる`battleId`の終了通知はPlayer Stateへ適用しません。
+
+Player State Ownerの必須cleanupは、以下のすべてが成立した時点で完了とします。
+
+* Gameplay入力の受付が停止している
+* Action、Aim、Reactionの進行が停止している
+* Gameplay用の保留入力と遅延Action要求が破棄されている
+* 結果確定後に新しいGameplay Stateへ遷移できない
+* 旧`battleId`のPlayer State通知を現在Battleへ適用できない
+
+完了時は、対象`battleId`を含むPlayer State cleanup完了をCombat／Gameへ一度だけ通知します。同じBattleについて重複通知しても完了数を増やさないよう、通知側・集約側の両方で一度限りとして扱います。
+
+死亡演出、VFX、SE、Dead中の重力・落下、および表示専用処理の終了は、この必須cleanup完了条件へ含めません。これらを継続する場合もGameplay上の効果は停止済みとします。
+
+#### 同一frameでClearとDeadが成立した場合
+
+同一frameでHPが0になった場合は、最終Battle結果が未確定であっても`RootState = Dead`を成立させます。その後、Gameが同一frame内の終了候補を収集してClearを最終結果として確定しても、次の事実は巻き戻しません。
+
+* PlayerのHPが0になったこと
+* `RootState = Dead`が成立したこと
+* そのframeまでに確定済みのDamageと状態変更
+
+一方、最終結果がClearであるため、死亡演出用Phase／State、Game Over表示、およびRetry受付への遷移は開始しません。Player Stateは`Dead`のまま、Game／UIがClear Resultへ接続します。
+
+#### Result操作受付gateとの分離
+
+Result操作受付gateは、`RootState`、`MovementState`、`ActionState`、`AimState`、`ReactionState`のいずれにも含めません。Result操作をGameplay入力としてPlayer Stateへ渡したり、`ActionState`へ変換したりしてはいけません。
+
+| Battle終了後の段階 | Gameplay State／入力 | Result操作受付gate |
+| --- | --- | --- |
+| Battle結果確定直後 | 停止済み | lock |
+| 必須Ownerのcleanup中 | 停止を維持 | lock |
+| 必須Ownerすべてのcleanup完了後 | 停止を維持 | 解禁可能 |
+| Result route決定後 | 旧BattleのStateを再開しない | 再びlockし、二重入力を受け付けない |
+
+Result操作gateの解禁可否は`RootState`から再判定せず、Gameが通知した確定Battle結果と必須cleanup完了通知だけを使用します。このため、`RootState = Dead`であっても最終結果がClearならClear Resultの`Continue`だけを扱い、Game Overの`Retry`へ分岐しません。
+
+Result操作がlockされている間の入力は、Gameplay用保留入力またはResult用先行入力として保存しません。Result入力の具体的な割り当て、誤操作防止時間、`Continue`／`Retry`の処理は「Player入力と操作」およびUI仕様を正とします。
 
 ---
 
@@ -989,6 +1079,8 @@ StateMachine間の組み合わせによって発生する具体的な移動速�
 | StateMachineの並列構造 | 本ページ |
 | StateMachine間の基本的な関係 | 本ページ |
 | 強制State遷移と通常Action入力の基本優先関係 | 本ページ |
+| Battle結果確定時のAction／Aim／Reaction停止 | 本ページ |
+| 同一frame Clear＋Dead時のRootState維持 | 本ページ |
 | ActionState間の遷移可否 | Playerアクション遷移 |
 | キャンセル・先行入力・入力バッファの詳細 | Playerアクション遷移 |
 | MovementStateの具体的な移動処理 | Player基本移動 / Player移動｜ジャンプ |
@@ -1001,7 +1093,9 @@ StateMachine間の組み合わせによって発生する具体的な移動速�
 | Conversation | Playerインタラクション｜Conversation |
 | Interacting | Playerインタラクション｜Interacting |
 | HP・スタミナ | Playerステータス |
-| Dead・死亡・Retry | Player死亡 |
+| Dead成立後の死亡演出・Game Over接続・Retry | Player死亡 |
+| Battle結果の確定・Clear優先・Result操作解禁条件 | ゲーム全体 |
+| Result操作受付gate・入力lock・Continue／Retry入力 | Player入力と操作 / UI |
 | カメラ設計 | カメラ仕様側 |
 
 ---
@@ -1010,6 +1104,8 @@ StateMachine間の組み合わせによって発生する具体的な移動速�
 
 現時点では、PlayerのState構造そのものに関する未決事項はありません。
 
-各Actionの数値パラメータ、モーション、入力バッファ時間などの未決事項は、それぞれの担当ページで管理します。
+Battle結果確定時のState停止、同一frame Clear＋Dead時の`RootState = Dead`維持、およびResult操作受付gateとの分離は決定済みです。ただし、Playerの同一frame Damage、死亡演出、Result入力、および各Action Ownerの終了処理を各正本へ反映した後に、旧`battleId`拒否とcleanup完了通知を横断確認するまでは、本ページのstatusを`仮仕様`とします。
+
+各Actionの数値パラメータ、モーション、入力バッファ時間、Result誤操作防止時間などの未決事項は、それぞれの担当ページで管理します。
 
 <PageRelations />
