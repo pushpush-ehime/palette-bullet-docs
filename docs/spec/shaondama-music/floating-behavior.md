@@ -1,6 +1,6 @@
 ---
 title: 浮遊・挙動
-description: 出現演出完了後のShaondama状態・浮遊・Lifetime・Reserved・自然破裂・終了条件に関する仕様
+description: 選択可能化後のShaondama状態・Parry由来Wildcardの弾き移動・浮遊・Lifetime・Reserved・自然破裂・終了条件に関する仕様
 pageType: spec
 category: シャオンダマ
 order: 20
@@ -13,19 +13,21 @@ status: 仮仕様
 
 - 対象担当：プログラム班・デザイン班
 - 出典：統合仕様書v3.2 §4.2.2、および全体仕様決定D-02・D-12
-- 関連ページ：[玉のデータ](/spec/shaondama-music/orb-data)、[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)、[Charge Allocation](/spec/draw-system/charge-allocation)、[戦闘](/spec/combat/)
+- 関連ページ：[玉のデータ](/spec/shaondama-music/orb-data)、[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)、[Playerアクション｜パリィ](/spec/player/player-action-parry)、[邪音玉](/spec/enemy/jaon-bullet)、[Charge Allocation](/spec/draw-system/charge-allocation)、[戦闘](/spec/combat/)
 
 ## 目的
 
-本ページでは、**出現演出が完了してGameplayへ制御移譲された後のShaondama**について、浮遊、選択可能状態、最低保証数への算入状態、一般Lifetime、Normal Shaondamaのsource NoteEvent時刻、`Reserved`、自然破裂、消費、Battle終了、および消滅の競合規則を定義します。
+本ページでは、**Gameplay上の選択可能なShaondama状態へ入った後の共通挙動**について、浮遊、選択可能状態、最低保証数への算入状態、一般Lifetime、Normal Shaondamaのsource NoteEvent時刻、`Reserved`、自然破裂、消費、Battle終了、および消滅の競合規則を定義します。
 
-ラジクジラはShaondamaを世界内へ出現させ、出現演出を完了し、Gameplayへ制御移譲して選択可能化するところまでを担当します。制御移譲後はShaondama側へ責務が移ります。
+Normal Shaondamaおよび最低保証補充Wildcardは、ラジクジラの出現演出完了とGameplayへの制御移譲を経て選択可能状態へ入ります。一方、Parry由来Wildcardは、Parry成立位置での変換commitと同時に選択可能なWildcard状態へ直接入り、RadioWhale経路や出現演出完了待ちを使用しません。
 
-本ページを、**出現演出完了後のShaondama状態と終了条件**の正本とします。
+本ページを、**選択可能化後のShaondama状態、Parry由来Wildcardの弾き移動、および共通終了条件**の正本とします。
 
 本ページは特に、次の境界を所有します。
 
-- 出現演出完了後に浮遊・選択可能状態へ入ること
+- RadioWhale経路では出現演出完了後に浮遊・選択可能状態へ入ること
+- Parry由来Wildcardは変換commit時点で選択可能状態へ直接入り、変換直後から弾き移動中も選択可能であること
+- Parry由来Wildcardへ加える力の適用、減衰、移動量、および通常浮遊への接続
 - 選択可能かつ非`Reserved`の個体だけを最低保証数へ算入すること
 - `Reserved`への遷移時点で最低保証数から除外すること
 - 個体の選択可否変化と不足検出結果を最低保証判定側へ通知すること
@@ -34,13 +36,16 @@ status: 仮仕様
 - 一般Lifetimeおよび各終了条件が競合した場合の一回終了処理
 - Battle結果確定時のGameplay無効化、表示専用演出、およびRetry／次Battleへの持ち越し禁止
 
-個体が保持するBattle ID、source NoteEvent occurrence、source music time、基本色・RGB値などのデータは[玉のデータ](/spec/shaondama-music/orb-data)、生成対象・生成タイミング・最低保証数・Wildcard生成要求は[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、出現演出完了までの状態遷移と制御移譲は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、Charge成功と`Reserved`へのcommitは[Charge Allocation](/spec/draw-system/charge-allocation)を正本とします。
+個体が保持するBattle ID、source NoteEvent occurrence、source music time、基本色・RGB値などのデータは[玉のデータ](/spec/shaondama-music/orb-data)、生成対象・生成タイミング・最低保証数・Wildcard生成要求は[シャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、RadioWhale経路の出現演出完了までの状態遷移と制御移譲は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、Parry成立と対象ごとの弾き方向は[Playerアクション｜パリィ](/spec/player/player-action-parry)、邪音玉としての終了と変換要求は[邪音玉](/spec/enemy/jaon-bullet)、変換条件と変換commitは[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)、Charge成功と`Reserved`へのcommitは[Charge Allocation](/spec/draw-system/charge-allocation)を正本とします。
 
 ## プレイヤーから見た挙動
 
 - シャオンダマは、世界内へ出現した後、独立したobjectとして空中を漂います。
-- 出現演出中は選択できず、最低保証数にも数えられません。
-- 出現演出完了後に浮遊状態へ入り、Playerが選択できるようになります。
+- Normal Shaondamaおよび最低保証補充Wildcardは、RadioWhaleの出現演出中は選択できず、最低保証数にも数えられません。
+- RadioWhale経路の個体は、出現演出完了後に浮遊状態へ入り、Playerが選択できるようになります。
+- Parry由来Wildcardは、変換commitと同時に選択可能状態へ直接入り、最低保証補充用の「出現演出中・選択不可」状態を経由しません。
+- Parry由来Wildcardは変換直後にParry結果の弾き方向へ力を受け、選択可能なまま弾き移動し、その後は通常の浮遊を継続します。
+- Parry由来Wildcardは、弾き移動中もCharge対象検索の対象となり、選択可能かつ非`Reserved`であれば変換commit時点から最低保証数へ算入されます。
 - 選択可能な個体がCharge成功によって`Reserved`になると、選択対象および最低保証数から外れます。
 - 浮遊中の具体的な移動範囲・速度・配置方法は未決です。
 - シャオンダマには一般Lifetimeがあり、正式値は未決ですが**数十秒程度**を想定します。
@@ -56,9 +61,10 @@ status: 仮仕様
 
 ### 制御開始
 
-シャオンダマの生成に関する責務は、以下のように分離します。
+Shaondamaが本ページの共通状態へ入る経路は、生成元によって次のように分かれます。
 
 ```text
+Normal／最低保証補充Wildcard
 BGM / MusicChart
 「何を・いつ・何個生成するか」
         ↓
@@ -73,9 +79,25 @@ BGM / MusicChart
 「浮遊・Lifetime・自然破裂・終了」
 ```
 
-ラジクジラからの出現演出が完了し、浮遊状態へ移行してShaondama Gameplay側へ制御が移譲された後の挙動を本ページの対象とします。
+```text
+Parry由来Wildcard
+Player Parryで成功・弾き方向確定
+        ↓
+邪音玉として終了・変換要求
+        ↓
+Parry成立位置でWildcardへ変換commit
+        ├─ 同時に選択可能化
+        └─ 非Reservedなら最低保証数へ算入
+        ↓
+変換済みWildcardへ弾き方向の力を1回だけ付与
+        ↓
+本ページ
+「選択可能な弾き移動・浮遊・Lifetime・終了」
+```
 
-出現演出完了前後の境界は次のとおりです。
+本ページは、RadioWhale経路では出現演出完了と制御移譲後、Parry経路ではWildcard変換commit時点からの挙動を対象とします。
+
+RadioWhale経路の出現演出完了前後の境界は次のとおりです。
 
 ```text
 生成要求
@@ -94,24 +116,28 @@ Gameplayへ制御移譲
   └─ 非Reservedなら最低保証数へ算入
 ```
 
-出現演出中の個体にworld objectまたは論理dataが存在していても、浮遊中・選択可能・最低保証算入済みとして扱いません。
+RadioWhale経路の出現演出中の個体にworld objectまたは論理dataが存在していても、浮遊中・選択可能・最低保証算入済みとして扱いません。この「出現演出中・選択不可」の状態はParry由来Wildcardへ適用しません。
 
-出現演出完了時は、対象Battleが継続中であり、個体のBattle IDが現在のBattleと一致することを確認したうえで、次を一度だけ行います。
+RadioWhale経路の出現演出完了時は、対象Battleが継続中であり、個体のBattle IDが現在のBattleと一致することを確認したうえで、次を一度だけ行います。
 
 1. 出現演出完了を確定する
 2. Spawn／RadioWhale側からShaondama Gameplay側へ制御を移譲する
 3. 選択可能な浮遊状態へ移行する
 4. 個体の選択可能化を最低保証判定側へ通知する
 
-出現演出そのもの、演出時間、および完了通知の送信は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)を正本とします。本ページは、完了通知を受けた後の状態を所有します。
+RadioWhale経路の出現演出そのもの、演出時間、および完了通知の送信は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)を正本とします。本ページは、完了通知を受けた後の状態を所有します。
 
-生成対象・生成タイミング・生成個数については、BGM側の仕様を正本とします。
+Parry由来Wildcardでは、対象Battleが継続中であり、変換元と同じBattle IDが現在のBattleと一致することを確認したうえで、変換commitと同じ処理単位に選択可能化、最低保証算入可否の確定、および算入状態変化の通知を行います。変換commitと選択可能化の間にRadioWhaleへの受付、背中側Spawn、出現演出時間、演出完了通知、timer、遅延callback、Gameplayへの制御移譲を挟みません。
 
-ラジクジラの背中から世界内へ出現するまでの処理については、ラジクジラ側の仕様を正本とします。
+Normal Shaondamaおよび最低保証補充Wildcardの生成対象・生成タイミング・生成個数については、BGM側の仕様を正本とします。Parry由来Wildcardの変換条件と1弾1個規則は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とします。
+
+ラジクジラの背中から世界内へ出現するまでの処理については、ラジクジラ側の仕様を正本とします。この経路をParry由来Wildcardへ適用しません。
 
 ### 浮遊
 
 生成後のシャオンダマは、世界内で空中を漂うobjectとして扱います。
+
+Parry由来Wildcardは、変換直後にParry側から渡された弾き方向の力を1回だけ受け、選択可能なWildcardのまま移動します。力が減衰して弾き移動が落ち着いた後は、他のWildcardと同じ浮遊アルゴリズムへ接続します。弾き移動中に邪音玉や攻撃projectileのStateへ戻しません。
 
 ただし、現在の詳細な浮遊アルゴリズムは未決です。
 
@@ -130,8 +156,9 @@ Gameplayへ制御移譲
 
 最低保証数へ算入できるShaondamaは、次の条件をすべて満たす個体だけです。
 
-- 出現演出が完了している
-- Gameplayへ制御移譲済みである
+- 生成元に応じた選択開始条件を満たしている
+  - RadioWhale経路：出現演出が完了し、Gameplayへ制御移譲済みである
+  - Parry変換経路：Wildcard変換がcommit済みである
 - 現在Playerの選択対象として公開されている
 - `Reserved`ではない
 - 消費済み・終了処理中ではない
@@ -140,14 +167,19 @@ Gameplayへ制御移譲
 
 次の個体は最低保証数へ算入しません。
 
-- 生成要求中
-- 論理生成済み・出現演出開始前
-- 出現演出中
-- 出現演出完了処理中・制御移譲前
+- RadioWhale経路の生成要求中
+- RadioWhale経路の論理生成済み・出現演出開始前
+- RadioWhale経路の出現演出中
+- RadioWhale経路の出現演出完了処理中・制御移譲前
+- Parry変換要求中・変換commit前
 - 選択不可
 - `Reserved`
 - 消費済み・自然破裂処理中・一般Lifetime終了処理中
 - Battle終了後または旧Battle ID所属
+
+Parry由来Wildcardは、変換commitと同時に選択可能かつ非`Reserved`であれば、そのcommit時点から最低保証数へ算入します。選択可能化や算入開始を次フレーム、演出完了、RadioWhaleからの制御移譲まで遅らせません。
+
+弾き移動中であることは、Charge対象検索または最低保証数への算入から除外する理由になりません。変換commitより前に完了したCharge対象検索へ遡って追加はせず、commit後に開始または再評価された検索から取得可能とします。
 
 ### `Reserved`への遷移
 
@@ -167,7 +199,7 @@ Charge成功がcommitされ、対象個体が`Reserved`へ移行した時点で�
 
 ### 不足検出結果の通知
 
-出現演出完了、`Reserved`への遷移、消費、自然破裂、一般Lifetime終了、Battle終了などによって選択可能数が変化した場合、現在Battleについて選択可能かつ非`Reserved`の個体数を再評価できる通知を最低保証判定側へ送ります。
+RadioWhale経路の出現演出完了、Parry由来Wildcardの変換commit、`Reserved`への遷移、消費、自然破裂、一般Lifetime終了、Battle終了などによって選択可能数が変化した場合、現在Battleについて選択可能かつ非`Reserved`の個体数を再評価できる通知を最低保証判定側へ送ります。
 
 通知は少なくとも、次の意味を識別できる状態にします。
 
@@ -192,6 +224,8 @@ Charge成功がcommitされ、対象個体が`Reserved`へ移行した時点で�
 ### 一般Lifetime
 
 シャオンダマには、浮遊開始後の通常滞在時間を制御する一般Lifetimeを設定します。
+
+Parry由来Wildcardは変換commit時点で選択可能なWildcard状態へ直接入るため、その時点から一般Lifetimeを開始します。弾き移動中も一般Lifetimeは通常どおり進行し、弾き移動の終了時にLifetimeを再開始またはresetしません。
 
 - 一般Lifetimeは数十秒程度を想定しますが、正式な秒数は未決です。
 - Pause中は一般Lifetimeを進行させません。
@@ -350,26 +384,39 @@ AttackEventで使用対象に確定したReserved Shaondamaは、対応する発
 通常Battle中のPauseでは、シャオンダマのGameplay lifecycleを停止します。
 
 - 浮遊移動を進行させません。
+- Parry由来Wildcardの弾き移動と力の減衰を進行させません。
 - 一般Lifetimeを進行させません。
 - BGMの音楽時計が停止するため、source NoteEvent時刻の自然破裂判定も進行させません。
 - Resume後は同じBattle IDと停止前の状態を維持して再開します。
+- Resume時にParry由来Wildcardへ弾き方向の力を再付与しません。
 
-### Parry由来Wildcardの選択可能化例外
+### Parry由来Wildcardの即時選択可能化と弾き移動
 
-Parry成功した邪音玉1弾が、そのworld位置でWildcard 1個へ変換されることは決定済みです。
+Parry成功した邪音玉は、Parry成立時点のworld位置で、邪音玉1弾につきWildcard 1個へ即座に変換されます。変換条件、同一Physics Stepの成功batchに含まれる各弾の1弾1個規則、生成位置、生成元区分、重複変換防止、および変換commitは[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とします。
 
-ただし、Parry由来Wildcardを、
+Parry由来Wildcardは、変換commitと同じ処理単位で次の状態へ直接入ります。
 
-- 変換成立と同時に選択可能にする
-- 最低保証補充と同じ一定時間の出現演出完了後に選択可能にする
+1. 選択可能なWildcardとしてPlayerのCharge対象へ公開する
+2. `Reserved`でなければ、同じcommit時点から最低保証数へ算入する
+3. 選択可能数と算入可否の変化を最低保証判定側へ通知する
+4. 一般Lifetimeを開始する
+5. Parry側から対象ごとに渡された弾き方向の力を、変換済みWildcardへ1回だけ加える
 
-のどちらとするかは未確定です。
+最低保証補充Wildcardに適用するRadioWhaleの通常受付、背中側Spawn、一定時間の出現演出、「出現演出中・選択不可」状態、演出完了通知、およびGameplayへの制御移譲は、Parry由来Wildcardへ適用しません。表示上の変換演出が変換commit後も続く場合も、その演出完了を選択可能化、Charge対象検索、最低保証算入、または弾き移動開始の条件にしません。
 
-この決定が確定するまでは、Parry変換が成立したという理由だけで、本ページの選択可能な浮遊状態へ自動的に移行させません。また、最低保証補充のRadioWhale出現経路や出現演出時間を自動適用しません。
+力を受ける対象は、攻撃projectileとしての邪音玉ではなく、変換commit後のWildcardです。邪音玉が弾かれて移動した後にWildcardへ変換する中間Stateは設けません。
 
-どちらの方式に決定しても、最低保証数へ算入できるのは、実際に選択可能かつ非`Reserved`となった時点からです。選択可能化後の浮遊・一般Lifetime・`Reserved`・Battle終了は本ページの共通規則へ接続します。
+Parry由来Wildcardは弾き方向の力を受けた後も選択可能状態を維持し、移動中からCharge対象検索で取得できます。選択可能かつ非`Reserved`である限り、弾き移動中も最低保証数へ算入し続けます。
 
-変換条件、1弾1個、生成位置、および生成元区分は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とします。
+弾き移動中のWildcardがCharge成功によって`Reserved`へ移行した場合は、本ページの共通`Reserved`規則に従い、そのcommit時点で選択対象と最低保証数から除外し、弾き移動と浮遊移動を停止して、その瞬間の現在World座標に留めます。
+
+弾き移動からPlayer Damage、Enemy Damage、Parry判定、追加のWildcard変換を発生させません。反射された邪音玉や攻撃projectileとして扱いません。弾き移動中に地形・Player・Enemy・他のShaondamaへ接触した場合の具体的な物理応答は、本ページでは確定しません。弾き移動後の浮遊、一般Lifetime、`Reserved`、消費、Palette Bullet化、Battle終了は、通常のWildcard／Shaondamaへ適用する本ページの共通規則へ接続します。
+
+弾き方向は[Playerアクション｜パリィ](/spec/player/player-action-parry)が対象ごとのParry結果として確定し、[邪音玉](/spec/enemy/jaon-bullet)の変換要求を通して引き渡します。本ページでは入力方向、Playerの向き、接触方向などから弾き方向を再計算しません。正確な弾き方向の算出方法が未確定である間は、Player Parry側の調整・実装検討事項とします。
+
+弾き移動に使用する力の強さ、減衰、最大移動量、落ち着くまでの時間は、本ページの調整データとして所有します。具体値はGameplayテストで調整し、実装へ直書きしません。Normal Parry／Just Parryによって、Wildcardの生成数、種別、選択条件、および弾き移動の基本性能を変えません。
+
+Battle結果確定後、現在Battleと異なるBattle IDの要求、または変換commit後に届いた重複・遅延callbackから、変換、選択可能化、最低保証算入、力の付与を行いません。同じ変換commitに対する力の付与は最大1回です。
 
 ### Battle結果確定時
 
@@ -381,8 +428,9 @@ ClearまたはGame Overの結果が確定した時点で、対象Battleの全Sha
 - AttackEventの使用対象やPalette Bullet化の対象にしません。
 - 最低保証数へ算入せず、個体の算入状態を無効化します。
 - 浮遊移動、一般Lifetime、source NoteEvent時刻の自然破裂判定を停止します。
+- Parry由来Wildcardの弾き移動、力の減衰、および未適用の力付与を停止します。
 - 新しいWeak攻撃、Hit、Damage、AttackEvent、Palette Bulletを発生させません。
-- 遅延した選択可能化、`Reserved`、自然破裂、Lifetime終了、消費、Palette Bullet化のcallbackをGameplayへ適用しません。
+- 遅延した選択可能化、弾き方向の力付与、`Reserved`、自然破裂、Lifetime終了、消費、Palette Bullet化のcallbackをGameplayへ適用しません。
 
 Battle結果確定時点で未確定のCharge、Allocation候補、選択中のShaondamaを後からcommitしません。未確定Chargeの破棄とAllocation関係の解消は[Charge Allocation](/spec/draw-system/charge-allocation)、未発射AttackEventと未消費`Reserved`の取消・解放は[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正本とします。
 
@@ -413,6 +461,7 @@ Game Over時は、全Shaondamaについて次のGameplay参照を無効化しま
 - Charge／Allocation候補としての参照
 - AttackEvent／`Reserved`／Palette Bullet化に使用する参照
 - 浮遊、Lifetime、source NoteEvent時刻監視の更新参照
+- Parry由来Wildcardの弾き移動、力の減衰、および力付与callback
 - 自然破裂、Hit、Damage、消費に関する予約通知とcallback
 
 残存objectを即時消去するか、Game Over演出として表示を残すかは演出仕様として未決です。どちらの場合もGameplay出力を発生させません。
@@ -434,7 +483,8 @@ Clear／Game Over後にShaondama object、破裂VFX、SEを表示専用として
 - 終了したBattleの全Shaondamaを選択、Charge、Allocation、AttackEvent、Palette Bullet化の対象外にしている
 - 終了したBattleの全Shaondamaを最低保証数から除外し、旧Battleの不足通知や補充要求を発生させない
 - 浮遊、一般Lifetime、source NoteEvent時刻監視、自然破裂、Hit、Damageに関するGameplay更新を停止している
-- 選択可能化、`Reserved`、自然破裂、Lifetime終了、消費、Palette Bullet化に関する発行待ちcallbackを無効化している
+- Parry由来Wildcardの弾き移動、力の減衰、および未適用の力付与を停止している
+- 選択可能化、弾き方向の力付与、`Reserved`、自然破裂、Lifetime終了、消費、Palette Bullet化に関する発行待ちcallbackを無効化している
 - 旧Battle IDのShaondama objectと参照が現在または次のBattleへ影響できない
 
 上記をすべて満たした時点で内部cleanup完了とし、対象battleIdを含むShaondama Floating Ownerの必須cleanup完了通知を、上位cleanup集約Ownerへ一度だけ送ります。表示専用object、VFX、SEの終了は待ちません。
@@ -450,11 +500,12 @@ Game Over ResultからのRetryまたは次のBattle開始時は、旧Battleに�
 - 消費処理中・Palette Bullet化待ちのShaondama参照
 - 自然破裂処理中objectとWeak攻撃予約
 - 一般Lifetime timerとsource時刻監視状態
+- Parry由来Wildcardの弾き移動状態、残存する力、および力付与予約
 - 最低保証数への算入状態と不足通知予約
 - 旧Battleの個体識別情報、source occurrence、Allocation参照
 - 遅延した終了callback・Damage通知
 
-新しいBattle IDを受領した後、新Battleの生成要求と出現演出完了通知から状態を構築し直します。旧Battle IDを持つ個体や通知は、選択可能化、最低保証算入、Charge、Allocation、`Reserved`、自然破裂、Palette Bullet化、Damageへ接続しません。
+新しいBattle IDを受領した後、RadioWhale経路では新Battleの生成要求と出現演出完了通知、Parry経路では新Battle中に成立した有効な変換commitから状態を構築し直します。旧Battle IDを持つ個体や通知は、選択可能化、弾き方向の力付与、最低保証算入、Charge、Allocation、`Reserved`、自然破裂、Palette Bullet化、Damageへ接続しません。
 
 Retry地点とPlayer／Enemy／BGM等の再初期化値はGame・Stage／Room側へ委譲します。本ページは、旧BattleのShaondama状態をGameplay上無効化し、新Battleへ持ち越さないことを保証します。
 
@@ -462,9 +513,10 @@ Retry地点とPlayer／Enemy／BGM等の再初期化値はGame・Stage／Room側
 
 | 状態・終了契機 | 選択可否 | 最低保証数 | 一般Lifetime | source時刻処理 | world object | Weak攻撃 |
 |---|---|---|---|---|---|---|
-| 生成要求中・論理生成済み | 不可 | 算入しない | 未開始 | 対象外 | 未表示または準備中 | 発生しない |
-| 出現演出中 | 不可 | 算入しない | 未開始 | 対象外 | 出現途中 | 発生しない |
-| 出現演出完了・制御移譲前 | 不可 | 算入しない | 未開始 | 対象外 | 出現済み | 発生しない |
+| RadioWhale経路の生成要求中・論理生成済み | 不可 | 算入しない | 未開始 | 対象外 | 未表示または準備中 | 発生しない |
+| RadioWhale経路の出現演出中 | 不可 | 算入しない | 未開始 | 対象外 | 出現途中 | 発生しない |
+| RadioWhale経路の出現演出完了・制御移譲前 | 不可 | 算入しない | 未開始 | 対象外 | 出現済み | 発生しない |
+| Parry変換commit・弾き移動中 | 可 | 非`Reserved`なら算入する | 進行 | 固定sourceなし | 変換済みWildcardとして弾き方向へ移動 | 発生しない |
 | 選択可能な浮遊中 | 可 | 算入する | 進行 | 未使用Normalは到達時に自然破裂候補 | 維持 | 自然破裂時のみ発生 |
 | Charge判定中・未`Reserved` | 判定対象 | 算入する | 進行 | 同frame success commitならCharge優先。未成立なら自然破裂 | commitまたは自然破裂まで維持 | Charge不成立時の自然破裂のみ |
 | `Reserved` | 不可 | 算入しない | 停止 | 未使用時の自然破裂対象外 | 対応する発射タイミングまでReserved移行時のWorld座標に留まる | 発生しない |
@@ -518,6 +570,8 @@ MusicChart / NoteEventの構造については、BGMカテゴリ側を正本と�
 
 Normal Shaondamaを使用するBattleではRadioWhaleを必須とします。RadioWhaleを経由せずにNormalを選択可能化し、本ページの浮遊状態や最低保証算入へ直接追加する経路は設けません。
 
+最低保証補充WildcardもRadioWhaleの通常Spawn経路を使用します。一方、Parry由来WildcardはParry成立位置で即時変換・即時選択可能化されるため、RadioWhaleの通常受付、背中側Spawn、出現演出、演出完了通知、およびGameplayへの制御移譲へ合流しません。Parry由来Wildcardの弾き移動もRadioWhaleは管理しません。
+
 ### Charge
 
 選択可能なシャオンダマをPlayerが選択した後のCharge入力は[Playerアクション｜チャージ](/spec/player/player-action-charge)、AllocationとReservedは[Charge Allocation](/spec/draw-system/charge-allocation)を正本とします。
@@ -538,8 +592,10 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 
 - 最低保証不足から生成するWildcardの個数・生成元区分は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とします。
 - 最低保証補充のWildcardは、出現演出完了・選択可能化後に本ページの浮遊状態へ入ります。
-- Parry由来Wildcardの選択可能化timingは未確定であり、本ページから同じ出現演出を決めません。
-- 選択可能化後は、生成元にかかわらず選択可能・非`Reserved`の場合だけ最低保証数へ算入します。
+- Parry由来Wildcardは、Parry成立位置での変換commitと同時に選択可能なWildcard状態へ直接入り、RadioWhaleの出現演出を使用しません。
+- Parry由来Wildcardは、変換直後に対象ごとの弾き方向の力を1回だけ受け、選択可能なまま移動します。
+- 弾き移動中もCharge対象検索の対象となり、選択可能かつ非`Reserved`であれば変換commit時点から最低保証数へ算入します。
+- 変換後の浮遊、一般Lifetime、`Reserved`、消費、Palette Bullet化、Battle終了は、他のWildcardと同じ本ページの共通規則へ接続します。
 
 ### Combat／Enemy Damage
 
@@ -551,8 +607,12 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 
 | 事項 | 所有者・正本 |
 |---|---|
-| 出現演出中の状態・完了通知 | RadioWhale Spawn |
-| 出現演出完了後の浮遊・選択可能状態 | 本ページ |
+| RadioWhale経路の出現演出中の状態・完了通知 | RadioWhale Spawn |
+| RadioWhale経路の出現演出完了後の浮遊・選択可能状態 | 本ページ |
+| Parry由来Wildcardの変換commit・即時選択可能化 | 変換条件とcommitは万能シャオンダマ、commit後の状態は本ページ |
+| Parry対象ごとの弾き方向確定 | Player Parry |
+| Parry由来Wildcardの弾き移動・通常浮遊への接続 | 本ページ |
+| 弾き移動の力・減衰・移動量・落ち着くまでの時間の調整データ | 本ページ |
 | 最低保証数へ算入できる個体状態 | 本ページ |
 | 最低保証数・不足数・補充要求中数・Wildcard要求判断 | BGM側のShaondama生成 |
 | Wildcardの生成元・生成個数 | 万能シャオンダマ |
@@ -563,7 +623,6 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 | EnemyへのRGB加算・clamp・浄化 | Enemy Damage |
 | Battle結果確定・Result接続・Retry／次Battle境界 | Game／Combat／Stage・Room |
 | Battle結果確定後のShaondama固有のGameplay無効化とcleanup | 本ページ |
-| Parry由来Wildcardの選択可能化timing | 未確定。Wildcard／Parry／邪音玉／本ページへ同期して確定 |
 
 ## 責務外
 
@@ -583,6 +642,7 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 * AttackEvent
 * Player State
 * 万能シャオンダマの生成仕様
+* Parryの弾き方向を算出する具体方式
 * Enemy側のDamage計算・浄化
 * Clear／Game Overの結果確定
 
@@ -603,6 +663,10 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 | 浮遊範囲 | 未決 | Gameplayテストで調整予定 |
 | 配置方法 | 未決 | Gameplayテストで調整予定 |
 | 浮遊速度 | 未決 | Gameplayテストで調整予定 |
+| Parry由来Wildcardへ加える力の強さ | 未決 | 本ページの調整データとしてGameplayテストで調整予定 |
+| Parry由来Wildcardの力の減衰 | 未決 | 本ページの調整データとしてGameplayテストで調整予定 |
+| Parry由来Wildcardの最大移動量 | 未決 | 本ページの調整データとしてGameplayテストで調整予定 |
+| Parry由来Wildcardが落ち着くまでの時間 | 未決 | 本ページの調整データとしてGameplayテストで調整予定 |
 | 自然破裂Weak攻撃範囲 | 未決 | Gameplayテストで調整予定 |
 
 ## 未決事項
@@ -612,15 +676,22 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 - Game Over時に残存objectを即時消去するか、終了演出として表示を残すか
 - 生成後の詳細な浮遊アルゴリズム
 - 浮遊範囲・配置方法・浮遊速度
+- Parry由来Wildcardへ加える力の強さ、減衰、最大移動量、落ち着くまでの時間の具体値
+- Parry由来Wildcardの弾き移動中に、地形・Player・Enemy・他のShaondamaへ接触した場合の物理応答
 - Normal Shaondama自然破裂のWeak攻撃範囲
-- Parry由来Wildcardを変換成立と同時に選択可能にするか、出現演出完了後に選択可能にするか
 
 これらはGameplayテスト、バランス調整、または関係ページ間の決定が必要なため、意図的に未決とします。
 
 一方、次の事項は決定済みです。
 
-- 出現演出中は選択不可・最低保証数への算入外とする
-- 出現演出完了後に浮遊状態へ入り、選択可能化する
+- RadioWhale経路の出現演出中は選択不可・最低保証数への算入外とする
+- RadioWhale経路では出現演出完了後に浮遊状態へ入り、選択可能化する
+- Parry由来Wildcardは変換commit時点で選択可能なWildcard状態へ直接入り、RadioWhale経路や「出現演出中・選択不可」状態を使用しない
+- Parry由来Wildcardは変換直後に弾き方向の力を1回だけ受け、選択可能なまま移動する
+- 力を受けて移動するのは変換済みWildcardであり、邪音玉が弾かれて移動する中間Stateは設けない
+- Normal Parry／Just Parryによって、Wildcardの生成数、種別、選択条件、および弾き移動の基本性能を変えない
+- Parry由来Wildcardは弾き移動中もCharge対象検索の対象となり、選択可能かつ非`Reserved`なら変換commit時点から最低保証数へ算入する
+- Parry由来Wildcardは弾き移動後も通常のWildcardと同じ浮遊・一般Lifetime・`Reserved`・消費・Battle終了規則へ接続する
 - 最低保証数へ数えるのは選択可能かつ非`Reserved`の個体だけとする
 - `Reserved`へ移行した時点で最低保証数から除外する
 - 不足検出結果を生成側へ通知し、Wildcard生成判断は担当ページへ委譲する
@@ -628,7 +699,6 @@ AttackEventの成立・発火・処理についてはBGM側のAttackEvent仕様�
 - 自然破裂Damageには発生元NormalのRGB値を使用する
 - 同一フレームではCharge成功commitを自然破裂より優先する
 - Battle結果確定時は旧BattleのShaondamaをGameplay上無効化し、Retryまたは次のBattleへ状態・参照を持ち越さない
-- Parry由来Wildcardの選択可能化timingは未確定のまま扱う
 
 ## 関連タスク
 
