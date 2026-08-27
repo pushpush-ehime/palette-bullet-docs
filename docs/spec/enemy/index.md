@@ -112,7 +112,10 @@ Gameplay有効化には、少なくとも次の開始を含みます。
 - Hit／Damage受付
 - 攻撃
 - Enemy由来のSpawn連携
-- Clear判定への影響
+
+`PendingSpawn`として登録されたClear対象記録は、登録時点から未解決のClear対象として扱います。Enemy個体がGameplay上でActiveになる前であっても、当該記録が残っている間はClear条件を満たしません。
+
+Enemy個体のAI、Target提供、Hit／Damage受付、攻撃などのGameplay参加は、Stage側記録を`Active`へ移行した後に開始します。
 
 動的Spawn EnemyがClear対象でない場合も、Gameplay有効化前に所属`battleId`とEnemy個体識別情報を確定します。Clear対象でないEnemyについて、Stage側Clear対象記録を作成してはいけません。
 
