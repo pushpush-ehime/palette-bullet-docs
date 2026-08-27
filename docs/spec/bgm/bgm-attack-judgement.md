@@ -1,6 +1,6 @@
 ---
 title: "AttackEvent成立判定"
-description: Palette BulletにおけるAttackEvent発火時のGameplay結果判定・Reserved Shaondama使用実体仕様
+description: Palette BulletにおけるAttackEvent発火時のGameplay結果判定・使用実体・発射開始位置・Target共有仕様
 pageType: spec
 category: "BGM"
 status: 仮仕様
@@ -24,9 +24,12 @@ relatedTasks:
 - Chordの発射対象・発射タイミング
 - Arpeggioの発射対象・発射順・解決完了タイミング
 - AttackEvent発火時のPalette Bullet化
+- 弾丸化する各Shaondamaの現在World座標を使用した発射開始位置
+- 各Reserved Shaondamaの個体単位での1回消費
+- Palette Bullet化後のShaondama状態終了
 - Weak AttackEvent発火時の使用実体・終了処理
 - Complete Chord時のバフ発生条件
-- AttackEvent発火時のTarget座標snapshot
+- AttackEvent発火時のTarget座標snapshotと同一AttackEvent内での共有
 
 一方、本ページでは、以下を再定義しません。
 
@@ -72,7 +75,10 @@ AttackEvent発火時
 Complete / Incomplete / Zero Charge
 使用Reserved Shaondama
 Chord / Arpeggio発射対象
+Target座標snapshot
+各発射時点のShaondama現在World座標
 Palette Bullet化
+個体単位の1回消費
 Weak発火時処理
 → bgm/bgm-attack-judgement.md
 ```
@@ -127,9 +133,10 @@ Reserved中の、
 
 - Lifetime
 - 自然破裂対象からの除外
-- 対応AttackEvent解決までの存在保証
+- Charge成功位置での停止・位置保持
+- 対応する発射タイミングまでの存在保証
 
-などは、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
+などは、[浮遊・挙動](/spec/shaondama-music/floating-behavior)を正本とします。AttackEvent / Slotへの対応付けと`Reserved`へのcommitは、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正本とします。
 
 本ページでは、
 
@@ -154,9 +161,13 @@ AttackEvent / Slotへ対応付け
 ↓
 Reserved
 ↓
+Charge成功位置で停止・待機
+↓
 AttackEvent発火
 ↓
-発火処理でPalette Bullet化
+対応する発射タイミングに現在World座標を取得
+↓
+Palette Bullet化・個体消費
 ↓
 攻撃
 ```
@@ -215,7 +226,7 @@ AttackEvent Target Position Snapshotとして保持
 同じAttackEventが発射する全Palette Bulletへ使用
 ```
 
-TTarget候補の優先順位と座標計算規則は、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
+Target候補の優先順位と座標計算規則は、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
 
 本ページは、その規則をAttackEvent発火時に1回だけ実行し、Target座標をsnapshotします。
 
@@ -232,6 +243,8 @@ TargetとなったMarkerまたはEnemyへの追従参照は保持しません。
 
 発火後にMarkerやEnemyが移動・消滅してもTarget座標を再取得しません。
 
+同じAttackEventに属するすべてのPalette Bulletは、発射タイミングや発射開始位置が異なる場合も、同じTarget座標snapshotを共有します。
+
 この規則は、以下のすべてへ適用します。
 
 - Normal Chord AttackEvent
@@ -242,6 +255,51 @@ TargetとなったMarkerまたはEnemyへの追従参照は保持しません。
 - Zero Charge
 
 Zero ChargeでもAttackEvent発火時のsnapshot処理は行いますが、使用するPalette Bulletが存在しないため、確定したTarget座標を使用する攻撃は発生しません。
+
+## 発射開始位置を各Shaondamaの現在World座標から取得する
+
+Palette Bullet化する各Shaondamaについて、弾丸化する瞬間の現在World座標を取得し、Palette Bulletの発射開始位置として渡します。
+
+```text
+Palette Bullet化の発射タイミング
+↓
+対象Reserved Shaondamaの現在World座標を取得
+↓
+Palette Bullet Start Positionとして渡す
+↓
+Palette Bullet化・発射
+```
+
+Charge入力時点、Charge成功時点、`Reserved`へのcommit時点、またはAttackEvent発火時点に保存した過去座標を、後続の発射タイミングにおける現在World座標の代わりに使用しません。
+
+ただし、`Reserved`中のShaondamaをCharge成功位置へ留めるLifecycleは、[浮遊・挙動](/spec/shaondama-music/floating-behavior)を正本とします。本ページは、発射タイミングにその個体が実際に保持している現在World座標を取得してPalette Bullet側へ渡します。
+
+AttackEvent Typeごとの取得タイミングは次のとおりです。
+
+| AttackEvent Type | 発射開始位置の取得タイミング |
+| --- | --- |
+| Chord | AttackEvent発火時の同一発射タイミングに、各Reserved Shaondamaから個別に取得 |
+| Arpeggio | 各Entryの発射タイミングに、対応するReserved Shaondamaから取得 |
+| Weak | Weak AttackEvent発火時に、対応する1つのReserved Shaondamaから取得 |
+
+同じAttackEvent内でTarget座標は共有しますが、発射開始位置はPalette Bulletごとに個別の値です。複数のShaondamaをPlayer位置や共通の発射Transformへ移動してから発射しません。
+
+## Palette Bulletへ渡す発射情報
+
+各Palette Bullet化では、少なくとも次の情報を一体としてPalette Bullet側へ渡します。
+
+| 情報 | 内容 |
+| --- | --- |
+| 発生元個体識別情報 | 弾丸化するReserved Shaondamaの個体 |
+| 有効RGB情報 | 発生元Shaondamaから引き継ぐRGB payloadの基準値 |
+| 発射開始位置 | 弾丸化する瞬間の対象Shaondamaの現在World座標 |
+| Target座標 | AttackEvent発火時に確定した共有Target座標snapshot |
+| Battle識別情報 | Palette Bulletが属する現在のBattle |
+
+Palette Bulletの直線飛行、衝突、Direct Contact RGB Damage、Explosion RGB Damage、爆風遮蔽、Markerとの相互作用は、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
+
+同一フレーム内のDamage集約、丸め、Clamp、浄化値への反映、浄化成立判定は、[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。本ページではDamage値や浄化結果を再計算しません。
+
 ## Click / Dragの違いを判定材料にしない
 
 発火時には、そのReserved Shaondamaが、
@@ -383,6 +441,37 @@ Empty Slotから架空のPalette Bulletを生成しません。
 
 また、Slotの数値から新しいShaondama実体を作り直す構造にはしません。
 
+## 各Shaondamaを1回だけ消費する
+
+発射対象となるReserved Shaondamaは、自身に対応する発射タイミングで1回だけPalette Bullet化し、個体単位で消費します。
+
+```text
+Reserved Shaondama
+↓
+対応する発射タイミング
+↓
+現在World座標を取得
+↓
+Palette Bullet化
+↓
+Shaondamaとして消費済み
+```
+
+Palette Bullet化が成立した時点で、次を一体として処理します。
+
+1. 発射開始位置として対象個体の現在World座標を取得する
+2. 個体情報と有効RGB情報をPalette Bulletへ引き渡す
+3. 対象個体をPalette Bullet化する
+4. 対象個体をShaondamaとして消費済みにする
+5. Slot / AttackEvent上の`Reserved`参照を使用済みとして扱う
+6. 同じ個体による再発射を禁止する
+
+Palette Bullet化した個体を、ShaondamaとPalette Bulletの両方としてGameplay上に残しません。
+
+同じobjectを状態遷移させるか、情報を引き継いだ別objectへ置き換えるかは実装方式とします。どちらの方式でも、同一個体の二重存在・二重消費・二重発射を発生させてはなりません。
+
+同じShaondamaの参照が複数Slotへ重複している不正なAllocation状態を検出した場合も、その個体から複数のPalette Bulletを発射しません。最初の有効な消費だけを許可し、重複参照は無効なruntime状態として扱います。
+
 ---
 
 # Charge Actionのsuccess / missとの分離
@@ -428,6 +517,10 @@ AttackEvent発火
 `Type = Chord`では、AttackEvent発火時に`Complete / Incomplete / Zero Charge`を確定します。
 
 Chordの各Occupied Slotに対応するReserved Shaondamaは、**同一のChord音楽タイミング**でPalette Bullet化・発射します。
+
+この発射タイミングに、各Reserved Shaondamaの現在World座標を個別に取得し、それぞれのPalette Bulletの発射開始位置として渡します。Chord内の全Palette Bulletは同じTarget座標snapshotを使用しますが、発射開始位置は各Shaondamaの位置を使用します。
+
+Palette Bullet化した各Shaondamaは、その時点で1回だけ消費し、Reserved Shaondamaとして残しません。
 
 ---
 
@@ -573,6 +666,8 @@ Arpeggio AttackEventは、発火した瞬間に、以下を確定してsnapshot�
 - 使用するReserved Shaondama
 - AttackEvent全体で共有するTarget座標
 
+各Palette Bulletの発射開始位置は、AttackEvent発火時のsnapshot対象に含めません。発射開始位置は、各Entryの発射タイミングに対応するShaondamaの現在World座標から取得します。
+
 ```text
 AttackEvent発火
 
@@ -592,6 +687,8 @@ G Reserved Shaondama
 snapshotした結果とTarget座標を、最後のArpeggio timingの処理が完了するまで維持します。
 
 各Arpeggio timingでTargetを再取得しません。
+
+先行EntryのPalette Bullet化によって、その個体に対応するReserved参照は消費済みになります。後続Entry用にsnapshotした別のReserved Shaondamaは、自身の発射タイミングまで維持します。
 ---
 
 ## 発射順
@@ -663,6 +760,28 @@ G timing
 AttackEvent発火時に、Arpeggioの全Reserved Shaondamaを一括でPalette Bullet化して先に保持する構造にはしません。
 
 各Reserved Shaondamaは、自身に対応するArpeggio timingで使用します。
+
+各Entryの発射処理は、次の順序で行います。
+
+```text
+Entry発射タイミング
+↓
+snapshot済みの対応Reserved Shaondamaを確認
+↓
+対象Shaondamaの現在World座標を取得
+↓
+共有Target座標snapshotとともにPalette Bulletへ渡す
+↓
+Palette Bullet化・発射
+↓
+対象Shaondamaを1回だけ消費
+↓
+同じ個体のReserved参照を使用済みにする
+```
+
+1発目や先行Entryの発射時点で、後続Entryに対応するShaondamaの発射開始位置を先に確定しません。
+
+Palette Bullet化した個体を、後続Entryまたは別AttackEventでReserved Shaondamaとして再利用しません。
 
 ---
 
@@ -847,10 +966,16 @@ Target座標snapshot
 ↓
 対応Reserved Shaondama 1つ
 ↓
-Palette Bullet化
+対象Shaondamaの現在World座標を取得
+↓
+共有Target座標と発射開始位置をPalette Bulletへ渡す
+↓
+Palette Bullet化・個体消費
 ↓
 単音Weak Attack
 ```
+
+Weak AttackEventでも、対応Shaondamaの現在World座標を発射開始位置として使用し、その個体を1回だけPalette Bullet化します。弾丸化後に同じ個体をReserved Shaondamaとして残しません。
 
 発火時に、
 
@@ -925,6 +1050,8 @@ Weak AttackEvent発火
 ↓
 対応Reserved ShaondamaをPalette Bullet化
 ↓
+対応Shaondamaを消費済みにし、Reserved参照を終了
+↓
 Weak Attackとして使用
 ↓
 Weak AttackEvent解決完了
@@ -943,7 +1070,13 @@ Weak AttackEventを、発火後に通常AttackEventの蓄積枠へ残しませ�
 ```text
 Reserved Shaondama
 ↓
+対応する発射タイミングに現在World座標を取得
+↓
+発射開始位置・共有Target座標・個体情報・有効RGB情報を引き渡す
+↓
 Palette Bullet化
+↓
+Shaondamaとして1回だけ消費
 ↓
 発射開始
 ```
@@ -951,6 +1084,8 @@ Palette Bullet化
 までです。
 
 Palette Bullet化された実体は、同じAttackEventのReserved Shaondamaとして再利用しません。
+
+Palette Bullet化した時点で、対象個体のShaondamaとしての浮遊状態と`Reserved`状態を終了します。同一個体をShaondamaとPalette Bulletの両方として残しません。
 
 以下はPalette Bullet側の正本へ委譲します。
 
@@ -978,7 +1113,8 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | 1 Slot = 最大1 Shaondama | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
 | 同音Slotへの割り当て | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
 | Weak AttackEventの生成・割り当て | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
-| Reserved化・Reserved中Lifecycle | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
+| Reserved化・AttackEvent / Slotへの対応付け | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
+| Reserved中の停止・位置保持・Lifetime・自然破裂除外 | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
 | 通常 / 万能ShaondamaのWeak用NoteEvent解決 | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
 | AttackEventの必要音・Type・Harmony | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) |
 | Arpeggio順序・音楽的タイミング | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) |
@@ -989,6 +1125,9 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | Complete Chordのバフ発生条件 | **本ページ** |
 | Arpeggioの使用対象snapshot | **本ページ** |
 | Arpeggioの発射対象 | **本ページ** |
+| 各発射時点におけるShaondama現在World座標の取得・引き渡し | **本ページ** |
+| 発射対象Shaondamaの個体単位での1回消費 | **本ページ** |
+| Palette Bullet化後のReserved参照終了 | **本ページ** |
 | Arpeggio AttackEventの解決完了タイミング | **本ページ** |
 | Weak AttackEvent発火時の使用実体 | **本ページ** |
 | Weak AttackEvent発火後の解決・破棄 | **本ページ** |
@@ -998,6 +1137,10 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | Markerの有効条件・置換・消滅 | [マーカー](/spec/combat/marker) |
 | Target候補の優先順位・座標計算 | [パレットブレット](/spec/combat/palette-bullet) |
 | AttackEvent発火時のTarget座標snapshot | **本ページ** |
+| 同一AttackEvent内でのTarget座標共有 | **本ページ** |
+| Palette Bulletの発射開始位置に使用する座標の規則 | [パレットブレット](/spec/combat/palette-bullet) |
+| Direct Contact / Explosion RGB Damage候補の生成 | [パレットブレット](/spec/combat/palette-bullet) |
+| Damage候補の集約・丸め・Clamp・浄化判定 | [敵の被弾と浄化](/spec/enemy/damage-and-purify) |
 
 ---
 
@@ -1007,6 +1150,8 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 
 ```text
 AttackEvent発火
+↓
+Target座標を1回snapshot
 ↓
 発火時点のSlot / Reserved状態を確認
 ↓
@@ -1029,13 +1174,21 @@ AttackEvent Type
 │
 ├─ Chord
 │   ↓
-│   同一音楽タイミングでPalette Bullet化・発射
+│   同一音楽タイミングで各Shaondamaの現在World座標を取得
+│   ↓
+│   共有Target座標とともにPalette Bulletへ渡す
+│   ↓
+│   Palette Bullet化・発射・個体消費
 │
 └─ Arpeggio
     ↓
-    発火時snapshot
+    結果・使用対象を発火時snapshot
     ↓
-    各Slotの音楽タイミングでPalette Bullet化・発射
+    各Entryの発射タイミングに対応Shaondamaの現在World座標を取得
+    ↓
+    共有Target座標とともにPalette Bulletへ渡す
+    ↓
+    Palette Bullet化・発射・個体消費
     ↓
     最後のArpeggio timing処理後に解決完了
 ```
@@ -1047,9 +1200,15 @@ AttackEvent Type
 ```text
 Weak AttackEvent発火
 ↓
+Target座標を1回snapshot
+↓
 対応Reserved Shaondama 1つ
 ↓
-Palette Bullet化
+対象Shaondamaの現在World座標を取得
+↓
+共有Target座標とともにPalette Bulletへ渡す
+↓
+Palette Bullet化・個体消費
 ↓
 単音Weak Attack
 ↓
@@ -1069,6 +1228,13 @@ Weak AttackEvent解決完了
 - 発火時には`charge-allocation.md`で確定済みのAllocation結果を使用する
 - 発火時に別AttackEvent検索・Slot再割り当て・Weak / Normal再判定を行わない
 - Charge成功時にはPalette Bullet化せず、ReservedとしてAttackEvent発火を待つ
+- AttackEvent発火時にTarget座標を1回だけ確定する
+- 同じAttackEventが発射する全Palette BulletでTarget座標を共有する
+- 各Palette Bulletの発射開始位置には、弾丸化する瞬間の対象Shaondamaの現在World座標を使用する
+- Chordでは同一発射タイミングに各Shaondamaの現在World座標を個別に取得する
+- Arpeggioでは各Entryの発射タイミングに対応Shaondamaの現在World座標を取得する
+- 発射対象Shaondamaは個体単位で1回だけPalette Bullet化・消費する
+- Palette Bullet化後に同じ個体をReserved Shaondamaとして残さない
 - `Complete`は全要求Slotが`Occupied`の場合とする
 - `Incomplete`は`Occupied`と`Empty`が混在する場合とする
 - `Incomplete`でもOccupied SlotのReserved Shaondamaを攻撃へ使用する
@@ -1096,7 +1262,10 @@ Weak AttackEvent解決完了
 - Weak AttackEventは発火・使用後に解決完了し、破棄する
 - Target候補の優先順位・座標計算は`combat/palette-bullet.md`を正本とする
 - AttackEvent発火時のTarget座標snapshotは本ページを正本とする
+- Direct Contact / Explosion RGB Damage候補の生成は`combat/palette-bullet.md`を正本とする
+- Damage候補の集約・丸め・Clamp・浄化判定は`enemy/damage-and-purify.md`を正本とする
 - Palette Bullet発射後の飛翔・命中・Damage・消滅は別正本へ委譲する
+
 ---
 
 # 未決事項
@@ -1120,20 +1289,13 @@ Weak AttackEvent解決完了
 - 重複仕様
 - UI
 
-## Palette Bullet発射後
-
-- 飛翔
-- 命中
-- Damage / 浄化計算
-- Enemy側処理
-- Bullet消滅
-- 未着弾BulletのBattle終了処理
-
 ## 表現
 
 - AttackEvent / Slot UIの具体的な消去演出
 
 本ページでは、これらを推測で追加しません。
+
+Palette Bulletの飛翔・命中・Direct Contact RGB Damage・Explosion RGB Damage・Bullet消滅・Battle終了時の無効化は、[パレットブレット](/spec/combat/palette-bullet)で確定済みです。Enemy側のDamage集約・丸め・Clamp・浄化判定は、[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とし、本ページの未決事項には含めません。
 
 ---
 
