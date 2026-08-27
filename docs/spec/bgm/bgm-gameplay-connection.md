@@ -31,7 +31,7 @@ relatedTasks: []
 - Pause / Resume
 - BGM Loop
 - Battle終了時のGameplay同期解除・cleanup / Room Retry
-- Parry成功時のHitStopと音楽時計の未確定境界
+- Parry HitStop中のBGM Audio・3時計・AttackEvent同期
 - 戦闘BGM / Palette Bullet音程音 / Gameplay SEのレイヤー関係
 
 一方、以下は本ページでは再定義しません。
@@ -49,6 +49,7 @@ relatedTasks: []
 - AttackEventの音楽データ構造そのもの
 - Battle結果の確定・同一frame終了候補の優先順位
 - Result表示・Result操作解禁・Result後のroute
+- Parry判定batchの収集・Normal / Just評価・HitStop中のParry入力保持
 
 これらは各正本ページへ委譲します。
 
@@ -87,12 +88,19 @@ Battle／Gameplay／MusicChart時計
 system pre-rollとBGM Audio開始
 Palette Bullet発射と音程音
 Gameplay SEとの音響接続
+Parry HitStop中のBGM Audio・3時計継続
+Parry HitStop中のAttackEvent同期維持
 Battle結果確定時の3時計停止
 MusicChart Event出力停止
 発行待ち通知・予約callback無効化
 旧battleId同期event拒否
 Gameplay同期解除cleanup完了通知
 → 本ページ
+
+Parry判定batch
+Normal / Just評価
+Parry HitStop中の入力保持
+→ player/player-action-parry.md
 ```
 
 本ページではGameplay判定を再実行しません。
@@ -1108,6 +1116,8 @@ system pre-roll時間は調整可能なパラメータとし、具体値は現�
 | Pause中 | 受付停止 | 受付停止 | 同じ時点で停止 | system pre-roll中なら未再生のまま、再生開始後なら現在位置で停止 | Gameplay状態を保持 | 進行しない |
 | Battle結果確定後 | 無効 | 無効 | 3時計を終了位置で停止し、再開しない | Gameplay同期から切り離す。停止・Fade・演出継続はいずれも可 | Gameplay対象として無効 | 新規開始せず、発行待ち通知・callbackも無効 |
 
+Parry HitStopは、この表へ新しい音楽runtime phaseを追加しません。HitStop開始前のphaseを維持したまま、BGM Audio、3時計、system pre-roll、およびAttackEventの進行を継続します。Parry HitStopを理由として`Pause中`の行へ遷移してはいけません。
+
 ---
 
 ## 同期の基準
@@ -1219,14 +1229,101 @@ Pauseは同じ`battleId`の同期状態・予約event・再開位置を保持す
 
 # Parry HitStop
 
-通常Parry / Just Parryのいずれであっても、Parry成功時にはHitStopが発生します。
+Parry HitStopは、Parry成功時の手触りを強調するための局所的な演出です。
 
-ただし、HitStop中に以下を停止するかは未確定です。
+HitStopによってBGM Audio、音楽runtime、またはAttackEventの音楽同期を変更しません。
 
-- 戦闘BGMの再生
-- MusicChart時計
+## 発生条件とbatch単位
 
-したがって、HitStopをPauseと同一処理であるとは現時点で規定しません。BGM / MusicChart時計を停止するかどうかを実装側で独自に確定せず、決定後はいずれの方式でもAttackEventの欠落・重複やBGMとの時間関係の破綻が起きないよう、本ページへ同期規則を追記します。
+Normal ParryとJust Parryのどちらでも、Parry判定batchが成功した場合にHitStopを発生させます。
+
+HitStopの発生単位は邪音玉1弾ではなく、**成功したParry判定batch**です。
+
+同一Physics Stepの同じ成功batch内に複数の邪音玉が含まれていても、HitStopは1batchにつき1回だけ発生させます。
+
+```text
+同一Physics Step
+↓
+邪音玉A / B / Cを同じParry判定batchとして処理
+↓
+batch成功
+↓
+A / B / CすべてParry成功
++
+HitStopはbatch全体に1回
+```
+
+各邪音玉のParry成功callbackからHitStopを個別に要求し、同じbatchで複数回発生させてはいけません。
+
+Just Parryでは、Normal Parryと区別できるようにHitStopの強さと長さを変更できます。Normal / Justそれぞれの具体的な強さ・時間は調整パラメータとし、本ページでは数値を固定しません。
+
+Parry判定batchの収集、Normal / Just評価、およびHitStopパラメータは、[Playerアクション｜パリィ](/spec/player/player-action-parry)を正本とします。本ページは、確定済みのHitStop要求をBGM・3時計・AttackEventへどう接続するかだけを定義します。
+
+## HitStop中のBGM Audioと3時計
+
+Parry HitStop中も、再生中の戦闘BGM Audioを停止しません。
+
+また、以下の3時計を停止、減速、巻き戻し、補正しません。
+
+- `Battle Clock`
+- `Gameplay Clock`
+- `MusicChart Clock`
+
+```text
+Parry HitStop開始
+├─ 局所的なHitStop演出を適用
+├─ 戦闘BGM Audioは継続
+├─ Battle Clockは継続
+├─ Gameplay Clockは継続
+├─ MusicChart Clockは継続
+└─ AttackEvent同期は継続
+```
+
+3時計はHitStop開始前と同じ時間関係を保ったまま進行します。HitStop終了時にBGM Audio位置やMusicChart位置をseekしたり、停止していた時間分のoffsetを追加したりしません。
+
+system pre-roll中にParry HitStopが発生した場合も、3時計とsystem pre-rollを進行させます。HitStopによってBGM Audio開始を遅延させず、system pre-roll終了点へ到達した時点で予定どおり音源位置0からBGM Audioを開始します。
+
+HitStop自体とは別にPauseまたはBattle結果確定が成立した場合は、それぞれの節で定義する停止規則を適用します。HitStop中であることを理由として、それらの上位境界を無効化しません。
+
+## HitStop中のAttackEvent
+
+HitStop中も`MusicChart Clock`が進行するため、AttackEventと関連eventは元の音楽時刻どおりに処理します。
+
+対象には少なくとも以下を含みます。
+
+- AttackEvent Preview
+- Charge timing
+- AttackEvent Fire
+- Arpeggio Entry timing
+- NoteEventに基づくGameplay通知
+- Palette Bullet発射と音程音の発音
+
+HitStopと重なったことを理由として、これらを遅延、再発行、欠落、重複させてはいけません。
+
+```text
+MusicChart上の予定時刻へ到達
+↓
+HitStop中かどうかにかかわらず
+対象eventを予定時刻に1回だけ処理
+```
+
+HitStop中に到達したAttackEventを終了後までqueueへ保留してまとめて実行したり、HitStop終了時に同じeventを再発行したりしません。
+
+HitStopによってAttackEventの`Complete / Incomplete / Zero Charge`を再判定せず、発火対象、Arpeggio順序、音程音の発音時刻も変更しません。
+
+## Pauseとの分離
+
+Parry HitStopをPauseとして扱いません。
+
+HitStop開始時にPause用の入力gate、時計停止、Audio停止、予約event保持、Resume位置保存を使用しません。HitStop終了時にもPause Resume処理を実行しません。
+
+したがって、Parry HitStopの前後でBGM AudioとMusicChartを再同期する特別な処理は不要です。HitStopは音楽runtimeから見ると時間軸を変更しない局所演出として扱います。
+
+## HitStop中のParry入力
+
+HitStop中のParry Pressを1回分だけ保持する規則、Holdとの区別、HitStop終了時の開始条件・スタミナ再確認、および強制終了時の保持入力破棄は、[Playerアクション｜パリィ](/spec/player/player-action-parry)を正本とします。
+
+本ページではParry入力を保持・再判定しません。また、入力保持のためにBGM Audio、3時計、MusicChart Event出力gateを停止しません。
 
 ---
 
@@ -1608,7 +1705,7 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 | --- | --- |
 | サウンド班 | 戦闘BGM制作、AttackEventの音楽的意図、Palette Bullet音程音・Gameplay SEの音響制作、実際にBGMへ重ねた際の音響確認 |
 | プランナー | AttackEventをGameplayとして採用可能か確認、Gameplayルールとの整合確認、必要なゲーム要件の決定 |
-| プログラマー | Battle IDに属する準備gateの構築、Ready gate成立時の受付解禁と3時計同時開始、system pre-rollとBGM再生位置の同期、確定済みAttackEvent結果からの発音・発射タイミング制御、Battle結果確定時の3時計停止・Event出力gate閉鎖・予約callback無効化・`battleId`検証・同期解除完了通知、各音レイヤーを調整可能な再生環境の実装 |
+| プログラマー | Battle IDに属する準備gateの構築、Ready gate成立時の受付解禁と3時計同時開始、system pre-rollとBGM再生位置の同期、確定済みAttackEvent結果からの発音・発射タイミング制御、Parry HitStop中のBGM Audio・3時計・AttackEvent同期維持、Battle結果確定時の3時計停止・Event出力gate閉鎖・予約callback無効化・`battleId`検証・同期解除完了通知、各音レイヤーを調整可能な再生環境の実装 |
 
 サウンド班は、GameplayのSlot割り当てや`Complete / Incomplete / Zero Charge`の判定ルールそのものを決定しません。
 
@@ -1624,6 +1721,8 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 | Battle結果の確定・Result操作解禁・Result後のroute | [ゲーム全体](/spec/game/) / `ui/index.md` |
 | Battle ID・Combat状態・Combat受付 | [戦闘](/spec/combat/) |
 | Ready gateと3時計・BGM Audio・system pre-rollのruntime接続 | **本ページ** |
+| Parry HitStop中のBGM Audio・3時計・AttackEvent同期 | **本ページ** |
+| Parry判定batch・Normal / Just評価・HitStopの強さと長さ・HitStop中のParry入力保持 | [Playerアクション｜パリィ](/spec/player/player-action-parry) |
 | Battle結果確定時の`Battle / Gameplay / MusicChart Clock`停止 | **本ページ** |
 | MusicChartからGameplayへのEvent出力停止 | **本ページ** |
 | 発行待ちGameplay通知・予約callback・BGM Audio開始予約の無効化 | **本ページ** |
@@ -1718,11 +1817,7 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 
 system pre-rollをパラメータとして持つことは確定していますが、具体的な時間は未確定です。
 
-## Parry HitStop中の音楽時計
-
-Parry成功時にHitStopを発生させることは確定しています。一方、HitStop中に戦闘BGMの再生とMusicChart時計を停止するかは未確定です。
-
-一方、**実際に発音するoctaveそのものは未決事項ではありません。**
+なお、**実際に発音するoctaveそのものは未決事項ではありません。**
 
 通常AttackEventでは、そのSlotが楽曲上で対応するMIDI Noteのoctaveを使用します。
 
