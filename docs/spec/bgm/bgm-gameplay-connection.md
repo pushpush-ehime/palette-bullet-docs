@@ -1,6 +1,6 @@
 ---
 title: "BGMとGameplayの接続"
-description: Palette BulletにおけるBGMの時間軸とGameplay結果の音響接続仕様
+description: Palette BulletにおけるBGMの時間軸、Gameplay結果の音響接続、Battle終了時の同期解除仕様
 pageType: spec
 category: "BGM"
 status: 仮仕様
@@ -30,7 +30,7 @@ relatedTasks: []
 - Battle開始時の準備gateとsystem pre-roll
 - Pause / Resume
 - BGM Loop
-- Battle終了 / Room Retry
+- Battle終了時のGameplay同期解除・cleanup / Room Retry
 - Parry成功時のHitStopと音楽時計の未確定境界
 - 戦闘BGM / Palette Bullet音程音 / Gameplay SEのレイヤー関係
 
@@ -47,6 +47,8 @@ relatedTasks: []
 - Palette Bullet化する対象の決定
 - Palette Bullet発射後のTarget / 飛翔 / 命中 / Damage / 消滅
 - AttackEventの音楽データ構造そのもの
+- Battle結果の確定・同一frame終了候補の優先順位
+- Result表示・Result操作解禁・Result後のroute
 
 これらは各正本ページへ委譲します。
 
@@ -85,6 +87,11 @@ Battle／Gameplay／MusicChart時計
 system pre-rollとBGM Audio開始
 Palette Bullet発射と音程音
 Gameplay SEとの音響接続
+Battle結果確定時の3時計停止
+MusicChart Event出力停止
+発行待ち通知・予約callback無効化
+旧battleId同期event拒否
+Gameplay同期解除cleanup完了通知
 → 本ページ
 ```
 
@@ -183,6 +190,8 @@ Shaondama由来音程音なし
 ```
 
 AttackEventの結果によって、元の戦闘BGMを置き換えたり停止したりはしません。
+
+ただし、この接続フローは現在のBattleが結果未確定で、MusicChartからGameplayへのEvent出力gateが有効な間だけ動作します。Battle結果確定後は3時計とGameplay向け同期eventを停止し、「Battle終了」で定義するcleanupへ移行します。
 
 ---
 
@@ -1097,6 +1106,7 @@ system pre-roll時間は調整可能なパラメータとし、具体値は現�
 | system pre-roll中 | 有効 | 有効 | 同じ時間関係で進行 | 停止・音源位置0で待機 | 選択・Charge可能 | Preview・Charge可能 |
 | system pre-roll終了後 | 有効 | 有効 | 同じ時間関係で進行 | 音源位置0から再生 | 通常Battle規則 | 通常のTiming規則 |
 | Pause中 | 受付停止 | 受付停止 | 同じ時点で停止 | system pre-roll中なら未再生のまま、再生開始後なら現在位置で停止 | Gameplay状態を保持 | 進行しない |
+| Battle結果確定後 | 無効 | 無効 | 3時計を終了位置で停止し、再開しない | Gameplay同期から切り離す。停止・Fade・演出継続はいずれも可 | Gameplay対象として無効 | 新規開始せず、発行待ち通知・callbackも無効 |
 
 ---
 
@@ -1203,6 +1213,8 @@ AttackEvent / Arpeggio / Gameplay音
 
 BGMだけが先に進んだり、system pre-rollだけが消費されたり、Arpeggioの発射・発音順序がずれたりしないようにします。
 
+Pauseは同じ`battleId`の同期状態・予約event・再開位置を保持する一時停止です。Battle結果確定時の終了停止は、発行待ち通知と予約callbackを無効化して同じBattleを再開不能にする処理であり、Pause / Resumeと共通化して意味を曖昧にしません。
+
 ---
 
 # Parry HitStop
@@ -1272,23 +1284,263 @@ system pre-rollはBattle音楽runtimeの開始時に置く区間であり、通�
 
 ## Battle終了
 
-Battle終了時は、
+### 本節の責務と同期解除の開始条件
+
+Battle結果の確定、同一frameに複数の終了候補が成立した場合の優先順位、およびResultへの接続は、[ゲーム全体](/spec/game/)を正本とします。
+
+本ページでは、Gameから現在のBattleに対する確定済みBattle結果を受け取った後、BGMとGameplayの同期接続を終了する処理を定義します。`Clear / Game Over`のどちらであっても、Gameplay同期解除の内容は同じです。
+
+Battle終了候補を受け取っただけでは停止しません。同一frame内の終了候補が収集され、Gameが最終Battle結果を一度だけ確定した時点を、同期解除の開始境界とします。
 
 ```text
-Battle終了
+同一frame内のBattle終了候補を収集
 ↓
-Battle／Gameplay／MusicChart時計終了
-+
-戦闘BGM終了
-+
-未発音のBGM同期音楽イベント終了
+GameがBattle結果を確定
+↓
+BGM / Gameplay同期Ownerへ
+BattleResultFinalized(battleId, result)
+↓
+現在のbattleIdに対する同期解除を開始
 ```
 
-とします。
+本ページでは`result`を再判定せず、Gameから通知された確定結果だけを使用します。
 
-終了したBattleに紐づくAttackEventから、新しいPalette Bullet音程音を後から発音しません。
+---
 
-system pre-roll中にBattleが終了した場合も、そのsystem pre-rollと予約済みのBGM再生開始を終了し、後から旧BattleのBGMを開始しません。
+### 3時計の終了停止
+
+Battle結果確定時に、現在のBattleに属する次の3時計を停止します。
+
+- `Battle Clock`
+- `Gameplay Clock`
+- `MusicChart Clock`
+
+3時計は、同じBattle終了境界で停止します。
+
+```text
+Battle結果確定
+↓
+Battle Clock停止
++
+Gameplay Clock停止
++
+MusicChart Clock停止
+```
+
+この停止はPauseとは異なり、同じBattleを後からResumeするための一時停止ではありません。停止した3時計を旧Battleのまま再開したり、Retry時に位置を巻き戻して再利用したりしません。
+
+3時計の停止後は、BGM Audioが演出として物理的に再生を続けていても、そのAudio再生位置を現在BattleのGameplay同期基準として使用しません。
+
+system pre-roll中にBattle結果が確定した場合も、3時計とsystem pre-roll進行を停止します。予約済みのBGM Audio開始を無効化し、system pre-roll終了時刻へ後から到達した扱いにして旧BattleのBGMを音源位置0から開始しません。
+
+---
+
+### MusicChart EventのGameplay出力停止
+
+Battle結果確定時に、MusicChartからGameplayへのEvent出力gateを閉じます。
+
+```text
+Battle結果確定
+↓
+MusicChart → Gameplay Event出力gateを閉じる
+↓
+3時計停止
+↓
+新しいMusicChart EventをGameplayへ送らない
+```
+
+結果確定後は、旧BattleのMusicChart時間軸から、以下を含む新しいGameplay処理を開始しません。
+
+- AttackEventの予告通知
+- AttackEventのCharge timing通知
+- AttackEvent発火通知
+- Arpeggio Entryのtiming通知
+- NoteEventに基づくGameplay通知
+- Palette Bullet音程音の新規発音要求
+- MusicChartに同期したShaondama生成・供給要求
+- その他、MusicChart Eventを起点とするGameplay状態変更
+
+各Gameplay Ownerが受け取った後のAttackEvent取消、Reserved Shaondama解放、Projectile無効化などは、それぞれのOwnerページを正本とします。本ページは、それらの起点となるMusicChart同期eventを新たに送らないことを保証します。
+
+終了したBattleに紐づくAttackEventから、新しいPalette Bullet音程音を後から発音しません。Battle結果確定より前にすでに発音開始済みの音を巻き戻すことはしません。
+
+---
+
+### 発行待ち通知・予約callbackの無効化
+
+3時計の停止だけでは、すでにqueueへ登録済みの通知やcallbackが後から実行される可能性があります。そのため、Battle結果確定時に、現在のBattleに属する以下を無効化します。
+
+- Gameplayへの発行待ちMusicChart通知
+- system pre-roll終了時のBGM Audio開始予約
+- AttackEvent Preview / Charge / Fire用の予約callback
+- Arpeggio Entry timing用の予約callback
+- BGM同期Gameplay音の予約発音callback
+- MusicChart Loop境界に予約されたGameplay callback
+- Gameplay Ownerへまだhand-offされていない同期event
+
+予約自体を解除できる場合は取消し、実行基盤の都合でcallbackが呼び出される可能性が残る場合は、実行直前の`battleId`判定とEvent出力gateによって副作用のないno-opとして終了させます。
+
+無効期間中に到達した通知やcallbackをqueueへ保存し、Result中またはRetry後にまとめて実行してはなりません。
+
+AttackEvent Ownerへすでにhand-off済みの発火前AttackEventや発火途中Arpeggioについては、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)のBattle終了cleanupへ委譲します。本ページ側で同じReserved ShaondamaやAttackEvent snapshotを重複して解放・破棄しません。
+
+---
+
+### `battleId`による旧Battle同期eventの拒否
+
+MusicChart Event、Gameplay向け通知、予約callback、Audio開始予約、および同期解除完了通知には、所属Battleを識別できる`battleId`を対応付けます。
+
+本ページ内の「Battle ID」はBattle識別情報の概念名、`battleId`は通知・runtime dataで保持する識別値を表し、同じBattle識別契約を指します。
+
+Gameplay向け同期eventを送る直前に、少なくとも次を確認します。
+
+```text
+eventのbattleId
+==
+現在のBattleのbattleId
+
+かつ
+
+現在のBattleが結果未確定
+
+かつ
+
+MusicChart → Gameplay Event出力gateがOpen
+```
+
+いずれか一つでも満たさない場合、その同期eventをGameplayへ送らず破棄します。
+
+旧`battleId`の同期event・callbackによって、以下を行ってはなりません。
+
+- 3時計を進行または再開する
+- system pre-rollを完了させる
+- BGM Audioを開始する
+- MusicChart EventをGameplayへ送る
+- AttackEventやArpeggioを進行させる
+- Palette Bullet音程音やGameplay SEを新規発音する
+- 新Battleの同期状態やcleanup状態を変更する
+
+Retryでは新しい`battleId`を使用します。前Battleのeventが新Battleと同じMusicChart位置・NoteEvent・AttackEventを指していても、別Battleのeventとして拒否します。
+
+Battle結果確定通知とcleanup完了通知は、停止済みGameplay Event出力gateとは別の終了処理用経路で扱います。
+
+---
+
+### BGM Audio・終了SEとGameplay Eventの分離
+
+Battle結果確定時に即時停止する正本対象は、3時計とMusicChartからGameplayへの同期eventです。
+
+BGM Audioや終了SEについては、演出方針に応じて以下のいずれも採用可能とします。
+
+- BGM Audioを即時停止する
+- BGM AudioをFade Outする
+- Result演出の一部として一定時間継続する
+- Clear / Game Over用の終了SEを再生する
+
+ただし、どの演出を採用してもGameplay同期はすでに終了済みです。
+
+```text
+Battle結果確定
+↓
+3時計停止
++
+MusicChart → Gameplay Event停止
+↓
+Gameplay同期解除済み
+
+並行して許可可能
+├─ BGM Audio停止
+├─ BGM Audio Fade Out
+├─ 表示・演出用BGM Audio継続
+└─ 終了SE
+```
+
+演出として残るAudioから、以下を発生させてはなりません。
+
+- MusicChart Clockの再開・進行
+- AttackEvent Preview / Charge / Fire
+- Arpeggio Entry進行
+- Palette Bullet音程音の新規発音
+- Shaondama生成・供給
+- Damageやその他のGameplay結果
+
+BGM AudioのFade、終了SE、すでに発音済みの音の余韻は、BGM / Gameplay同期Ownerの必須cleanup完了条件に含めません。これらの演出が継続していても、Gameplay同期解除が完了していれば本Ownerはcleanup完了を通知できます。
+
+---
+
+### 同期解除cleanupの処理順と冪等性
+
+BGM / Gameplay同期Ownerは、現在の`battleId`に対するBattle結果確定通知を一度だけ受理し、次の順序で処理します。
+
+```text
+1. BattleResultFinalized(battleId, result)を受理
+↓
+2. MusicChart → Gameplay Event出力gateを閉じる
+↓
+3. Battle / Gameplay / MusicChart Clockを同じ終了境界で停止する
+↓
+4. 発行待ちGameplay通知・予約callbackを無効化する
+↓
+5. system pre-roll / BGM Audio開始予約を無効化する
+↓
+6. 旧Battleの同期購読・Gameplay向け参照を終了する
+↓
+7. 必須cleanup完了条件を確認する
+↓
+8. battleId付きで同期Ownerの必須cleanup完了を通知する
+```
+
+同じBattle結果確定通知を複数回受け取っても、時計停止・callback取消・参照解除を重複実行して不正状態を発生させない冪等処理とします。
+
+```text
+Active
+↓ 初回のBattle結果確定通知
+Cleaning
+↓ 必須同期解除完了
+CleanupCompleted
+```
+
+`Cleaning`または`CleanupCompleted`のBattleへ同じ終了通知が届いても、旧Battleの時計やcallbackを再生成したり、現在Battleの状態へ誤って作用したりしません。
+
+---
+
+### 必須cleanup完了条件
+
+BGM / Gameplay同期Ownerの必須cleanupは、現在の`battleId`について次のすべてを満たした時点で完了とします。
+
+- `Battle Clock`が終了位置で停止している
+- `Gameplay Clock`が終了位置で停止している
+- `MusicChart Clock`が終了位置で停止している
+- MusicChartからGameplayへのEvent出力gateが閉じている
+- 発行待ちGameplay通知が無効化されている
+- 予約済みGameplay callbackが無効化されている
+- system pre-roll進行とBGM Audio開始予約が終了している
+- 旧Battleの同期購読・Gameplay向け参照が解除されている
+- 旧`battleId`の同期eventがGameplayへ到達できない
+- Audio演出が継続していてもGameplay Eventへ再接続できない
+
+すべてを満たした後、上位のcleanup集約Ownerへ、`battleId`付きでBGM / Gameplay同期Ownerの必須cleanup完了を通知します。
+
+```text
+BGM / Gameplay必須同期解除完了
+↓
+CleanupCompleted(battleId)
+↓
+上位cleanup集約Ownerへ通知
+```
+
+Result操作の解禁は本Owner単独では判断しません。全必須Ownerのcleanup完了を集約した上位Ownerが、[ゲーム全体](/spec/game/)の規則に従って判断します。
+
+次の完了は待ちません。
+
+- BGM AudioのFade Out
+- 終了SE
+- すでに発音済みの音の余韻
+- Gameplay Eventを発生させない表示・音響演出
+
+---
+
+### 本ページで固定しないBattle終了詳細
 
 以下は本ページでは固定しません。
 
@@ -1296,7 +1548,8 @@ system pre-roll中にBattleが終了した場合も、そのsystem pre-rollと�
 - 発射済みPalette Bulletの着弾処理
 - Palette Bullet消滅
 - すでに発音済みの音の余韻
-- BGM Fade Out
+- BGM Audioを即時停止・Fade Out・演出継続のどれにするか
+- Clear / Game Overごとの終了SEと具体的な再生タイミング
 
 これらはPalette Bullet側の正本または演出調整へ委譲します。
 
@@ -1310,15 +1563,19 @@ Room Retry時は、旧Battleに属する音楽runtimeを破棄します。少な
 - 旧Battleのsystem pre-roll進行状態とBGM再生開始予約
 - 旧BattleのBGM再生位置とLoop周回
 - 旧Battleの未発音AttackEvent / Arpeggio音
+- 旧Battleの発行待ちGameplay通知・予約callback
+- 旧BattleのMusicChart Event出力gate・同期購読・Gameplay向け参照
 
-その後、新しいBattle IDを発行・配布し、現在Roomの先頭用に定義された音楽初期状態を時計停止中に構築します。新Battleでも、Enemy ReadyとShaondama Supply Readyを含むReady gateが成立するまで3時計、Combat受付、およびPlayer戦闘入力を開始しません。
+旧Battleの必須Gameplay同期解除が完了したことを確認した後、新しいBattle IDとして新しい`battleId`を発行・配布し、現在Roomの先頭用に定義された音楽初期状態を時計停止中に構築します。新Battleでも、Enemy ReadyとShaondama Supply Readyを含むReady gateが成立するまで3時計、Combat受付、およびPlayer戦闘入力を開始しません。
 
 ```text
 Room Retry
 ↓
 旧Battleの音楽runtimeを破棄
 ↓
-新しいBattle IDを発行・配布
+旧Battleの必須Gameplay同期解除完了を確認
+↓
+新しいbattleIdを発行・配布
 ↓
 3時計を停止したままRoom先頭用の音楽初期状態を構築
 ↓
@@ -1337,6 +1594,8 @@ system pre-roll終了時に既存の戦闘BGMを音源位置0から再生
 
 Room Retryは、旧Battleの時計を巻き戻して再利用する処理ではありません。
 
+旧Battleの同期eventやcallbackがRetry後に到着しても、`battleId`不一致として破棄し、新Battleの3時計・system pre-roll・BGM Audio・Gameplay Eventへ影響させません。
+
 Shaondama / Reserved / Player等のGameplay状態リセットについては、それぞれのGameplay正本へ委譲します。
 
 ---
@@ -1349,7 +1608,7 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 | --- | --- |
 | サウンド班 | 戦闘BGM制作、AttackEventの音楽的意図、Palette Bullet音程音・Gameplay SEの音響制作、実際にBGMへ重ねた際の音響確認 |
 | プランナー | AttackEventをGameplayとして採用可能か確認、Gameplayルールとの整合確認、必要なゲーム要件の決定 |
-| プログラマー | Battle IDに属する準備gateの構築、Ready gate成立時の受付解禁と3時計同時開始、system pre-rollとBGM再生位置の同期、確定済みAttackEvent結果からの発音・発射タイミング制御、各音レイヤーを調整可能な再生環境の実装 |
+| プログラマー | Battle IDに属する準備gateの構築、Ready gate成立時の受付解禁と3時計同時開始、system pre-rollとBGM再生位置の同期、確定済みAttackEvent結果からの発音・発射タイミング制御、Battle結果確定時の3時計停止・Event出力gate閉鎖・予約callback無効化・`battleId`検証・同期解除完了通知、各音レイヤーを調整可能な再生環境の実装 |
 
 サウンド班は、GameplayのSlot割り当てや`Complete / Incomplete / Zero Charge`の判定ルールそのものを決定しません。
 
@@ -1362,8 +1621,14 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 | 内容 | 正本 |
 | --- | --- |
 | Battle開始・終了の高レベルな順序 | [ゲーム全体](/spec/game/) |
+| Battle結果の確定・Result操作解禁・Result後のroute | [ゲーム全体](/spec/game/) / `ui/index.md` |
 | Battle ID・Combat状態・Combat受付 | [戦闘](/spec/combat/) |
 | Ready gateと3時計・BGM Audio・system pre-rollのruntime接続 | **本ページ** |
+| Battle結果確定時の`Battle / Gameplay / MusicChart Clock`停止 | **本ページ** |
+| MusicChartからGameplayへのEvent出力停止 | **本ページ** |
+| 発行待ちGameplay通知・予約callback・BGM Audio開始予約の無効化 | **本ページ** |
+| 旧`battleId`のBGM同期event拒否 | **本ページ** |
+| BGM / Gameplay同期Ownerの必須cleanup完了条件・通知 | **本ページ** |
 | MIDI / FLAC書き出し条件 | [BGM MIDIファイルの設定](/spec/bgm/bgm-midi-settings) |
 | MusicChart構造・TempoMap・Sync Settings・system pre-rollの保存・validation | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart) |
 | 初期Shaondama生成・最低保証数・Shaondama Supply Ready | [BGM｜シャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
@@ -1373,6 +1638,7 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 | Current Normal AttackEvent / Slot / Weak / Reserved | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
 | Charge入力・Click / Drag・受付gateを含む開始条件・`success / miss` | [Playerアクション｜チャージ](/spec/player/player-action-charge) |
 | `Complete / Incomplete / Zero Charge`・使用Reserved・Palette Bullet化・発射対象 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
+| 発火前AttackEvent・Arpeggio残Entry・AttackEvent snapshot・未消費ReservedのBattle終了cleanup | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | BGM / Palette Bullet音程音 / Gameplay SEの同期・発音 | **本ページ** |
 | Shaondama runtime data | [玉のデータ](/spec/shaondama-music/orb-data) |
 | 万能Shaondama固有仕様 | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
@@ -1381,6 +1647,8 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 ---
 
 # Chord / Arpeggio / Weakの音響結果まとめ
+
+以下は、現在のBattleが結果未確定で、MusicChartからGameplayへのEvent出力gateが有効な場合の通常接続です。Battle結果確定後は、未発音のChord / Arpeggio / Weak音を新しく発音しません。
 
 | Attack種別 | Gameplay結果 | 発音 |
 | --- | --- | --- |
@@ -1437,6 +1705,14 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 - VFX
 
 これらの具体内容は未決です。
+
+## Battle終了時のAudio演出
+
+- BGM Audioを即時停止・Fade Out・演出継続のどれにするか
+- Clear / Game Overごとの終了SE
+- 具体的な再生時間・Fade時間
+
+これらの演出値は未決です。ただし、Battle結果確定時に3時計とMusicChartからGameplayへのEventを停止し、Audio演出をGameplay同期から切り離すことは確定しています。
 
 ## system pre-roll時間
 
