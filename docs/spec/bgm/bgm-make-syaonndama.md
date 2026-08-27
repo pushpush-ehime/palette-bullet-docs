@@ -16,7 +16,7 @@ status: 仮仕様
 
 BGMの`MusicChart`に保存された`NoteEvent`をもとに、Normal Shaondama（通常シャオンダマ）について、**何を・いつ・何個生成するか**を決定するルールを定義する。
 
-加えて本ページを、現在選択可能なShaondamaの最低保証判定、不足数の算出、Wildcard Shaondama（万能シャオンダマ）の補充要求、要求中個体の重複防止、およびBattle開始gateへ渡すShaondama準備完了通知の正本とする。
+加えて本ページを、現在選択可能なShaondamaの最低保証判定、不足数の算出、Wildcard Shaondama（万能シャオンダマ）の補充要求、要求中個体の重複防止、およびBattle開始gateへ渡す`Shaondama Supply Ready`通知の正本とする。
 
 Normalについては、source NoteEvent occurrenceの作成、通常の先行生成、BGM loopごとの再生成、重複防止、およびSpawn Systemへ渡す生成要求を扱う。曲頭から一定数のNormal NoteEventを集める旧初期生成方式は使用しない。
 
@@ -206,10 +206,12 @@ MinimumLeadTime = 4秒
 
 ## Battle開始前の準備
 
-Battle開始前は、音楽時計を先に進めず、対象Battleの初期位置に対してNormalの先行生成判定と最低保証判定を行う。
+新しいBattle IDを受領した後、Battle開始gateが成立する前に、対象Battleの開始前評価を行う。上位lifecycleがCombat stateを`NonCombat`に維持し、`Battle／Gameplay／MusicChart`の3時計を停止している準備phaseで、本ページは対象Battleの初期位置に対してNormalの先行生成判定と最低保証判定を行う。
 
 ```text
 新しいBattle IDを受領
+↓
+3時計が停止していることを確認
 ↓
 対象Battle用のMusicChartとoccurrence管理を初期化
 ↓
@@ -224,18 +226,25 @@ MinimumLeadTimeによるNormal先行生成を評価
 ↓
 不足数分のWildcard補充を要求
 ↓
-出現完了・選択可能化を待つ
+開始前評価で必要となったShaondamaの
+出現演出完了・Gameplayへのhand-off・選択可能化を待つ
+↓
+現在選択可能・非Reservedの個体数を再集計
 ↓
 最低保証数へ到達
 ↓
-Battle開始gateへShaondama準備完了を通知
+Battle開始gateへShaondama Supply Readyを通知
 ```
 
-この初期評価は、BGM／MusicChart時計を進める処理ではない。Battle音楽runtimeの開始点、システム側pre-roll、および曲本編の対応関係は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とする。
+この初期評価は、3時計またはBGM Audioを開始する処理ではない。Battle音楽runtimeの開始点、system pre-roll、および曲本編位置0の対応関係は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とする。
 
 `MinimumLeadTime`上、生成triggerがBattle音楽runtime開始点以前になる小節は、この開始前評価でNormal生成要求を発行する。曲頭からNormal NoteEvent数を数えて任意の先の小節まで広げることはしない。
 
 Normal生成要求は通常時と同じsource occurrence単位の重複防止を使用する。開始前評価とBattle開始後の先行生成判定が同じoccurrenceを発見しても、同じNormalを再生成しない。
+
+開始前評価で発行した生成要求について、論理個体作成済み、生成要求中、出現演出中、またはGameplayへのhand-off前の個体は最低保証数へ算入しない。出現演出が完了し、Gameplayへhand-offされ、Playerの選択対象として公開された非`Reserved`個体だけを集計する。
+
+Battle開始前の初期生成と、3時計開始後の通常先行生成・最低保証の継続補充は、異なるphaseとして扱う。開始前の不足は`Shaondama Supply Ready`を成立させずに準備を待つ理由になる。Battle開始後の一時的な不足は、Combat stateや3時計を停止・巻き戻す理由にはせず、[継続監視](#継続監視)に従って不足分の補充要求だけを行う。
 
 ## 選択可能Shaondamaの最低保証
 
@@ -291,7 +300,7 @@ Normalは、ラジクジラからの出現演出完了と制御移譲をもっ�
 
 補充要求の受付、個体作成、出現完了、失敗、cancelの結果を受け取るたびに、対象Battleの補充要求中数と現在選択可能数を更新し、必要なら再判定する。
 
-補充演出を待つ間に最低保証数を下回ることは許容する。Battle開始後に一時不足が発生しても、音楽時計やBattle進行を停止・巻き戻さず、不足分の補充要求だけを行う。
+補充演出を待つ間に最低保証数を下回ることは許容する。Battle開始後に一時不足が発生しても、3時計やBattle進行を停止・巻き戻さず、不足分の補充要求だけを行う。
 
 最低保証数は上限ではない。Normalの出現完了やParry由来Wildcardへの変換などによって最低保証数を上回っても、それだけを理由に既存個体を消滅させない。
 
@@ -313,11 +322,21 @@ Normalは、ラジクジラからの出現演出完了と制御移譲をもっ�
 
 ## Battle開始gate
 
-Battle開始前は、現在選択可能かつ非`Reserved`のShaondama数が最低保証数へ到達した時点で、対象Battle IDを伴うShaondama準備完了をBattle開始gateへ通知する。
+Battle開始前は、以下のすべてを満たした時点で、対象Battle IDを伴う`Shaondama Supply Ready`をBattle開始gateへ通知する。
 
-準備完了通知後、Battle／MusicChart時計が実際に開始される前に算入数が最低保証数を下回った場合は、Shaondama準備完了状態を解除して再び補充完了を待つ。
+- 対象BattleのBattle IDを受領し、現在の準備対象と一致している
+- 対象Battle用のMusicChartとsource NoteEvent occurrence管理の初期化が完了している
+- 初期位置と`MinimumLeadTime`に基づく必要なNormal生成要求を発行済みである
+- 開始前評価で必要となったShaondamaの出現演出とGameplayへのhand-offが完了している
+- 対象Battleに属する選択可能かつ非`Reserved`のShaondama数が最低保証数へ到達している
 
-対象RoomのEnemy準備完了など、Shaondama以外の開始条件は各所有ページを正本とする。すべての開始条件が揃う前に、本ページからBattle／Gameplay／MusicChart時計を開始しない。開始条件が揃った後の時計同時開始とシステム側pre-rollは[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とする。
+`Shaondama Supply Ready`は、Shaondama供給に関するBattle開始gateへの入力であり、Battle開始gate全体の成立通知ではない。本ページは、対象RoomのEnemy Readyなど、Shaondama以外のReady条件を判定しない。
+
+`Shaondama Supply Ready`通知後、`Battle／Gameplay／MusicChart`の3時計が実際に開始される前に算入数が最低保証数を下回った場合は、`Shaondama Supply Ready`状態を解除し、対象Battle IDを伴うReady解除をBattle開始gateへ通知して、再び補充完了を待つ。
+
+すべてのReady条件が揃った後は、上位lifecycleがCombat受付とPlayerの戦闘操作受付を有効化し、3時計を同じ基準点から同時に開始してsystem pre-rollへ入る。本ページは、Ready条件が揃う前後を問わず、Combat state、Player入力受付、3時計、またはBGM Audioを自ら開始しない。Battle開始全体の順序は[ゲーム全体](/spec/game/)、Combat受付との接続は[戦闘](/spec/combat/)、3時計の同時開始とsystem pre-rollは[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とする。
+
+3時計の開始後は、選択可能数が最低保証数を下回ってもBattle開始gateを巻き戻したり、`Combat`を`NonCombat`へ戻したりしない。通常Battle中の不足は、[継続監視](#継続監視)と[不足数とWildcard補充要求](#不足数とwildcard補充要求)に従って補充する。
 
 Normal Shaondamaを使用するBattleでは、Normalを世界内へ出現させる経路としてRadioWhaleを必須とする。RadioWhaleが存在しない状態で、Normalだけを別経路から出現させて準備完了を成立させない。
 
@@ -501,7 +520,7 @@ BGM側は`MusicChart`と`NoteEvent`をもとに、Normalの生成対象・生成
 
 ### Pause
 
-Pause中はBGM／MusicChartの音楽時計と先行生成判定を進行させず、Normal生成要求とWildcard補充要求を新しく発行しない。Resume後は同じBattle IDとloop occurrence管理を維持して停止位置から再開し、現在選択可能数と補充要求中数を再評価する。
+Pause中は3時計と先行生成判定を進行させず、Normal生成要求とWildcard補充要求を新しく発行しない。Resume後は同じBattle IDとloop occurrence管理を維持して停止位置から再開し、現在選択可能数と補充要求中数を再評価する。
 
 ### Battle終了
 
@@ -529,19 +548,22 @@ Room Retry時は旧Battleのoccurrence管理、生成済み記録、最低保証
 * 同じ音程でもNoteEventをまとめない。
 * シャオンダマは小節単位でまとめて生成する。
 * Normalは、各小節の開始まで`MinimumLeadTime`以上の準備時間を確保して生成する。
-* Battle開始前は音楽時計を進めず、初期位置に対して`MinimumLeadTime`の先行生成判定を行う。
+* Battle ID受領後、Battle開始前は`Battle／Gameplay／MusicChart`の3時計を停止したまま、初期位置に対して`MinimumLeadTime`の先行生成判定を行う。
 * 曲頭からNormal NoteEventを目標数まで集める旧初期生成方式は使用しない。
 * BPMによって何小節前に生成するかは変化する。
 * 同じBattle・同じsource NoteEvent occurrenceから重複生成しない。
 * BGM loopごとに新しいsource NoteEvent occurrenceを作成し、各周回用Shaondamaを再生成する。
 * 最低保証数へ算入するのは、対象Battleで現在選択可能かつ非`Reserved`のNormal／Wildcardだけとする。
-* 生成要求中、出現演出中、`Reserved`、終了処理中、別Battleの個体は最低保証数へ算入しない。
-* Battle開始前は最低保証数へ到達するまでShaondama準備完了にしない。
-* Battle中も最低保証を監視し、不足分についてWildcard補充を要求する。
+* 生成要求中、出現演出中、Gameplayへのhand-off前、`Reserved`、終了処理中、別Battleの個体は最低保証数へ算入しない。
+* Battle開始前は、必要な初期Shaondamaの出現演出・hand-off・選択可能化と最低保証数到達の両方を確認する。
+* 開始前条件の成立後、対象Battle IDを伴う`Shaondama Supply Ready`をBattle開始gateへ通知する。
+* `Shaondama Supply Ready`通知後、3時計開始前に最低保証数を下回った場合はReady状態を解除して再び準備を待つ。
+* 本ページはCombat state、Player戦闘入力、3時計、およびBGM Audioを開始しない。
+* 初期生成と通常Battle中の継続補充を区別し、Battle開始後も最低保証を監視して不足分のWildcard補充を要求する。
 * 補充要求中数を別管理し、同じ不足に対するWildcard要求を重複させない。
-* 補充待ちによるBattle中の一時不足は許容し、音楽時計を停止しない。
+* 補充待ちによるBattle中の一時不足は許容し、Combat stateまたは3時計を停止・巻き戻さない。
 * Normal Shaondamaを使用するBattleではRadioWhaleを必須とする。
-* Battle IDの発行・配布前にoccurrence作成、先行生成、最低保証監視を開始しない。
+* Battle IDの受領前、またはBattle IDが現在の準備対象と一致しない状態で、occurrence作成、先行生成、最低保証監視を開始しない。
 * BGM / MusicChart側が、Normalについて何を・いつ・何個生成するかを決定する。
 * BGM側が最低保証不足と、新しく要求するWildcard補充数を決定する。
 * BGM側はゲーム世界上の具体的な生成位置を決定しない。
