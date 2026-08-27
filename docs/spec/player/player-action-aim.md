@@ -439,20 +439,6 @@ AimState = Normal
 
 Aim解除後のActionStateについては、各ActionおよびReactionStateの仕様に従います。
 
-例えば`DragCharging`はSmallHitでも継続できますが、Aimは解除されます。
-
-```text
-ActionState   = DragCharging
-AimState      = Aiming
-ReactionState = None
-↓
-SmallHit
-↓
-ActionState   = DragCharging
-AimState      = Normal
-ReactionState = SmallHit
-```
-
 ## RootStateとの関係
 
 `Gameplay`から以下のRootStateへ遷移する場合、Aimingを終了します。
