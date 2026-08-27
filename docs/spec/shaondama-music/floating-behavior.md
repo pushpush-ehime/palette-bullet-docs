@@ -437,7 +437,7 @@ Clear／Game Over後にShaondama object、破裂VFX、SEを表示専用として
 - 選択可能化、`Reserved`、自然破裂、Lifetime終了、消費、Palette Bullet化に関する発行待ちcallbackを無効化している
 - 旧Battle IDのShaondama objectと参照が現在または次のBattleへ影響できない
 
-上記をすべて満たした時点で内部cleanup完了とし、Shaondama Floating Ownerの必須cleanup完了を一度だけ通知します。表示専用object、VFX、SEの終了は待ちません。
+上記をすべて満たした時点で内部cleanup完了とし、対象battleIdを含むShaondama Floating Ownerの必須cleanup完了通知を、上位cleanup集約Ownerへ一度だけ送ります。表示専用object、VFX、SEの終了は待ちません。
 
 ### Retry／次Battle
 
