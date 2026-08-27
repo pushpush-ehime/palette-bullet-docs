@@ -27,7 +27,7 @@ relatedTasks: []
 - Weak Attackの発音
 - Gameplay照合用Pitch Classと実発音用MIDI Noteの関係
 - BGM時間軸との同期
-- Battle開始時の準備gateとシステム側の無音pre-roll
+- Battle開始時の準備gateとsystem pre-roll
 - Pause / Resume
 - BGM Loop
 - Battle終了 / Room Retry
@@ -80,8 +80,9 @@ Palette Bullet化・発射対象
 → bgm/bgm-attack-judgement.md
 
 BGM時間軸
-Battle開始時の準備gate
-システム側の無音pre-roll
+Battle ID配布後の準備gate
+Battle／Gameplay／MusicChart時計
+system pre-rollとBGM Audio開始
 Palette Bullet発射と音程音
 Gameplay SEとの音響接続
 → 本ページ
@@ -123,9 +124,21 @@ AttackEventは`MusicChart`上のGameplay用音楽情報として管理します�
 Gameplay側の大まかな接続は以下です。
 
 ```text
-Battle / Gameplay / MusicChart時計を同時開始
+Battle ID発行・配布
 ↓
-システム側の無音pre-roll
+3時計を停止したまま初期化・初期Shaondama生成
+↓
+Enemy Ready
++
+Shaondama Supply Ready
+↓
+Ready gate成立
+↓
+Combat受付・Player戦闘入力を有効化
++
+Battle／Gameplay／MusicChart時計を同時開始
+↓
+system pre-roll
 +
 MusicChart時計進行
 ↓
@@ -980,14 +993,29 @@ AttackEventが`Complete`でも`Incomplete`でも、
 
 ## 同期開始前の準備gate
 
-Battleの音楽runtimeは、以下の両方が準備完了してから開始します。
+Battleの音楽runtimeに対する準備gateは、対象BattleのBattle IDが発行・配布された後に構築します。
 
+Battle IDの発行・配布は、対象Battleの準備開始を示す境界です。この時点では、Combat受付、Player戦闘入力、`Battle／Gameplay／MusicChart`の3時計、system pre-roll、およびBGM Audioを開始しません。
+
+Ready gateを成立させるには、少なくとも以下をすべて満たす必要があります。
+
+- 対象BattleのBattle IDが発行・配布済みである
+- 対象Battleの初期化が完了している
 - 対象RoomのEnemyが準備完了している
+- 必要な初期Shaondamaの出現演出が完了している
+- 初期ShaondamaがGameplayへhand-offされ、Playerの選択対象として公開されている
 - 必要数の、**現在選択可能かつ`Reserved`ではないShaondama**が準備完了している
+- 前Battleの音楽runtime、時計、Audio状態、および同期eventが現在Battleへ残っていない
 
 必要数の定義、算入条件、生成要求、出現演出完了による選択可能化は、Shaondama生成側の正本へ委譲します。
 
-準備gateを満たす前は、Battle / Gameplay / MusicChart時計を開始せず、pre-roll時間も消費しません。準備待ちの間に戦闘BGMやMusicChart eventだけを先行させません。
+論理生成済み、生成要求中、出現演出中、またはGameplayへのhand-off前のShaondamaは、Shaondama Supply Readyの最低保証数へ算入しません。
+
+準備gateを満たす前は、3時計を開始せず、system pre-roll時間も消費しません。準備待ちの間にBGM AudioまたはMusicChart eventだけを先行させません。
+
+Shaondama Supply Readyの通知後、3時計の開始前に選択可能かつ非`Reserved`のShaondamaが必要数を下回った場合は、準備完了状態を解除し、再びReady条件の成立を待ちます。
+
+本ページは、Ready gateと3時計・BGM Audioの開始関係を正本とします。Enemy Readyの内部判定、初期Shaondama生成、hand-off、選択可能化、および最低保証数の集計方法は、それぞれの所有ページへ委譲します。
 
 ---
 
@@ -996,67 +1024,96 @@ Battleの音楽runtimeは、以下の両方が準備完了してから開始し�
 Battle開始時の順序は以下を正とします。
 
 ```text
-Enemy準備完了
+Battle開始要求
+↓
+新しいBattle IDを発行
+↓
+Battle IDを各参加システムへ配布
+↓
+3時計を停止したまま対象Battleを初期化
+↓
+初期Shaondama生成・出現演出・Gameplayへのhand-off
+↓
+Enemy Ready
 +
-必要数の選択可能・非Reserved Shaondama準備完了
+Shaondama Supply Ready
 ↓
-Battle / Gameplay / MusicChart時計を同時開始
+Ready gate成立
 ↓
-システム側の無音pre-roll
+Combat受付・Player戦闘入力を有効化
++
+Battle／Gameplay／MusicChart時計を同じ基準点から同時開始
+↓
+system pre-roll
 ├─ AttackEventの予告開始可能
 └─ Charge受付可能
 ↓
-pre-roll終了
+system pre-roll終了
 ↓
 既存の戦闘BGMを音源位置0から再生
 ```
 
-Battle / Gameplay / MusicChart時計の同時開始点を、当該Battleの音楽runtime開始点とします。戦闘BGMの音源位置0はこの開始点ではなく、pre-roll終了点へ対応します。
+Battle ID配布、Ready gate成立、およびsystem pre-roll終了は、以下の異なる境界として扱います。
 
-pre-roll中に実際に開始できる予告・Chargeの詳細条件は各Gameplay正本へ委譲します。本ページは、少なくともpre-rollをそれらの受付・予告に使用できる時間として確保することを定義します。
+| 境界 | 意味 |
+| --- | --- |
+| Battle ID発行・配布 | 対象Battleの準備を開始する |
+| Ready gate成立 | Combat受付・Player戦闘入力・3時計を同じ基準点から開始する |
+| system pre-roll終了 | BGM Audioを音源位置0から開始する |
+
+3時計の同時開始点を、当該Battleの音楽runtime開始点とします。戦闘BGMの音源位置0はこの開始点ではなく、system pre-roll終了点へ対応します。
+
+system pre-roll中は、BGM Audioがまだ再生されていなくても、対象BattleのCombat受付とPlayer戦闘入力が有効です。AttackEvent Previewを開始でき、Charge固有の開始条件を満たす場合はChargeも開始できます。
+
+Chargeの具体的な受付条件は[Playerアクション｜チャージ](/spec/player/player-action-charge)を正本とします。本ページでは、Charge開始条件としてBGM Audioの再生状態を要求しません。
 
 ---
 
-## システム側の無音pre-roll
+## system pre-roll
 
-pre-rollは、音源へ埋め込んだ無音ではなく、**システム側がBattleの音楽runtime上に持つ無音区間**です。
+system pre-rollは、音源へ埋め込んだ無音ではなく、**システム側がBattleの音楽runtime上に持つ無音区間**です。
 
-以下の素材へ、pre-roll用の無音や空小節を追加しません。
+以下の素材へ、system pre-roll用の無音や空小節を追加しません。
 
 - 音源ファイル
 - 完成曲
 - FLACからImportする`AudioClip`の元素材
 - MIDI
 
-MusicChartはpre-roll時間との対応を保持できるものとしますが、MIDI由来データそのものへ無音を追加して表現しません。pre-roll終了時に、既存の戦闘BGMを編集せず音源位置0から再生します。
+MusicChartはsystem pre-roll時間との対応を静的な曲定義として保持できるものとしますが、MIDI由来データそのものへ無音を追加して表現しません。system pre-roll終了時に、既存の戦闘BGMを編集せず音源位置0から再生します。
 
-音源位置0とMIDI由来の曲本編位置0は、いずれもBattle音楽runtime上のpre-roll終了点へ対応します。pre-rollを曲本編位置へのoffsetとして保持する具体的な内部表現は、本ページでは固定しません。
+音源位置0とMIDI由来の曲本編位置0は、いずれもBattle音楽runtime上のsystem pre-roll終了点へ対応します。
 
-pre-roll時間は調整可能なパラメータとし、具体値は現時点で固定しません。パラメータ名、保存先、内部timer、Audio再生予約の実装方式も本ページでは固定しません。
+system pre-roll時間、最初のAttackEvent Preview開始位置、最初のCharge受付開始位置、および曲本編位置0との対応を保持する静的データ契約は、[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)を正本とします。
 
-| phase | Battle / Gameplay / MusicChart時計 | 戦闘BGM | 音楽Gameplayとの関係 |
-| --- | --- | --- | --- |
-| 準備待ち | 未開始 | 停止、音源位置0で待機 | Enemyと必要数Shaondamaの準備gateを待つ |
-| 無音pre-roll | 同時に開始して進行 | 未再生、音源位置0で待機 | 予告開始・Charge受付が可能 |
-| pre-roll終了後 | 同じ時間関係のまま進行 | 音源位置0から再生して進行 | MusicChart eventと発射・発音を同期する |
-| Pause中 | 同じ時点で停止 | pre-roll中なら未再生のまま、再生開始後ならその位置で停止 | pre-rollを含む時間関係を凍結する |
+MusicChartの保存、Import、再Import、およびEditor validationでは、system pre-rollによって最初のAttackEventに必要なPreview leadとCharge準備時間を確保できているか検証します。検証条件と不正データの扱いはMusicChart側の正本へ委譲し、本ページのruntime側で最初のPreviewやCharge時間を暗黙に短縮・補正しません。
+
+system pre-roll時間は調整可能なパラメータとし、具体値は現時点で固定しません。フィールド名、時間型、保存単位、内部timer、およびAudio再生予約の実装方式も本ページでは固定しません。ただし、system pre-rollとの対応をMusicChartから取得可能にすることは必須とします。
+
+| phase | Combat受付 | Player戦闘入力 | 3時計 | BGM Audio | Shaondama | Preview／Charge |
+| --- | --- | --- | --- | --- | --- | --- |
+| Battle準備中 | 無効 | 無効 | 停止 | 停止・音源位置0で待機 | 初期生成・出現演出・hand-offを進行 | 無効 |
+| Ready gate成立時 | 有効化 | 有効化 | 同じ基準点から同時開始 | 停止・音源位置0で待機 | 必要数が選択可能 | 開始可能 |
+| system pre-roll中 | 有効 | 有効 | 同じ時間関係で進行 | 停止・音源位置0で待機 | 選択・Charge可能 | Preview・Charge可能 |
+| system pre-roll終了後 | 有効 | 有効 | 同じ時間関係で進行 | 音源位置0から再生 | 通常Battle規則 | 通常のTiming規則 |
+| Pause中 | 受付停止 | 受付停止 | 同じ時点で停止 | system pre-roll中なら未再生のまま、再生開始後なら現在位置で停止 | Gameplay状態を保持 | 進行しない |
 
 ---
 
 ## 同期の基準
 
-BGMとGameplayの音楽同期は、**実際に再生中のBGM Audio時間だけ**を基準とはしません。Audioがまだ再生されていないpre-rollを含め、以下の対応関係を一体として扱います。
+BGMとGameplayの音楽同期は、**実際に再生中のBGM Audio時間だけ**を基準とはしません。Audioがまだ再生されていないsystem pre-rollを含め、以下の対応関係を一体として扱います。
 
-- Battle / Gameplay / MusicChart時計の共通開始点
-- システム側のpre-roll時間
-- pre-roll終了後に始まるBGMの実再生位置
+- `Battle／Gameplay／MusicChart`時計の共通開始点
+- system pre-roll時間
+- system pre-roll終了後に始まるBGMの実再生位置
 - MusicChart上の音楽位置と`TempoMap`
 - 必要な`Sync Settings`補正
 
 ```text
-Battle / Gameplay / MusicChart時計の共通開始点
+Battle／Gameplay／MusicChart時計の共通開始点
 ↓
-システム側の無音pre-roll
+system pre-roll
 ↓
 BGM音源位置0
 ↕
@@ -1069,7 +1126,7 @@ Palette Bullet発射
 音程音発音
 ```
 
-Audio再生開始後は実際のBGM再生位置も同期確認に使用しますが、pre-rollを含む共通の時間関係を捨ててAudio時間だけへ切り替えません。
+Audio再生開始後は実際のBGM再生位置も同期確認に使用しますが、system pre-rollを含む共通の時間関係を捨ててAudio時間だけへ切り替えません。
 
 Gameplay側の描画フレームや、この関係から独立して進む通常ゲーム時間を、BGM同期Gameplayの単独の同期基準にはしません。
 
@@ -1079,7 +1136,7 @@ Chord / Arpeggio / Weakを含むBGM同期Gameplay音は、同じBattle音楽runt
 
 ## Sync Settings
 
-BGMとGameplay音の間に再生環境などによるズレが存在する場合は、MusicChartの`Sync Settings`による補正を使用します。`Sync Settings`はシステム側pre-rollとの対応を維持したうえで適用し、音源やMIDIへ無音を追加する代わりには使用しません。
+BGMとGameplay音の間に再生環境などによるズレが存在する場合は、MusicChartの`Sync Settings`による補正を使用します。`Sync Settings`はsystem pre-rollとの対応を維持したうえで適用し、音源やMIDIへ無音を追加する代わりには使用しません。
 
 具体的な補正値・データ構造・実装方法については、[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)を正とします。
 
@@ -1089,14 +1146,14 @@ BGMとGameplay音の間に再生環境などによるズレが存在する場合
 
 ## Pause
 
-Pause時は、pre-rollを含む以下の進行を同じ音楽時間関係のまま停止します。
+Pause時は、system pre-rollを含む以下の進行を同じ音楽時間関係のまま停止します。
 
 ```text
 Pause
 ↓
-Battle / Gameplay / MusicChart時計
+Battle／Gameplay／MusicChart時計
 +
-pre-roll進行
+system pre-roll進行
 +
 戦闘BGM
 +
@@ -1123,19 +1180,19 @@ E / Gの音楽時間だけ進む
 
 未完了Arpeggioの残りtimingもBGMとともに停止します。
 
-pre-roll中にPauseした場合は、戦闘BGMを開始せず、pre-rollの残り時間を保持します。Pause中にpre-rollだけを完了させたり、戦闘BGMを音源位置0から開始したりしません。
+system pre-roll中にPauseした場合は、戦闘BGMを開始せず、system pre-rollの残り時間を保持します。Pause中にsystem pre-rollだけを完了させたり、戦闘BGMを音源位置0から開始したりしません。
 
 ## Resume
 
-Resume時は、Pauseしたpre-rollまたはBGM位置と音楽時間関係から再開します。
+Resume時は、Pauseしたsystem pre-rollまたはBGM位置と音楽時間関係から再開します。
 
 ```text
 Pause位置
 ↓
 Resume
 ↓
-pre-roll中
-→ 残りpre-rollから再開し、終了後にBGMを音源位置0から再生
+system pre-roll中
+→ 残りsystem pre-rollから再開し、終了後にBGMを音源位置0から再生
 
 BGM再生開始後
 → 同じBGM位置から再開
@@ -1144,7 +1201,7 @@ AttackEvent / Arpeggio / Gameplay音
 の同期関係を維持
 ```
 
-BGMだけが先に進んだり、pre-rollだけが消費されたり、Arpeggioの発射・発音順序がずれたりしないようにします。
+BGMだけが先に進んだり、system pre-rollだけが消費されたり、Arpeggioの発射・発音順序がずれたりしないようにします。
 
 ---
 
@@ -1193,7 +1250,7 @@ Loop
 
 です。
 
-システム側のpre-rollはBattle音楽runtimeの開始時に置く区間であり、通常のBGM Loopごとに音源やMIDIへ無音区間を挿入しません。Loop時は、再度Battle準備gateや開始時pre-rollへ戻らず、BGMとMusicChartを同じ新しい周回へ進めます。
+system pre-rollはBattle音楽runtimeの開始時に置く区間であり、通常のBGM Loopごとに音源やMIDIへ無音区間を挿入しません。Loop時は、再度Battle準備gateやsystem pre-rollへ戻らず、BGMとMusicChartを同じ新しい周回へ進めます。
 
 現在位置より後のMusicChart eventを検索する規則がloop境界を越える場合、音楽上の検索は次loopへ連続します。Wildcard Weakの「次のNoteEvent」検索などの具体条件とoccurrence識別は、AllocationおよびMusicChart側の正本へ委譲します。
 
@@ -1220,7 +1277,7 @@ Battle終了時は、
 ```text
 Battle終了
 ↓
-Battle / Gameplay / MusicChart時計終了
+Battle／Gameplay／MusicChart時計終了
 +
 戦闘BGM終了
 +
@@ -1231,7 +1288,7 @@ Battle / Gameplay / MusicChart時計終了
 
 終了したBattleに紐づくAttackEventから、新しいPalette Bullet音程音を後から発音しません。
 
-pre-roll中にBattleが終了した場合も、そのpre-rollと予約済みのBGM再生開始を終了し、後から旧BattleのBGMを開始しません。
+system pre-roll中にBattleが終了した場合も、そのsystem pre-rollと予約済みのBGM再生開始を終了し、後から旧BattleのBGMを開始しません。
 
 以下は本ページでは固定しません。
 
@@ -1249,27 +1306,33 @@ pre-roll中にBattleが終了した場合も、そのpre-rollと予約済みのB
 
 Room Retry時は、旧Battleに属する音楽runtimeを破棄します。少なくとも以下を新しいBattleへ持ち越しません。
 
-- 旧BattleのBattle / Gameplay / MusicChart時計とその進行位置
-- 旧Battleのpre-roll進行状態とBGM再生開始予約
+- 旧Battleの`Battle／Gameplay／MusicChart`時計とその進行位置
+- 旧Battleのsystem pre-roll進行状態とBGM再生開始予約
 - 旧BattleのBGM再生位置とLoop周回
 - 旧Battleの未発音AttackEvent / Arpeggio音
 
-その後、現在Roomの先頭用に定義された音楽初期状態を新しく構築し、同RoomのEnemyと必要数の選択可能・非`Reserved` Shaondamaの準備gateから開始します。
+その後、新しいBattle IDを発行・配布し、現在Roomの先頭用に定義された音楽初期状態を時計停止中に構築します。新Battleでも、Enemy ReadyとShaondama Supply Readyを含むReady gateが成立するまで3時計、Combat受付、およびPlayer戦闘入力を開始しません。
 
 ```text
 Room Retry
 ↓
 旧Battleの音楽runtimeを破棄
 ↓
-Room先頭用の音楽初期状態を構築
+新しいBattle IDを発行・配布
 ↓
-Enemyと必要数Shaondamaの準備完了を待つ
+3時計を停止したままRoom先頭用の音楽初期状態を構築
 ↓
-新しいBattle / Gameplay / MusicChart時計を同時開始
+Enemy ReadyとShaondama Supply Readyを待つ
 ↓
-新しいシステム側pre-roll
+Ready gate成立
 ↓
-既存の戦闘BGMを音源位置0から再生
+Combat受付・Player戦闘入力を有効化
++
+新しいBattle／Gameplay／MusicChart時計を同時開始
+↓
+新しいsystem pre-roll
+↓
+system pre-roll終了時に既存の戦闘BGMを音源位置0から再生
 ```
 
 Room Retryは、旧Battleの時計を巻き戻して再利用する処理ではありません。
@@ -1286,7 +1349,7 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 | --- | --- |
 | サウンド班 | 戦闘BGM制作、AttackEventの音楽的意図、Palette Bullet音程音・Gameplay SEの音響制作、実際にBGMへ重ねた際の音響確認 |
 | プランナー | AttackEventをGameplayとして採用可能か確認、Gameplayルールとの整合確認、必要なゲーム要件の決定 |
-| プログラマー | 準備gate後の時計同時開始、システム側pre-rollとBGM再生位置の同期、確定済みAttackEvent結果からの発音・発射タイミング制御、各音レイヤーを調整可能な再生環境の実装 |
+| プログラマー | Battle IDに属する準備gateの構築、Ready gate成立時の受付解禁と3時計同時開始、system pre-rollとBGM再生位置の同期、確定済みAttackEvent結果からの発音・発射タイミング制御、各音レイヤーを調整可能な再生環境の実装 |
 
 サウンド班は、GameplayのSlot割り当てや`Complete / Incomplete / Zero Charge`の判定ルールそのものを決定しません。
 
@@ -1298,11 +1361,17 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 
 | 内容 | 正本 |
 | --- | --- |
+| Battle開始・終了の高レベルな順序 | [ゲーム全体](/spec/game/) |
+| Battle ID・Combat状態・Combat受付 | [戦闘](/spec/combat/) |
+| Ready gateと3時計・BGM Audio・system pre-rollのruntime接続 | **本ページ** |
 | MIDI / FLAC書き出し条件 | [BGM MIDIファイルの設定](/spec/bgm/bgm-midi-settings) |
-| MusicChart構造・TempoMap・Sync Settings | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart) |
+| MusicChart構造・TempoMap・Sync Settings・system pre-rollの保存・validation | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart) |
+| 初期Shaondama生成・最低保証数・Shaondama Supply Ready | [BGM｜シャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
+| RadioWhaleの出現演出・Gameplayへのhand-off | [ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning) |
+| Shaondamaの選択可能状態・最低保証への算入可否 | [シャオンダマ｜浮遊挙動](/spec/shaondama-music/floating-behavior) |
 | AttackEventの必要音・音楽情報・Chord / Arpeggio・発火時刻 | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) |
 | Current Normal AttackEvent / Slot / Weak / Reserved | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
-| Charge入力・Click / Drag・`success / miss` | [Playerアクション｜チャージ](/spec/player/player-action-charge) |
+| Charge入力・Click / Drag・受付gateを含む開始条件・`success / miss` | [Playerアクション｜チャージ](/spec/player/player-action-charge) |
 | `Complete / Incomplete / Zero Charge`・使用Reserved・Palette Bullet化・発射対象 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | BGM / Palette Bullet音程音 / Gameplay SEの同期・発音 | **本ページ** |
 | Shaondama runtime data | [玉のデータ](/spec/shaondama-music/orb-data) |
@@ -1369,9 +1438,9 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 
 これらの具体内容は未決です。
 
-## システム側pre-roll時間
+## system pre-roll時間
 
-pre-rollをパラメータとして持つことは確定していますが、具体的な時間は未確定です。
+system pre-rollをパラメータとして持つことは確定していますが、具体的な時間は未確定です。
 
 ## Parry HitStop中の音楽時計
 
