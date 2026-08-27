@@ -131,7 +131,7 @@ Wildcard変換要求には、少なくとも次の対応関係を維持できる
 
 弾き方向は[Playerアクション｜パリィ](/spec/player/player-action-parry)が対象ごとのParry結果として確定した値を使用します。Jaon Bullet側で固定の「Playerから離れる方向」へ置き換えたり、入力方向、Playerの向き、接触方向などから独自に再計算したりしません。正確な算出方法が未確定である間は、Player Parry側の調整・実装検討事項とします。
 
-`変換元邪音玉IDと`battleId`の組み合わせによる重複変換・重複生成の防止は、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とします。同一の邪音玉から成立させる変換要求は最大1回とし、同一の組み合わせから成立させる変換commitも最大1回とします。
+`変換元邪音玉ID`と`battleId`の組み合わせによる重複変換・重複生成の防止は、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とします。同一の邪音玉から成立させる変換要求は最大1回とし、同一の組み合わせから成立させる変換commitも最大1回とします。
 
 Normal ParryとJust Parryのどちらでも、Wildcardの生成数、種別、変換位置の決定方法、選択条件、弾き移動の基本性能、およびその他のGameplay性能を同じにします。Just Parryを理由として追加のWildcard変換要求を発行したり、強いWildcardや強い弾き移動へ変更したりしてはいけません。
 
