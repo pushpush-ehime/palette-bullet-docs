@@ -1,6 +1,6 @@
 ---
 title: "ラジクジラ｜シャオンダマ生成"
-description: Palette Bulletにおける生成要求から出現演出完了・選択可能化までの仕様
+description: RadioWhale経路における生成要求から出現演出完了・選択可能化までの仕様
 pageType: spec
 category: "ラジクジラ"
 order: 20
@@ -12,7 +12,7 @@ relatedTasks: []
 
 ## 目的
 
-本ページでは、**ゲームシステム側から生成要求を受け取った後、論理生成、出現演出、出現演出完了、Gameplayへの制御移譲、および選択可能化まで**を定義します。
+本ページでは、**Normal Shaondamaおよび最低保証補充Wildcardについて、ゲームシステム側から生成要求を受け取った後、論理生成、出現演出、出現演出完了、Gameplayへの制御移譲、および選択可能化まで**を定義します。
 
 本ページを、生成要求から出現演出完了・選択可能化までの状態境界と、Battle開始Readyへ接続する完了通知の正本とします。
 
@@ -38,11 +38,13 @@ Spawn System
 
 生成対象、生成個数、生成タイミング、最低保証数、不足数の算出は[BGM→シャオンダマ生成仕様](../bgm/bgm-make-syaonndama.md)を正本とします。出現完了後の浮遊、Lifetime、Reserved、自然破裂、消滅は[浮遊・挙動](../shaondama-music/floating-behavior.md)を正本とします。
 
-本ページの共通状態遷移は、Normal Shaondamaと、最低保証不足を生成元とするWildcard Shaondamaの出現要求に適用します。Parry由来Wildcardの選択可能化タイミングは未確定であるため、本ページの一定時間の出現演出を自動的に適用しません。
+本ページの共通状態遷移は、Normal Shaondamaと、最低保証不足を生成元とするWildcard Shaondamaの出現要求にだけ適用します。
+
+Parry由来Wildcardは、Parry成立時点のworld位置で即座に変換され、変換commitと同時に選択可能になります。そのため、本ページのRadioWhale通常受付へ合流させず、論理生成、姿勢変更、背中側Spawn、一定時間の出現演出、出現演出完了通知、およびGameplayへの制御移譲を適用しません。変換後のWildcardへ加える弾き方向の力と、その後の移動もRadioWhaleは管理しません。
 
 ## ラジクジラが担当する生成範囲
 
-ラジクジラが担当する範囲は、外部のSpawn Systemから生成要求を受け取ってから、論理個体を作成し、シャオンダマを世界内へ出現させ、出現演出完了時にGameplayへ制御を移譲して選択可能にするまでです。
+ラジクジラが担当する範囲は、Normal Shaondamaおよび最低保証補充Wildcardについて、外部のSpawn Systemから生成要求を受け取ってから、論理個体を作成し、シャオンダマを世界内へ出現させ、出現演出完了時にGameplayへ制御を移譲して選択可能にするまでです。
 
 基本的な流れは以下です。
 
@@ -81,7 +83,7 @@ Gameplayへ制御移譲
 | Normal生成要求 | MusicChartのsource NoteEvent occurrenceに基づき、BGM生成側が対象・時刻・個数を決定 | 要求されたNormalを論理生成し、ラジクジラから出現させる |
 | 最低保証不足によるWildcard補充要求 | BGM生成側が現在選択可能数と補充要求中数から不足数を決定 | 要求された不足数分のWildcardを論理生成し、出現させる |
 
-Parry由来Wildcardはこの2種類とは別の生成元です。本ページの通常受付へ自動的に合流させません。
+Parry由来Wildcardはこの2種類とは別の生成元です。本ページの通常受付へ合流させず、RadioWhaleはParry変換要求を通常生成要求として受理・再発行しません。
 
 生成要求を受信した時点では、ラジクジラ側で、
 
@@ -121,7 +123,7 @@ Parry由来Wildcardはこの2種類とは別の生成元です。本ページの
 
 ## 状態遷移
 
-本ページが管理する基本状態遷移は、以下を正とします。
+本ページが管理するNormal Shaondamaおよび最低保証補充Wildcardの基本状態遷移は、以下を正とします。Parry由来Wildcardはこの状態遷移へ入りません。
 
 ```text
 生成要求
@@ -159,7 +161,7 @@ Gameplayへ制御移譲
 
 ### 出現演出中
 
-論理生成後、対象個体を出現演出中へ移します。
+RadioWhale経路で論理生成したNormal Shaondamaおよび最低保証補充Wildcardを、出現演出中へ移します。
 
 - 出現演出中の個体は選択不可です。
 - Charge対象検索、Click／Dragの保持対象、およびAllocation候補へ含めません。
@@ -171,7 +173,7 @@ Gameplayへ制御移譲
 
 ### 出現演出完了・選択可能化
 
-個体ごとの出現演出が完了した時点で、次の処理を順に一度だけ行います。
+RadioWhale経路の個体ごとの出現演出が完了した時点で、次の処理を順に一度だけ行います。
 
 1. 対象Battleが継続中であり、個体のBattle IDが現在のBattleと一致することを確認する
 2. 対象個体の出現演出完了を確定する
@@ -204,7 +206,7 @@ Gameplayへ制御移譲
 
 最低保証不足によるWildcardの生成契機、生成元区分、Wildcard固有dataは[万能シャオンダマ](../shaondama-music/wildcard-orb.md)を正本とします。本ページは、上流でWildcardとして確定した補充要求を受け、要求個数分を出現演出完了・選択可能化まで処理します。
 
-Parry由来Wildcardは邪音玉の位置で変換されるため、ラジクジラの背中側から出現する本経路へ自動的に置き換えません。
+Parry由来Wildcardは邪音玉のParry成立位置で即時変換され、変換commitと同時に選択可能になるため、ラジクジラの背中側から出現する本経路へ置き換えません。Parry由来Wildcardのために、Normal Shaondamaまたは最低保証補充Wildcardの既存Spawn経路を変更しません。
 
 ## 単体生成
 
@@ -250,7 +252,7 @@ Gameplayへ制御移譲・選択可能化
 
 ## 出現演出時間
 
-論理生成後から出現演出完了までには、一定の出現演出時間を設けます。
+RadioWhale経路のNormal Shaondamaおよび最低保証補充Wildcardには、論理生成後から出現演出完了まで一定の出現演出時間を設けます。Parry由来Wildcardには適用しません。
 
 - 出現演出時間は調整可能な共通パラメータです。
 - 具体的な秒数は未確定です。
@@ -262,7 +264,7 @@ Gameplayへ制御移譲・選択可能化
 
 ## Gameplayロジックと表示タイミングの分離
 
-**Gameplay上の生成成立と、ラジクジラからシャオンダマが視覚的に出現するタイミングは、区別して扱います。**
+**RadioWhale経路におけるGameplay上の生成成立と、ラジクジラからシャオンダマが視覚的に出現するタイミングは、区別して扱います。**
 
 ラジクジラの姿勢変更や背中から吹き出す表現は、上流で決定された生成内容を世界内へ表現するための処理です。
 
@@ -320,7 +322,7 @@ BGM / MusicChartによる生成内容の決定
 
 ## シャオンダマ側への制御移譲
 
-ラジクジラが担当するのは、シャオンダマを世界内へ出現させ、**出現演出完了時に**シャオンダマ側へ制御を移譲して選択可能にするところまでです。
+ラジクジラが担当するのは、Normal Shaondamaおよび最低保証補充Wildcardを世界内へ出現させ、**出現演出完了時に**シャオンダマ側へ制御を移譲して選択可能にするところまでです。
 
 制御移譲後の、
 
@@ -335,11 +337,13 @@ BGM / MusicChartによる生成内容の決定
 
 制御移譲timingは未決ではありません。出現演出完了を境界とし、完了前はラジクジラ／出現処理側、完了後はShaondama Gameplay側が責務を持ちます。
 
+この制御移譲境界はRadioWhale経路だけに適用します。Parry由来Wildcardは変換commitと同時に選択可能なWildcard状態へ直接入るため、RadioWhaleからの制御移譲を待ちません。
+
 ## 最低保証数との接続
 
 選択可能Shaondamaの最低保証数は、[BGM→シャオンダマ生成仕様](../bgm/bgm-make-syaonndama.md)が所有します。本ページは最低保証数や不足数を計算せず、個体ごとの状態を一意に通知します。
 
-最低保証数へ算入できるのは、以下をすべて満たす個体だけです。
+本ページのRadioWhale経路から最低保証数へ算入できるのは、以下をすべて満たす個体だけです。
 
 - 出現演出が完了している
 - Gameplayへ制御移譲済みである
@@ -387,19 +391,37 @@ Battle中に最低保証数を下回った場合は、上流から不足数分�
 
 出現演出中は、一時的に最低保証数を下回ることを許容します。不足補充を待つためにBattleや音楽時計を停止・巻き戻しません。
 
-## Parry由来Wildcardの例外
+## Parry由来WildcardはRadioWhale責務外
 
-Parry成功によって邪音玉からその場で変換されるWildcardは、最低保証不足によるWildcard補充と生成元・生成位置が異なります。
+Parry成功によって邪音玉から変換されるWildcardは、最低保証不足によるWildcard補充と生成元、生成位置、および選択可能化経路が異なります。
 
-次の内容は確定しています。
+Parry由来Wildcardには、次の規則を適用します。
 
 - Parry成功した邪音玉1弾につきWildcard 1個へ変換する
-- 変換位置は対象邪音玉がParryされたworld位置である
-- 通常Parry／Just Parryのどちらでも変換する
+- 同一Physics Stepの成功batchに複数弾が含まれる場合も、各弾を個別のWildcardへ変換する
+- 変換位置は、各邪音玉のParry成立時点のworld位置とする
+- Parry成立位置で即座にWildcardへ変換commitする
+- 変換commitと同時にPlayerのCharge対象として選択可能にする
+- 変換直後に、Parry結果として対象ごとに確定した弾き方向の力を変換済みWildcardへ1回だけ加える
+- 変換後のWildcardは選択可能なまま弾き移動し、選択可能かつ非`Reserved`であれば変換commit時点から最低保証数へ算入する
+- Normal Parry／Just Parryによって、Wildcardの生成数、種別、選択条件、および弾き移動の基本性能を変えない
 
-一方、変換直後から選択可能にするか、本ページと同じ一定時間の出現演出を経て選択可能にするかは未確定です。
+この経路はRadioWhaleの通常受付へ合流しません。RadioWhaleはParry由来Wildcardについて、次の処理を行いません。
 
-したがって、Parry由来Wildcardへ本ページのRadioWhale出現経路、背中側Spawn、出現演出時間、選択可能化timingを自動適用しません。最終決定は[万能シャオンダマ](../shaondama-music/wildcard-orb.md)、邪音玉、Parry、および浮遊挙動の各正本へ同期します。
+- 通常生成要求としての受付または論理生成
+- ラジクジラの姿勢変更
+- 背中側Spawn
+- 一定時間の出現演出と、その演出時間のtimer管理
+- 出現演出完了通知
+- Shaondama Gameplayへの制御移譲
+- Parry由来Wildcardの選択可能化完了通知や最低保証算入通知
+- 変換後のWildcardへの力の付与、弾き移動、減衰、または通常浮遊への接続
+
+表示上の変換演出が続いていても、RadioWhaleの出現演出完了通知を待たず、Gameplay上は変換commit時点から選択可能です。
+
+Parry由来Wildcardの変換条件、即時変換、即時選択可能化、および重複変換防止は[万能シャオンダマ](../shaondama-music/wildcard-orb.md)、Parry判定batchと対象ごとの弾き方向は[Playerアクション｜パリィ](../player/player-action-parry.md)、邪音玉としての終了と変換要求は[邪音玉](../enemy/jaon-bullet.md)、変換後の弾き移動・浮遊・Lifetime・`Reserved`・消費・Battle終了は[浮遊・挙動](../shaondama-music/floating-behavior.md)を正本とします。
+
+本ページのNormal Shaondamaおよび最低保証補充Wildcardに対する通常受付、背中側Spawn、出現演出、完了通知、制御移譲、および選択可能化の規則は変更しません。
 
 ## Battle終了・Room Retry
 
@@ -439,15 +461,18 @@ Room Retry地点と、Player／Enemy／BGM等の再初期化値はGame・Stage�
 | 生成個数の決定                 | BGM側のシャオンダマ生成仕様  |
 | 生成タイミングの決定              | BGM側のシャオンダマ生成仕様  |
 | 最低保証不足によるWildcard生成元・data | 万能シャオンダマ仕様 |
-| Parry由来Wildcardの生成・選択開始timing | 万能シャオンダマ／Parry／邪音玉 |
 | BGMとの同期                 | BGM / MusicChart |
 | 生成要求                    | Spawn System     |
-| 生成要求の受信                 | ラジクジラ            |
-| 論理生成・出現演出中state          | 本ページ             |
-| 世界内への出現                 | ラジクジラ            |
-| 背中側からの出現                | ラジクジラ            |
-| 出現演出完了・制御移譲・選択可能化      | 本ページ             |
-| 選択可能化完了通知               | 本ページ             |
+| Normal／最低保証補充Wildcard生成要求の受信 | ラジクジラ            |
+| Normal／最低保証補充Wildcardの論理生成・出現演出中state | 本ページ             |
+| Normal／最低保証補充Wildcardの世界内への出現 | ラジクジラ            |
+| Normal／最低保証補充Wildcardの背中側からの出現 | ラジクジラ            |
+| Normal／最低保証補充Wildcardの出現演出完了・制御移譲・選択可能化 | 本ページ             |
+| Normal／最低保証補充Wildcardの選択可能化完了通知 | 本ページ             |
+| Parry判定batch・対象ごとの弾き方向 | Player Parry |
+| 邪音玉としての終了・Wildcard変換要求 | 邪音玉 |
+| Parry由来Wildcardの変換commit・即時選択可能化・重複変換防止 | 万能シャオンダマ。本ページの通常受付外 |
+| Parry由来Wildcardの弾き移動・共通lifecycle | 浮遊・挙動。本ページの責務外 |
 | 最低保証達成・Shaondama Supply Ready | BGM側のシャオンダマ生成仕様 |
 | 出現完了後のシャオンダマ挙動          | 浮遊・挙動            |
 
@@ -471,8 +496,9 @@ AttackEventは[AttackEvent](../bgm/bgm-attack-event.md)、選択可能化後のS
 | 出現演出時間の具体秒数                         | 未決・調整パラメータ |
 | 複数生成時の演出間隔                            | 未決           |
 | 複数生成を完全同時または連続噴出のどちらで見せるか             | 未決           |
-| Parry由来Wildcardを即時選択可能または演出後選択可能のどちらにするか | 未決・本ページでは決定しない |
 
 これらについて、本ページでは推測による具体値や挙動を設定しません。
 
-一方、生成要求→論理生成→出現演出中→出現演出完了→制御移譲→選択可能という状態遷移、出現演出中の選択禁止・最低保証算入禁止、出現演出完了時の制御移譲、および旧Battleの演出・完了通知をRoom Retry後へ持ち越さないことは決定済みです。
+一方、Normal Shaondamaおよび最低保証補充Wildcardについて、生成要求→論理生成→出現演出中→出現演出完了→制御移譲→選択可能という状態遷移、出現演出中の選択禁止・最低保証算入禁止、出現演出完了時の制御移譲、および旧Battleの演出・完了通知をRoom Retry後へ持ち越さないことは決定済みです。
+
+Parry由来Wildcardは、Parry成立位置で即時変換され、変換commitと同時に選択可能になることが決定済みです。RadioWhaleの通常受付、背中側Spawn、出現演出、完了通知、制御移譲、および弾き移動管理は適用しません。
