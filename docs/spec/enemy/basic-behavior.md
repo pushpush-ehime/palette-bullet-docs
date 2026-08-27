@@ -164,7 +164,11 @@ Enemyが次の状態になっただけでは、StageのClear対象から除外�
 
 正式除外は、現在の`battleId`に属する登録済み記録に対するStageの明示処理だけで成立します。Enemy自身、Enemy Damage Owner、AI、Enemy Spawn Owner、表示object、またはobject pooling処理が、正式除外を独自に成立させてはいけません。
 
-Stageが対応するClear対象記録を`FormallyExcluded`へ変更した時点で、対応EnemyをGameplay上無効化します。対応EnemyについてAI、移動、追跡、索敵、攻撃、Target提供、Hit／Damage受付、Spawn連携、および新しいGameplay出力を停止し、同じBattle中に再びGameplay上`Active`へ移行させません。Enemy world objectを残す場合は表示専用とし、GameplayまたはClear条件へ影響させません。
+Stageが対応するClear対象記録を`FormallyExcluded`へ変更した時点で、対応EnemyをGameplay上無効化します。AI、移動、追跡、索敵、攻撃、Target提供、Spawn連携、および新しいGameplay出力を停止し、正式除外成立後に新しく発生したHit／Damage候補は受け付けません。
+
+ただし、正式除外成立前に同一frameのDamage集約対象として有効に受け付けていたHit／Damage候補は、そのframeのsnapshotに従って処理を完了できます。その結果、同一frame内でEnemy側の浄化が成立することはありますが、Stage側のClear対象記録は`FormallyExcluded`を維持し、`Purified`へ変更しません。
+
+正式除外されたEnemyは、同じBattle中に再びGameplay上`Active`へ移行させません。Enemy world objectを残す場合は表示専用とし、GameplayまたはClear条件へ影響させません。
 
 Enemy world objectが想定外に消滅した場合、対応するClear対象記録は未解決のまま維持します。想定外消滅を浄化または正式除外として扱わず、次のいずれかによって明示的に解決します。
 
