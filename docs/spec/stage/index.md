@@ -332,6 +332,8 @@ Clear条件を1回だけ評価
 
 objective完了と最後のEnemy浄化が同一frameに成立し、`PendingSpawn`または`Active`の記録が残っていなければ、Clear候補を発生させます。
 
+同一frameに同じClear対象記録の正式除外と浄化成立通知が成立した場合、Stage側記録はFormallyExcludedを維持する。Enemy自身の浄化成立は取り消さないが、Stage側記録をPurifiedへ上書きしない。
+
 ### Clear候補通知
 
 Clear条件が成立した場合、Stageは対象`battleId`付きのClear候補をGameへ一度だけ通知します。
