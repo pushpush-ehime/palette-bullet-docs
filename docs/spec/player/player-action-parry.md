@@ -21,6 +21,7 @@ relatedTasks: []
 * スタミナ消費
 * Parrying内部Phase
 * Parry判定batch
+* 成功batch内の対象ごとの弾き方向の確定と受け渡し
 * Normal Parry / Just Parry
 * 成功・失敗・空振り
 * 連続パリィ
@@ -283,6 +284,8 @@ batchへ参加できるのは、そのPhysics Stepの判定時点で有効かつ
 
 同一Physics Step内の接触候補を収集している間は、対象邪音玉のDamage、Parry成功、Wildcard変換を確定しません。batch判定完了後に、各対象の最終結果を確定します。同一Physics Step内のcallback到着順によってDamageを先に確定してはいけません。
 
+成功batchの結果適用では、各対象についてParry成功結果を1回だけ確定します。邪音玉については、変換後のWildcardへ渡す弾き方向を対象ごとに確定し、Parry成功結果とともに各邪音玉へ1回だけ通知します。Damage無効化、攻撃projectile終了、およびWildcard変換要求の成立は、通知を受けた邪音玉側で1弾につき1回だけ行います。
+
 邪音玉ごとの有効性と重複解決防止については「邪音玉」を正とします。
 
 邪音玉以外の有効なParry対象にも「1回のParryingにつき1成功batch」の上限を適用しますが、対象固有の成功結果は各攻撃仕様を正とします。
@@ -300,9 +303,13 @@ batch全体をNormal / Just判定
 ↓
 A、B、CがすべてParry成功
 ↓
-各邪音玉のDamageを無効化
+A、B、CそれぞれのParry成功結果と弾き方向を1回ずつ確定
 ↓
-邪音玉1弾につきWildcard変換要求を1回発行
+各邪音玉へ成功結果と弾き方向を1回通知
+↓
+各邪音玉側でDamage無効化・攻撃projectile終了・Wildcard変換要求を1回だけ成立
+↓
+Wildcard側で、変換commit後の各個体へ対応する弾き方向の力を1回適用
 ↓
 batch処理完了後に成功枠を消費
 ```
@@ -312,6 +319,18 @@ batch処理完了後に成功枠を消費
 最初に到着したcallbackだけで成功枠を消費し、同一Physics Step内の後続callbackを失敗させてはいけません。
 
 batch内の全対象に成功結果を適用した後、そのParryingの成功枠を消費します。
+
+### 対象ごとの弾き方向
+
+成功batchに複数の邪音玉が含まれる場合も、変換後のWildcardへ渡す弾き方向は対象ごとに確定します。同一batchであることを理由に、全対象へ1つの共通方向を一括適用しません。
+
+弾き方向はParry結果の一部として本ページで確定し、対応する邪音玉へ成功結果とともに1回だけ通知します。通知を受けた邪音玉は、Parry成立位置、`battleId`、変換元邪音玉ID、および弾き方向を1弾ごとの変換要求としてWildcard側へ渡します。この方向は邪音玉自身を移動させるためには使用しません。
+
+実際に力を受けて移動する対象は、邪音玉ではなく変換commit後のWildcardです。邪音玉を弾いて移動させてからWildcardへ変換する中間Stateは設けません。変換commit、同時の選択可能化、および力の適用後の基本規則は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)、その後の衝突・浮遊・Lifetime・`Reserved`・消費・Battle終了は[浮遊・挙動](/spec/shaondama-music/floating-behavior)を正とします。
+
+弾き方向を固定の「Playerから離れる方向」と決め打ちしません。入力方向、Playerの向き、接触方向などのどれを使用して弾き方向を算出するか、その具体式は現時点では未確定です。確定するまでは、いずれかの情報から実装側で独自に補完せず、実装・操作感の検討事項として扱います。
+
+Battle結果確定後、または現在Battleと異なる`battleId`の遅延結果から、弾き方向の受け渡し、Wildcard変換、選択可能化、または力の付与を発生させません。
 
 ### 成功batch処理後
 
@@ -354,24 +373,28 @@ Normal Parry Window内かつJust Parry Window外であれば、Normal Parryと�
 
 callbackごと、または邪音玉ごとにNormal / Justを別々に評価してはいけません。
 
-Normal ParryとJust Parryは、Damage無効化、Reaction抑止、Wildcard変換、成功枠消費については同じ結果になります。ただし、スタミナ精算は異なります。
+Normal ParryとJust Parryは、Damage無効化、Reaction抑止、Wildcard変換、変換commit時の選択可能化、弾き方向の受け渡し、弾き移動の基本性能、および成功枠消費については同じ結果になります。ただし、スタミナ精算は異なります。
 
 | 結果 | Normal Parry | Just Parry |
 | --- | --- | --- |
 | Damage | 無効 | 無効 |
 | 通常被弾・ReactionState | 発生させない | 発生させない |
 | 邪音玉の変換 | 1弾につきWildcard 1個 | 1弾につきWildcard 1個 |
+| Wildcardの選択可能化 | 変換commitと同時 | 変換commitと同時 |
+| 弾き方向と力の対象 | 対象ごとに方向を確定し、変換後のWildcardへ1回適用 | 対象ごとに方向を確定し、変換後のWildcardへ1回適用 |
 | 成功枠 | batch処理後に消費 | batch処理後に消費 |
 | HitStop | 1batchにつき1回 | 1batchにつき1回 |
 | スタミナ精算 | Parrying開始時に消費したコストを維持 | 現在のParrying開始時に消費した`ParryStaminaCost`を1回だけ返却し、実質消費0 |
 
-Just ParryによってWildcardの生成数、種別、Gameplay性能を増減させません。
+Just ParryによってWildcardの生成数、種別、選択条件、弾き方向の算出規則、または弾き移動の基本性能を変えません。追加Wildcard、強いWildcard、またはJust専用の強い弾き移動は発生させません。
+
+Just Parryのスタミナ返却は、現在のParryingについて最大1回です。同一batchに含まれる邪音玉の弾数に応じて`ParryStaminaCost`を複数回返却せず、同じbatch結果の重複処理によって再返却もしません。
 
 Normal / Justの違いは、スタミナ精算、VFX、SE、画面効果、およびHitStopの強さ・長さによって表現します。
 
 HitStopの具体的な音楽同期規則は「BGMとGameplayの接続」を正とし、本ページではHitStop中のParry入力だけを定義します。
 
-Parry由来Wildcardをいつ選択可能にするかは本ページでは確定せず、「万能写音玉」の仕様に委譲します。
+Parry由来Wildcardは、Parry成立位置での変換commitと同時に選択可能になります。即時選択可能化、最低保証数への算入、RadioWhale経路を使用しないこと、および変換後の弾き移動の詳細は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正とします。
 
 ## Recovery Phase
 
@@ -624,8 +647,9 @@ Parry Window Phase中に、そのParryingの成功枠が未使用の状態で有
 
 成功時は以下の処理を行います。
 
-* batch内の対象攻撃のダメージをすべて無効化する
-* batch内の邪音玉1弾につきWildcard変換要求を1回だけ発行する
+* batch内のすべての対象攻撃についてParry成功結果を1回だけ確定する
+* batch内の各邪音玉について、Damage無効化・Wildcard変換対象となる成功結果を1回だけ通知する
+* batch内の各邪音玉について、変換後のWildcardへ渡す弾き方向を対象ごとに確定し、成功結果とともに1回だけ通知する
 * 通常の被弾を発生させない
 * `ReactionState`を変更しない
 * `ActionState = Parrying`を維持する
@@ -633,6 +657,8 @@ Parry Window Phase中に、そのParryingの成功枠が未使用の状態で有
 * batch全体に1つのNormal / Just評価を適用する
 * batch全体に対してHitStopを1回だけ発生させる
 * batch処理完了後に、そのParryingの成功枠を消費する
+
+弾き方向を受け取って実際に力を受けるのは、邪音玉ではなくParry成立位置で即時変換された後のWildcardです。変換後のWildcardは変換commitと同時に選択可能になり、選択可能なまま弾き移動します。
 
 ```text
 ActionState   = Parrying
@@ -646,11 +672,11 @@ ReactionState = None
 
 パリィ成功専用のPlayer Stateは作成しません。
 
-Normal Parry成功では、Parrying開始時に消費したスタミナを返却しません。Just Parry成功では、現在のParrying開始時に消費したParryStaminaCostを一度だけ返却し、実質的なスタミナ消費を0にします。同一batchの重複処理によって複数回返却してはいけません。
+Normal Parry成功では、Parrying開始時に消費したスタミナを返却しません。Just Parry成功では、現在のParrying開始時に消費した`ParryStaminaCost`を1回だけ返却し、実質的なスタミナ消費を0にします。同一batchの邪音玉数に応じて複数回返却したり、同じbatchの重複処理によって再返却したりしてはいけません。1回のParryingに対するJust返却は最大1回です。
 
 ただし、成功後のParry再入力によって新しいParryingを開始する場合は、その新しいParryingの開始分としてスタミナを消費します。
 
-邪音玉の攻撃projectileとしての終了と重複解決防止は「邪音玉」、Wildcardの生成内容と重複生成防止は「万能写音玉」を正とします。
+邪音玉の攻撃projectileとしての終了、Parry成立位置・`battleId`・変換元邪音玉ID・弾き方向の受け渡し、および重複解決防止は[邪音玉](/spec/enemy/jaon-bullet)を正とします。Wildcardの即時変換、変換commitと同時の選択可能化、重複生成防止、および変換後の力の適用は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正とします。
 
 ## パリィ失敗
 
@@ -961,6 +987,8 @@ HitStop中に入力を保持しただけでは`ParryStaminaCost`を消費せず�
 | Parryingの開始・Phase・判定・終了 | 本ページ |
 | Parry開始時のスタミナ確認・消費タイミング | 本ページ |
 | 同一Physics StepのParry判定batch収集とbatch全体の評価 | 本ページ |
+| 成功batch全体のParry成功確定と、各対象への成功結果の1回限りの通知 | 本ページ |
+| 変換後のWildcardへ渡す対象ごとの弾き方向の確定 | 本ページ |
 | 1回のParryingで成功できるbatch数 | 本ページ |
 | Normal / Justの時間評価とGameplay上の共通結果 | 本ページ |
 | 成功後早期・空振り時・HitStop保持入力による再開始 | 本ページ |
@@ -968,8 +996,9 @@ HitStop中に入力を保持しただけでは`ParryStaminaCost`を消費せず�
 | パリィ成功・失敗・空振り | 本ページ |
 | ActionState間の遷移可否 | Playerアクション遷移 |
 | スタミナ最大値・消費量・回復 | Playerステータス |
-| 邪音玉ごとのDamage無効化・projectile終了・重複解決防止 | 邪音玉 |
-| 邪音玉1弾からWildcard 1個への変換・重複生成防止・選択可能化 | 万能写音玉 |
+| 邪音玉ごとのDamage無効化・projectile終了・Wildcard変換要求の1回限りの成立・Parry成立位置・`battleId`・変換元ID・弾き方向の受け渡し・重複解決防止 | [邪音玉](/spec/enemy/jaon-bullet) |
+| 邪音玉1弾からWildcard 1個への即時変換・重複生成防止・変換commitと同時の選択可能化・変換後の力の適用 | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
+| 力適用後のWildcardの衝突・浮遊・Lifetime・`Reserved`・消費・Battle終了 | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
 | HitStop中のBGM Audio・3時計・AttackEvent | BGMとGameplayの接続 |
 | Aimingのカメラ・移動・向き制御 | Playerアクション｜照準 |
 | Player通常移動の停止 | Player基本移動 |
@@ -980,8 +1009,9 @@ HitStop中に入力を保持しただけでは`ParryStaminaCost`を消費せず�
 ## 未決事項
 
 * 体当たりなど、邪音玉以外の攻撃をパリィした場合に敵をひるませるか
+* 対象ごとの弾き方向を、入力方向、Playerの向き、接触方向などからどのように算出するかの具体式
 
-Normal / Justの2段階評価とHitStopの採用自体は確定事項です。
+Normal / Justの2段階評価とHitStopの採用自体は確定事項です。また、成功した邪音玉ごとに弾き方向を確定して変換後のWildcardへ渡すこと、力を受ける対象が変換後のWildcardであること、および変換commitと同時に選択可能になることも確定事項です。
 
 各Window、空振り時の再入力受付開始、Normal / JustそれぞれのHitStop、入力保持時間、VFX、SE、画面効果の具体値は、未決仕様ではなく調整パラメータとして扱います。
 
