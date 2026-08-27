@@ -19,7 +19,7 @@ status: 仮仕様
 
 シャオンダマ1個が持つruntime dataと、攻撃へ使用するときの実効値を定義し、生成・出現演出・浮遊・Charge・Allocation・発音・Damageの各システムが参照する共通契約を作ります。
 
-本ページは、Normal Shaondama（通常シャオンダマ）／Wildcard Shaondama（万能シャオンダマ）の種別、個体識別情報、Battleへの帰属、生成元区分、選択可能性・出現演出・`Reserved`を判定するための情報、Normalのsource NoteEvent occurrence、元の音楽情報、元RGB値、Allocation後の実効値payload、およびPalette Bullet化時のデータ引き継ぎ契約の正本です。
+本ページは、Normal Shaondama（通常シャオンダマ）／Wildcard Shaondama（万能シャオンダマ）の種別、個体識別情報、Battleへの帰属、生成元区分、選択可能性・出現演出・`Reserved`を判定するための情報、Parry変換時の一時的な引き継ぎ情報、Normalのsource NoteEvent occurrence、元の音楽情報、元RGB値、Allocation後の実効値payload、およびPalette Bullet化時のデータ引き継ぎ契約の正本です。
 
 生成対象・生成タイミング・重複防止は[BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、状態遷移・Lifetime・自然破裂は[浮遊・挙動](/spec/shaondama-music/floating-behavior)、Allocationと実効値の解決手順は[Charge Allocation](/spec/draw-system/charge-allocation)、Palette Bullet化と発射情報の受け渡しは[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、飛行・衝突・Damage候補生成は[パレットブレット](/spec/combat/palette-bullet)、発音は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)、Damage適用は[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。
 
@@ -39,24 +39,24 @@ status: 仮仕様
 すべてのシャオンダマ個体は、最低限以下の意味を保持または一意に参照できる状態にします。このうちBattle IDと個体識別情報は各runtime個体が必ず保持し、world object化後も同じ値を引き継ぎます。
 
 | データ | 内容 | 規則 |
-|---|---|
+|---|---|---|
 | Shaondama種別 | `Normal`または`Wildcard` | 生成後に別種別へ変更しない |
-| Battle ID | 個体が属するBattleの識別情報 | 生成要求から引き継ぎ、別Battleへ付け替えない |
+| Battle ID | 個体が属するBattleの識別情報 | 生成要求または変換元から引き継ぎ、別Battleへ付け替えない |
 | 個体識別情報 | 1個のシャオンダマを他個体と区別する情報 | `Battle ID + 個体識別情報`で一意に識別できること |
 | 生成元区分 | NormalのNoteEvent由来、Wildcardの最低保証不足による生成、WildcardのParry変換を区別する情報 | 下記以外の生成元を追加せず、NormalとWildcardの生成責務を混同しない |
-| 生成元固有参照 | source NoteEvent occurrence、最低保証不足の生成要求、変換元邪音玉など、生成元を追跡するための参照 | 種別・生成元区分に必要な参照だけを持ち、無関係な参照を擬似的に設定しない |
-| 出現演出の進行情報 | 出現演出中か、演出が完了したかを区別できる情報 | 演出中を選択可能化や最低保証算入と混同しない |
+| 生成元固有参照 | source NoteEvent occurrence、最低保証不足の生成要求、変換元邪音玉IDなど、生成元を追跡するための参照 | 種別・生成元区分に必要な参照だけを持ち、無関係な参照を擬似的に設定しない |
+| 出現演出の進行情報 | 通常生成または最低保証補充で、出現演出中か演出が完了したかを区別するための情報 | 適用する生成経路だけが持てばよい。Parry由来Wildcardへ最低保証補充用の出現演出状態を必須としない |
 | 選択可能性 | 現在Charge対象として選択できるかを判定できる情報 | 判定規則と状態遷移は[浮遊・挙動](/spec/shaondama-music/floating-behavior)に従う |
 | `Reserved`情報 | Allocation先へ確保済みか、および必要な割当先参照 | `Reserved`中は最低保証数へ算入しない |
 | 表示用種別・色参照 | 通常7色またはWildcardの虹色表示を解決する参照 | Gameplay上の実効色とは分離する |
 | Charge選択フィードバック音参照 | Charge対象として選択した際のGameplay SE参照 | AttackEvent発射時の音程音とは分離する |
 | 破裂音参照 | 自然破裂・終了演出などの音響参照 | 再生条件は各lifecycle・演出正本で判定する |
 
-最低保証数へ算入できるのは、**現在選択可能かつ非`Reserved`**の個体だけです。出現演出中、選択不可、または`Reserved`中の個体は算入しません。この算入可否を独立した重複flagとして保持する必要はありませんが、上記情報から一意に導出できなければなりません。
+最低保証数へ算入できるのは、**現在選択可能かつ非`Reserved`**の個体だけです。Gameplay上の出現演出gate中、選択不可、または`Reserved`中の個体は算入しません。この算入可否を独立した重複flagとして保持する必要はありませんが、上記情報から一意に導出できなければなりません。
 
-出現演出中であること、選択不可であること、`Reserved`であることは同義ではありません。たとえば出現演出中は選択不可ですが、選択不可となる理由をすべて出現演出中として扱ってはいけません。状態名、flag、enum、および組み合わせ方は本ページでは固定しません。
+Gameplay上の出現演出gate中であること、表示演出が再生中であること、選択不可であること、`Reserved`であることは、それぞれ同義ではありません。最低保証補充の出現演出gate中は選択不可ですが、Parry由来Wildcardは変換commit時点で選択可能な状態へ直接入り、表示上の変換演出が継続していても選択可能性を失いません。状態名、flag、enum、および組み合わせ方は本ページでは固定しません。
 
-Battle IDと個体識別情報は、生成要求、world object、選択可能化通知、Allocation、`Reserved`、Palette Bullet化、および破棄まで追跡可能にします。Battle終了またはRoom Retry時は、旧Battle IDに属する個体、保留中の生成・選択可能化通知、`Reserved`情報、Allocation結果、およびその他のruntime状態を次のBattleへ持ち越しません。
+Battle IDと個体識別情報は、生成／変換要求、world object、選択可能化、Allocation、`Reserved`、Palette Bullet化、および破棄まで追跡可能にします。Battle終了またはRoom Retry時は、旧Battle IDに属する個体、保留中の生成・変換・選択可能化通知、Parry変換用の一時情報、`Reserved`情報、Allocation結果、およびその他のruntime状態を次のBattleへ持ち越しません。
 
 ### Normal Shaondamaのsourceデータ
 
@@ -112,13 +112,29 @@ Wildcard Shaondamaの生成元区分は、次の2種類です。
 | 生成元区分 | 生成元固有情報 | 規則 |
 |---|---|---|
 | 最低保証不足による生成 | 対象Battleと不足補充の生成要求を追跡できる情報 | 不足判定・要求重複防止は[BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、生成lifecycleは[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正本とする |
-| Parryによる邪音玉からの変換 | 対象Battleと変換元邪音玉を追跡できる情報 | 邪音玉1弾から同じBattle IDのWildcard 1個へ、その場で変換する |
+| `Parry変換` | 変換元と同じ`battleId`、変換元邪音玉ID、Parry成立時点のworld位置を追跡できる情報 | 邪音玉1弾から同じ`battleId`のWildcard 1個へ、Parry成立位置で即時変換する |
 
-通常ParryとJust Parryのどちらで変換された場合も、生成後は同じ`Wildcard`種別の個体として扱います。Parry評価の違いをWildcardの別種別、性能差、Allocation条件、または選択条件に使用しません。
+Parry由来Wildcardでは、変換時に次の情報を引き継ぎます。
+
+| データ | 内容 | 規則 |
+|---|---|---|
+| `battleId` | 変換元邪音玉が属するBattle | 変換元と同じ値を引き継ぎ、現在Battle以外へ付け替えない |
+| 変換元邪音玉ID | どの邪音玉から変換されたかを示す識別情報 | `battleId`と組み合わせて重複変換防止と追跡に使用する |
+| Parry成立world位置 | 即時変換をcommitするworld位置 | 邪音玉を弾いて移動させた後の位置へ変更しない |
+| 弾き方向／初期移動情報 | Parry結果として確定した方向、または変換後のWildcardへ一度だけ力を適用するために必要な情報 | 必要な場合だけ一時的に引き継ぎ、力の適用後は変換処理用情報として解放できる |
+| 選択可能性 | 変換後のWildcardがCharge対象検索へ参加できる状態 | 変換commitと同時に選択可能とし、表示演出の完了待ちを条件にしない |
+
+通常ParryとJust Parryのどちらで変換された場合も、生成後は同じ`Wildcard`種別の個体として扱います。Parry評価の違いをWildcardの別種別、性能差、Allocation条件、選択条件、または弾き移動の基本性能に使用しません。
 
 Wildcardへ変換できるのは、Parryに成功した邪音玉だけです。体当たり、接触攻撃、その他の非邪音玉攻撃からWildcardを生成しません。
 
-Parry由来Wildcardは邪音玉の位置で個体へ変換されますが、変換直後から選択可能にするか、出現演出完了後に選択可能にするかは未確定です。本ページでは選択開始timingを仮決定せず、共通データの出現演出情報と選択可能性で確定後の規則を表現できる状態にします。
+Parry由来Wildcardは、Parry成立時点の邪音玉world位置で即時変換され、変換commitと同時に選択可能なWildcard状態へ直接入ります。最低保証補充用の出現演出中・選択不可state、RadioWhaleからの制御移譲、出現演出完了通知、timer、または遅延callbackを選択可能化の前提にしません。
+
+表示上の変換演出は選択可能性から分離します。変換演出が継続していてもGameplay上は選択可能です。現在Battleに属する選択可能かつ非`Reserved`の個体は、変換commit時点から最低保証数へ算入します。
+
+弾き方向または初期移動情報は、変換後のWildcardへ一度だけ力を適用するための一時的な引き継ぎ情報です。Wildcardの恒久的な固有属性、固有音程・色、Damage倍率、攻撃方向、またはその他の攻撃性能として保持・解釈しません。力の適用後は通常のWildcard共通lifecycleへ接続します。
+
+Gameplay上のデータ結果が同じであれば、既存objectをWildcardへ変換するか、新しいobjectへ置換するかは実装詳細です。どちらの方式でも、同じ`battleId`、変換元邪音玉ID、Wildcard個体識別情報、選択可能性、および必要な一時引き継ぎ情報を欠落させません。
 
 Wildcard Shaondamaは、Normal Shaondamaと異なり、生成時点では以下を持ちません。
 
@@ -207,9 +223,10 @@ Palette Bullet化が成立した時点で、元個体のShaondamaとしての浮
 
 | 段階 | データ上の要件 | 挙動の正本 |
 |---|---|---|
-| 生成要求 | 種別、Battle ID、生成元情報を持つ。Normalはsource occurrence情報、Wildcardは2種類の生成元区分を欠落させない | [BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
-| world object作成 | 個体識別情報を割り当て、生成要求のBattle／source／生成元データを引き継ぐ | [ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
-| 出現演出・浮遊・選択可能 | 同じ個体識別情報を維持し、出現演出と選択可能性を区別できる状態にする | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
+| 生成／変換要求 | 種別、Battle ID、生成元情報を持つ。Normalはsource occurrence情報、Wildcardは2種類の生成元区分を欠落させない。Parry変換では変換元邪音玉ID、Parry成立位置、必要な一時引き継ぎ情報を含める | [BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama)、[万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
+| world object作成／変換 | 個体識別情報を割り当て、生成／変換要求のBattle／source／生成元データを引き継ぐ。Parry変換ではobject再利用・置換のどちらでも同じデータ結果を維持する | Normal・最低保証補充は[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)、Parry変換は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
+| Parry変換commit | 変換元と同じ`battleId`、変換元邪音玉ID、Wildcard個体識別情報を追跡し、同時に選択可能化する。必要な弾き方向／初期移動情報を変換後のWildcardへ一時的に渡す | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb)、[浮遊・挙動](/spec/shaondama-music/floating-behavior) |
+| 出現演出・浮遊・選択可能 | 同じ個体識別情報を維持し、Gameplay上の出現演出gate、表示演出、および選択可能性を区別できる状態にする。Parry由来Wildcardは表示演出中でも選択可能であり、選択可能なまま弾き移動へ接続する | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
 | Allocation／Reserved | 元sourceデータを保持したまま、割当参照と実効値を別に保持する | [Charge Allocation](/spec/draw-system/charge-allocation) |
 | Palette Bullet化 | Battle ID、個体識別情報、source／effective RGB、解決済み実効値、`DirectHitMultiplier`参照、`ExplosionMultiplier`参照を欠落なく弾側へ渡し、Gameplay上の個体同一性を維持する | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet) |
 | Battle終了／Room Retry | 旧Battle IDの個体・通知・`Reserved`・実効値・参照・状態をすべて破棄し、次Battleへ持ち越さない | [ゲーム全体](/spec/game/)、[戦闘](/spec/combat/) |
@@ -219,9 +236,11 @@ Palette Bullet化が成立した時点で、元個体のShaondamaとしての浮
 | システム | 本ページとの接続 |
 |---|---|
 | BGM／MusicChart | Battle ID、source NoteEvent definition／occurrence、loop occurrence、source music time、MIDI情報をNormal生成要求へ渡す。選択可能かつ非`Reserved`の個体だけを最低保証へ数える |
-| Spawn／ラジクジラ | Normal生成要求を再解析せず、論理個体とworld objectへデータを引き継ぐ。出現演出中は選択可能化しない |
-| Wildcard生成 | 最低保証不足またはParry変換の生成元区分、Battle ID、必要な生成元固有参照を個体へ渡す |
-| 浮遊・挙動 | source music time、出現演出、選択可能性、`Reserved`、Battle終了を使ってlifecycleを解決する |
+| Spawn／ラジクジラ | Normalおよび最低保証補充の生成要求を再解析せず、論理個体とworld objectへデータを引き継ぐ。これらの出現演出gate中は選択可能化しない。Parry由来Wildcardの変換・選択可能化・弾き移動は管理しない |
+| [Player Parry](/spec/player/player-action-parry) | 成功batch内の対象ごとに弾き方向を確定し、1弾ごとのParry結果へ含める |
+| [邪音玉](/spec/enemy/jaon-bullet) | Parry成立位置、同じ`battleId`、変換元邪音玉ID、および弾き方向を、1弾につき1回のWildcard変換要求として渡す。同一邪音玉から変換要求を重複成立させない |
+| Wildcard生成 | 最低保証不足または`Parry変換`の生成元区分、Battle ID、必要な生成元固有参照を個体へ渡す。Parry由来は`battleId`と変換元邪音玉IDの組み合わせで重複commitを防ぎ、変換commitと同時に選択可能化する |
+| 浮遊・挙動 | source music time、Gameplay上の出現演出gate、表示演出、選択可能性、`Reserved`、Battle終了を使ってlifecycleを解決する。Parry由来は選択可能なまま弾き移動へ接続する |
 | Charge Allocation | pitch classとsource occurrenceを参照し、Allocation後の実効値を解決する |
 | BGMとGameplayの接続 | effective MIDI Note／octaveを使って発射時の音程音を鳴らす |
 | Palette Bullet | Battle ID、個体識別情報、種別、source／effective RGB payload、実効音程・色、`DirectHitMultiplier`参照、`ExplosionMultiplier`参照を受け取り、物理object方式にかかわらずGameplay上の個体情報を維持する |
@@ -235,9 +254,12 @@ Palette Bullet化が成立した時点で、元個体のShaondamaとしての浮
 |---|---|
 | 個体runtime data契約 | 本ページ |
 | source NoteEvent definitionとMusicChart上の音楽情報 | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart) |
-| occurrence生成・生成要求・重複防止 | [BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
-| 出現演出・選択可能・`Reserved`の状態遷移 | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
-| Wildcard生成trigger・生成位置 | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
+| Normalのoccurrence生成・Normal／最低保証補充の生成要求・要求重複防止 | [BGM側のシャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
+| Gameplay上の出現演出gate・表示演出・選択可能・`Reserved`の状態遷移 | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
+| Wildcard生成trigger・生成位置・Parry変換commit時の即時選択可能化・`battleId`と変換元邪音玉IDによる重複commit防止 | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
+| Parry対象ごとの弾き方向の確定 | [Playerアクション｜パリィ](/spec/player/player-action-parry) |
+| Parry成立位置・`battleId`・変換元邪音玉ID・弾き方向の受け渡し、および同一邪音玉からの変換要求の1回限りの成立 | [邪音玉](/spec/enemy/jaon-bullet) |
+| Parry変換時の一時引き継ぎデータ契約 | 本ページ |
 | 7色・度数対応・Normal source RGB定義 | 本ページで契約を定義し、具体値は企画班の調整データ |
 | Wildcardの実効値解決 | [Charge Allocation](/spec/draw-system/charge-allocation) |
 | `DirectHitMultiplier`・`ExplosionMultiplier`の適用規則 | [パレットブレット](/spec/combat/palette-bullet) |
@@ -259,8 +281,14 @@ Palette Bullet化が成立した時点で、元個体のShaondamaとしての浮
 - 最低保証不足とParry変換以外の経路からWildcardを生成してはいけません。
 - 体当たり、接触攻撃、その他の非邪音玉攻撃をWildcardへ変換してはいけません。
 - 通常Parry由来とJust Parry由来のWildcardを別種別・別性能として扱ってはいけません。
-- Parry由来Wildcardの未確定な選択開始timingを、実装都合で確定仕様として補完してはいけません。
-- 出現演出中、選択不可、または`Reserved`中の個体を最低保証数へ算入してはいけません。
+- Parry由来Wildcardの選択可能化を、最低保証補充用の出現演出、RadioWhaleからの制御移譲、timer、遅延callback、または表示上の変換演出完了まで待たせてはいけません。
+- Parry由来Wildcardへ、最低保証補充用の出現演出中・選択不可stateを必須データとして設定してはいけません。
+- 表示上の変換演出が継続していることだけを理由に、Parry由来Wildcardを選択不可または最低保証算入外として扱ってはいけません。
+- Gameplay上の出現演出gate中、選択不可、または`Reserved`中の個体を最低保証数へ算入してはいけません。
+- Parryで確定した弾き方向または初期移動情報を、Wildcardの恒久的な固有属性、Allocation条件、Damage倍率、または攻撃性能として扱ってはいけません。
+- Parry変換用の一時情報を、力の適用後も不要に保持したりPalette Bulletの攻撃payloadへ引き継いだりしてはいけません。
+- 変換元邪音玉IDと`battleId`が同じ結果からWildcardを重複変換してはいけません。
+- Battle結果確定後、または現在Battleと異なる`battleId`の遅延処理から、変換・選択可能化・力の付与を行ってはいけません。
 - Wildcardの実効値が未解決のまま、Palette Bullet化・発音・Damage通知へ進めてはいけません。
 - Palette Bullet化を理由に個体識別情報を再採番し、元Shaondamaとは別のGameplay個体として扱ってはいけません。
 - Palette Bullet化によってNormalのsource RGB値またはeffective RGB payloadを失ってはいけません。
@@ -290,9 +318,12 @@ Palette Bullet化が成立した時点で、元個体のShaondamaとしての浮
 - 想定浄化Hit数
 - `DirectHitMultiplier`と`ExplosionMultiplier`の具体値
 - Wildcard攻撃用に各Multiplierのoverrideを設ける場合の具体値
-- Parry由来Wildcardを変換直後から選択可能にするか、出現演出完了後に選択可能にするか
 
-RGB・Damage倍率・浄化Hit数はQ-12・Q-13で意図的に未決とされた調整用パラメータです。Direct ContactとExplosionで別々のMultiplierを使用する構造は確定済みであり、未決なのは各具体値です。Parry由来Wildcardは変換自体、1弾1個、Battle ID継承、Normal／Just Parryで同じWildcardとして扱うことまで確定しており、選択開始timingだけが未確定です。
+RGB・Damage倍率・浄化Hit数はQ-12・Q-13で意図的に未決とされた調整用パラメータです。Direct ContactとExplosionで別々のMultiplierを使用する構造は確定済みであり、未決なのは各具体値です。
+
+Parry由来Wildcardは、邪音玉1弾につき1個、変換元と同じ`battleId`、生成元区分`Parry変換`、変換元邪音玉IDを保持し、Parry成立位置で即時変換されます。変換commitと同時に選択可能になること、最低保証補充用の出現演出stateを必須としないこと、および表示上の変換演出と選択可能性を分離することは確定済みです。
+
+弾き方向または初期移動情報を必要に応じて一時的に引き継げること、その情報をWildcardの恒久属性や攻撃性能として扱わないことも確定済みです。弾き方向の具体的な算出方法は[Playerアクション｜パリィ](/spec/player/player-action-parry)側の実装・調整検討事項であり、本ページの未決データ契約には含めません。
 
 source NoteEvent occurrenceの識別要件、最低保証への算入条件、Wildcardの2種類の生成元、Allocation結果からの実効音程・実効色・実効RGBの解決、およびWildcardのLifetime終了破裂でDamageを発生させない規則は決定済みです。
 
