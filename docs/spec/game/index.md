@@ -30,7 +30,7 @@ Player State、Charge、Allocation、MusicChart、AttackEvent、シャオンダ�
 | ゲーム形式 | 色と音を使って敵を浄化する3Dアクション | 確定 |
 | Playerの役割 | 戦場を移動し、シャオンダマを選択・Chargeして攻撃を構成する | 確定 |
 | コア体験 | 色と音で世界をつなぐ爽快ドローアクション | 確定 |
-| Battleの目的 | ステージ内の対象Enemyをすべて浄化し、Clearを目指す | 確定 |
+| Battleの目的 | Stage objectiveを完了し、登録済みClear対象Enemyをすべて浄化または正式除外してClearを目指す | 確定 |
 | Player死亡後 | 最終Battle結果がGame Overの場合、その場では復活せず、Game Over ResultのRetryによって現在のステージを最初から開始する | 確定 |
 | Battle終了後 | 共通Result画面に確定結果のClear／Game Over variantを表示し、cleanup完了後に操作を受け付ける | 確定 |
 
@@ -86,9 +86,10 @@ ResultはClear／Game Overで別々の勝敗判定を行う画面ではなく、
 20. 使用するReserved Shaondamaを確定し、Palette Bullet化する
 21. Chord／Arpeggio／Weakの規則に従ってPalette Bulletを発射する
 22. Palette Bulletの命中、Enemy Damage、および浄化を処理する
-23. 同一フレーム内のClear候補とGame Over候補を収集し、優先規則に従ってBattle結果を1回だけ評価する
-24. Battle結果が未確定である間、12から23までを繰り返す
-25. Battle結果が確定した場合は、Battle終了lifecycleへ移行する
+23. StageがStage objectiveと登録済みClear対象Enemy記録からClear条件を評価し、成立時は対象`battleId`付きClear候補をGameへ通知する
+24. Gameが同一フレーム内のClear候補とGame Over候補を収集し、優先規則に従ってBattle結果を1回だけ評価する
+25. Battle結果が未確定である間、12から24までを繰り返す
+26. Battle結果が確定した場合は、Battle終了lifecycleへ移行する
 
 Battle IDの配布は対象Battleの準備を開始する境界、Ready gateの成立はCombat／Player受付と3時計を開始する境界、system pre-rollの終了はBGM Audioを実際に鳴らし始める境界です。これらを同じ開始Eventとして扱いません。
 
@@ -207,10 +208,24 @@ Battle開始における3つの境界は、以下のとおりです。
 
 | 判定 | 条件 | 判定後 |
 |---|---|---|
-| Clear候補 | 対象BattleのClear対象Enemy集合に属するすべてのEnemyが浄化済みになる | 結果確定規則へ渡す |
+| Clear候補 | Stage objectiveが`Completed`であり、登録済みClear対象Enemyがすべて`Purified`または`FormallyExcluded`である | 結果確定規則へ渡す |
 | Game Over候補 | Playerの`CurrentHP <= 0`となり、`RootState = Dead`が成立する | 結果確定規則へ渡す |
 
-Clear対象Enemy集合には、Battle開始時の戦闘対象Enemyに加え、戦闘中に動的Spawnして戦闘対象となったEnemyも追加します。Enemyが遠くへ移動しただけでは対象から外しません。特殊イベントによる正式な除外だけをStageが明示的に行い、背景演出用など戦闘Enemyではない存在は含めません。集合の登録・更新・除外手続きは[ステージ](/spec/stage/)を正本とします。
+Clear候補は、次の両方が成立した場合だけ発生します。
+
+```text
+Stage objectiveがCompleted
+AND
+登録済みClear対象EnemyがすべてPurifiedまたはFormallyExcluded
+```
+
+Stage objectiveの状態、Clear対象Enemy記録、およびClear条件の評価はStageが所有します。Stageは条件成立時に、対象`battleId`付きClear候補をGameへ一度だけ通知します。GameはStageが確定したClear候補を受け取り、Stage内部のClear対象Enemy集合、wave進行、残りSpawn数、またはobjective状態を独自に参照・再計算してClearを判定しません。
+
+現在world上に存在するEnemyが0体であることだけでは、Clear候補にしません。将来のwaveが残っている場合、またはpending wave／pending Spawn中で新しいClear対象Enemyが追加される可能性が残っている場合は、Stage objectiveを`InProgress`に維持し、Clear候補を発生させません。
+
+初期Enemyが0体の場合も、Battle準備中にはClear候補を扱いません。対象BattleのBattle開始gate（Ready gate）が成立してBattleが開始され、Battle結果が未確定であり、かつStage objectiveが`Completed`となった後に、未解決の登録済みClear対象Enemyが存在しない場合だけClear候補を扱います。
+
+Clear対象Enemy記録には、Battle開始時の戦闘対象Enemyに加え、戦闘中に動的Spawnすることが確定した戦闘対象Enemyも登録します。Enemyが遠くへ移動しただけでは対象から外しません。特殊イベントによる正式な除外だけをStageが明示的に`FormallyExcluded`として成立させ、背景演出用など戦闘Enemyではない存在は含めません。記録の登録・更新・浄化反映・正式除外・objective完了・Clear条件評価の手続きは[ステージ](/spec/stage/)を正本とします。
 
 Playerの`CurrentHP <= 0`と`RootState = Dead`は、Game Over候補を発生させるGameplay上の事実です。死亡演出、Game Over Result、およびRetry受付は、この事実だけから直ちに開始せず、Gameが最終Battle結果を確定した後に分岐します。
 
@@ -222,6 +237,9 @@ Playerの`CurrentHP <= 0`と`RootState = Dead`は、Game Over候補を発生さ�
 
 ## Battle結果の確定規則
 
+- Gameは、Stageから通知されたClear候補と、PlayerのHP 0および`RootState = Dead`によって成立したGame Over候補を収集します。
+- Clear候補には対象`battleId`を含めます。Gameは現在のBattle IDと一致し、かつBattle結果が未確定であるClear候補だけを収集します。
+- GameはClear候補の受理時に、Stage内部のClear対象Enemy記録、wave進行、残りSpawn数、またはobjective状態を再計算しません。
 - Clear候補とGame Over候補の収集単位は、Unity上の同一フレームです。
 - 各フレームでは、そのフレームの候補発生処理を完了してから結果評価を1回だけ行います。先に届いた候補だけで即時確定せず、同一フレーム内の両候補を評価対象に含めます。
 - 1回のBattleで確定できる最終結果は、ClearまたはGame Overのいずれか1つだけです。
@@ -229,6 +247,7 @@ Playerの`CurrentHP <= 0`と`RootState = Dead`は、Game Over候補を発生さ�
 - ClearとGame Overの両候補が成立してClearを確定した場合も、すでに成立したHP 0、`RootState = Dead`、Damage、および状態変更は巻き戻しません。
 - Clearを確定した場合は、`RootState = Dead`が成立済みであっても死亡演出、Game Over variant、Game Over専用の入力待機、およびRetry受付を開始しません。
 - Battle結果は一度だけ確定します。確定後の命中、浄化、Damage、演出、通知によって結果を変更しません。
+- Battle結果確定後に届いたClear候補は、現在のBattle IDと一致していても拒否し、結果評価を再実行しません。現在と異なる`battleId`のClear候補も適用しません。
 - 結果確定後に既存の命中演出や終了演出を継続する場合も、Clear／Game Overの再判定は行いません。
 - Result、UI、および各システムは、Gameから確定済み結果を受け取り、独自に勝敗を再判定したり別のBattle結果を確定したりしてはいけません。
 - 確定結果には終了対象のBattle IDを付与します。現在のBattle IDと一致しない結果通知は適用しません。
@@ -360,12 +379,14 @@ Scene Reloadまたはin-place resetのどちらを使用するかは実装上の
 | Reserved／Allocation | Current、Slot、Weakを含む旧Battle分をすべて破棄し、空の状態から開始する | チャージシステム |
 | Palette Bullet／Marker／Jaon Bullet | 旧Battleに属するobject、target情報、および保留中の命中処理を持ち越さない | Combat |
 | ラジクジラ | 新しいBattleの初期位置、表示、存在状態へ戻す | ラジクジラ、Stage |
-| Stage進行・ギミック | ステージ開始時の進行度、配置、作動状態へ戻す | Stage |
+| Stage進行・ギミック | 旧BattleのStage objective、wave／Spawn program進行、Clear対象Enemy記録、登録・浄化・正式除外状態を破棄し、Stage定義から開始時の進行度、配置、作動状態を再構築する | Stage |
 | UI | HP、Slot、予告、共通Result、操作lock、Pause表示など、旧Battle由来の表示状態を破棄・再構築する | UI |
 | 入力・入力バッファ | 旧Battle中の押下状態、予約入力、選択対象を破棄する | Player、入力、UI |
 | VFX／SE／演出 | 旧Battleに属し、新Battleへ影響する再生・予約状態を持ち越さない | 演出、各所有システム |
 
 Retry完了後は、新しいBattleとしてBattle開始lifecycleに従って初期化し、必要な準備が完了してからPlayerの戦闘操作を受け付けます。終了したBattleのcleanup済みobjectやStateを初期値として再利用しません。
+
+旧BattleのStage objectiveまたはClear対象Enemy記録へ新しいBattle IDを付け替えて再利用してはいけません。新しいBattle IDを受領したStageは、Stage定義からobjective、wave／Spawn program進行、およびClear対象Enemy記録を再構築します。
 
 旧Battle IDを持つ遅延通知、生成結果、命中、Damage、および浄化結果は、新しいBattleへ適用しません。
 
@@ -381,8 +402,8 @@ Retry完了後は、新しいBattleとしてBattle開始lifecycleに従って初
 | Charge | Playerによる対象選択とCharge入力・成立処理を管理する | [Playerアクション｜チャージ](/spec/player/player-action-charge) |
 | チャージシステム | Current／Slot／WeakへのAllocationとReserved状態を管理する | [チャージシステム](/spec/draw-system/)、[Charge Allocation](/spec/draw-system/charge-allocation) |
 | Combat | Battle状態、開始・終了通知、Palette Bullet／Marker、命中、浄化判定、Battle終了gate、および必須Combat Ownerのcleanup完了集約を管理する | [戦闘](/spec/combat/)、[Palette Bullet](/spec/combat/palette-bullet)、[Marker](/spec/combat/marker) |
-| Enemy | 攻撃対象、Damage、浄化状態、およびClear候補の成立を管理する | [敵](/spec/enemy/)、[Damage・浄化](/spec/enemy/damage-and-purify) |
-| Stage | 初期配置、Clear対象Enemy集合、Stage進行、およびRetry時のStage再初期化を管理する | [ステージ](/spec/stage/) |
+| Enemy | 攻撃対象、所属Battle、Damage、浄化状態、およびStageへの浄化成立通知を管理する。Clear条件や最終Battle結果は確定しない | [敵](/spec/enemy/)、[Damage・浄化](/spec/enemy/damage-and-purify) |
+| Stage | Stage objective、wave／Spawn program進行、Clear対象Enemy記録、登録・浄化反映・正式除外、Clear条件評価、対象`battleId`付きClear候補通知、およびRetry時のStage再初期化を管理する。最終Battle結果は確定しない | [ステージ](/spec/stage/) |
 | カメラ | 拠点・Battle中の視界と選択対象を表示する | [カメラ](/spec/camera/) |
 | UI | 現在状態、Pause、共通ResultのClear／Game Over variant、Result操作lock、および確定route操作の通知を管理する。勝敗は再判定しない | [UI](/spec/ui/) |
 | 演出 | 色、音、攻撃結果、Clear、死亡などを視覚・聴覚的に伝える | [演出](/spec/effects/) |
@@ -398,7 +419,7 @@ Retry完了後は、新しいBattleとしてBattle開始lifecycleに従って初
 
 ## 責務境界
 
-Battle結果の確定、同一フレームに複数の終了候補が成立した場合の優先規則、Clear＋Dead時の非巻き戻しと演出分岐、共通Resultへの接続、Result操作解禁条件、ゲーム全体lifecycle、Battle開始・終了の高レベルな順序、Pause可能範囲、およびRetry時に満たすべき全体リセット結果は、本ページを正本とします。
+Stageから受け取ったClear候補とGame Over候補の収集、Battle結果の確定、同一フレームに複数の終了候補が成立した場合の優先規則、Clear＋Dead時の非巻き戻しと演出分岐、共通Resultへの接続、Result操作解禁条件、ゲーム全体lifecycle、Battle開始・終了の高レベルな順序、Pause可能範囲、およびRetry時に満たすべき全体リセット結果は、本ページを正本とします。
 
 以下は本ページで再定義しません。
 
@@ -410,6 +431,7 @@ Battle結果の確定、同一フレームに複数の終了候補が成立し�
 - シャオンダマの個別lifecycle
 - Palette Bullet／Markerの飛翔、衝突、および消滅
 - EnemyへのRGB Damage計算と浄化値更新
+- Stage objective、wave／Spawn program、Clear対象Enemy記録、およびStage内部のClear条件評価
 - UIレイアウト、Result内の表示内容、演出、SEの具体的内容
 - RetryにおけるScene Reload／in-place resetなどの内部実装方式
 
@@ -428,6 +450,10 @@ Battle結果の確定、同一フレームに複数の終了候補が成立し�
 - PlayerのHP 0または`RootState = Dead`だけを根拠に、最終Battle結果の確定前からGame Over表示やRetry受付を開始してはいけません。
 - 同一フレームにClearとPlayer Deadが成立してClearを確定した場合、HP 0、`RootState = Dead`、Damage、または成立済みの状態変更を巻き戻してはいけません。
 - Clearを確定した場合に、`RootState = Dead`を根拠として死亡演出、Game Over variant、またはRetry受付を開始してはいけません。
+- 現在world上に存在するEnemyが0体であることだけを根拠にClear候補を成立させてはいけません。
+- pending waveまたはpending Spawn中に、Stage objectiveが`InProgress`のままClear候補を成立させてはいけません。
+- GameまたはCombatが、Stage内部のClear対象Enemy記録、wave進行、残りSpawn数、またはobjective状態からClear条件を再計算してはいけません。
+- Battle結果確定後または現在と異なる`battleId`で届いたClear候補を、結果評価へ適用してはいけません。
 - Battle結果確定後に、後続の命中、Damageや浄化によって結果を変更してはいけません。
 - Result／UIまたは各Ownerが、Player HPやEnemy状態からBattle結果を再判定してはいけません。
 - Battle結果確定後に、新しい戦闘操作、Charge、生成要求、Enemy Spawn、AttackEvent、Arpeggio、Projectile、Target決定、Hit、Damage、Parry、または浄化を開始してはいけません。
@@ -439,7 +465,7 @@ Battle結果の確定、同一フレームに複数の終了候補が成立し�
 - 同じBattle終了通知に対してcleanupを複数回実行したり、同じReserved、Slot、参照、またはobjectを二重に解放・破棄したりしてはいけません。
 - 現在と異なるBattle IDのGameplay通知、Damage、生成結果、callback、またはcleanup完了通知を適用してはいけません。
 - Clear演出としてのシャオンダマ破裂から、Weak攻撃、Damage、またはAttackEventを発生させてはいけません。
-- Retry後に、旧BattleのShaondama、Reserved、Allocation、Weak AttackEvent、Palette Bullet、Marker、Enemy状態、入力、UI状態を持ち越してはいけません。
+- Retry後に、旧BattleのShaondama、Reserved、Allocation、Weak AttackEvent、Palette Bullet、Marker、Enemy状態、Stage objective、Clear対象Enemy記録、入力、UI状態を持ち越してはいけません。
 - ラジクジラへChargeやAttackEventの成立判定を担当させてはいけません。
 - 個別システムの内部仕様を本ページで重複定義してはいけません。
 
