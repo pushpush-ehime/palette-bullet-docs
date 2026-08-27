@@ -1,6 +1,6 @@
 ---
 title: "マーカー"
-description: Palette BulletにおけるMarkerの生成・飛行・衝突・付着・Target提供・消滅仕様
+description: Palette BulletにおけるMarkerの生成・飛行・衝突・付着・Target提供・消滅・Battle終了時無効化仕様
 pageType: spec
 category: "戦闘"
 status: 仮仕様
@@ -24,7 +24,7 @@ relatedTasks: []
 - 未付着状態での最大飛行距離・最大飛行時間
 - MarkerがEnemyへ付着した後の扱い
 - Palette Bulletの爆風による消滅
-- Battle終了時の無効化との接続
+- Battle終了時のTarget公開停止・Gameplay無効化・cleanup
 
 ---
 
@@ -37,6 +37,10 @@ MarkerFiringの入力・ActionState・発射タイミング・Marker生成位置
 本ページは、Marker生成位置と狙点を受け取り、初期発射方向を確定した後の飛行・重力・衝突・付着・消滅を正本とします。
 
 AttackEventがMarkerを含むTarget候補からTarget座標を決定する優先順位は、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
+
+Battle結果の確定規則、同一frameの終了候補の優先順位、Result操作解禁は、[ゲーム全体](/spec/game/)および[戦闘概要](/spec/combat/)を正本とします。本ページでは、確定済みBattle結果を受け取った後のMarker OwnerによるGameplay無効化を定義します。
+
+発火済みAttackEventが保持するTarget座標snapshotのBattle終了時無効化は、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正本とします。本ページはMarker自身からの新しいTarget公開を停止し、他Ownerが保持するsnapshotを直接破棄しません。
 
 ---
 
@@ -59,7 +63,7 @@ Marker
 | `AttachedToEnemy` | Enemyへ付着し、Enemyの移動へ追従中 | 有効 |
 | `AttachedToSurface` | 地面または壁の接触地点へ固定中 | 有効 |
 | `DetachedFromEnemy` | 付着先を失い、切り離した時点のworld座標へ固定中 | 有効 |
-| `Ended` | 消滅・無効化済み | 無効 |
+| `Ended` | Gameplay上の消滅・無効化済み。表示専用objectが一時的に残る場合を含む | 無効 |
 
 Markerは生成された時点で`Flying`になります。
 
@@ -67,7 +71,7 @@ Markerは生成された時点で`Flying`になります。
 
 `AttachedToEnemy`のMarkerが付着先を失った場合は、`DetachedFromEnemy`へ遷移します。
 
-`Ended`へ移行したMarkerは、Target座標を公開せず、飛行・衝突・付着処理へ参加しません。
+`Ended`へ移行したMarkerは、Target座標を公開せず、飛行・衝突・付着処理へ参加しません。表示専用objectを残す場合も、Gameplay状態は`Ended`のままとします。
 
 ---
 
@@ -75,7 +79,14 @@ Markerは生成された時点で`Flying`になります。
 
 同時に有効にできるMarkerは、最大1個とします。
 
-Markerは、生成された時点から有効なTarget候補になります。
+現在のBattleが結果未確定で、有効な生成要求として受理されたMarkerは、生成された時点から有効なTarget候補になります。
+
+各Markerは生成時に、所属Battleの`battleId`を保持します。Markerが有効なTarget候補になるには、次をすべて満たす必要があります。
+
+- Markerの`battleId`が現在のBattleと一致する
+- 現在のBattleが結果未確定である
+- Marker状態が`Flying`、`AttachedToEnemy`、`AttachedToSurface`、`DetachedFromEnemy`のいずれかである
+- MarkerのGameplay無効化が完了していない
 
 ```text
 Marker生成
@@ -93,11 +104,13 @@ Flying
     → AttachedToSurface
 ```
 
-`Flying`、`AttachedToEnemy`、`AttachedToSurface`、`DetachedFromEnemy`のいずれも、有効なTarget候補です。
+現在のBattleが進行中である場合、`Flying`、`AttachedToEnemy`、`AttachedToSurface`、`DetachedFromEnemy`のいずれも、有効なTarget候補です。
 
 状態にかかわらず、有効なMarkerはAttackEventへ現在のworld座標を公開します。
 
 Markerが飛行中か付着済みかを、有効性の条件には使用しません。
+
+Battle結果確定後は、状態が飛行中または付着済みに見えていても、Target候補として扱いません。
 
 ---
 
@@ -331,11 +344,211 @@ Marker消滅前にAttackEventがTarget座標をsnapshotしていた場合、そ�
 
 ## Battle終了との関係
 
-Battle結果が確定した時点で、Markerは[戦闘概要](/spec/combat/)のBattle終了lifecycleに従ってGameplay上無効化し、`Ended`へ遷移します。
+### 無効化の開始条件
 
-無効化後は、新しいAttackEventへTarget座標を提供しません。
+Gameが現在のBattleについて最終Battle結果を確定した時点で、Marker OwnerはBattle終了cleanupを開始します。
 
-旧BattleのMarkerをRetry後の新しいBattleへ持ち越しません。
+Battle終了候補を受け取っただけでは無効化を開始しません。同一frame内の終了候補の収集と結果確定は、[ゲーム全体](/spec/game/)を正本とします。
+
+```text
+GameがBattle結果を確定
+↓
+Marker Ownerへ
+BattleResultFinalized(battleId, result)
+↓
+現在のbattleIdに属するMarkerをGameplay無効化
+```
+
+Marker Ownerは`Clear / Game Over`を再判定せず、Gameから通知された確定結果だけを使用します。どちらの結果でもMarkerのGameplay無効化内容は同じです。
+
+---
+
+### 状態にかかわらないGameplay無効化
+
+Battle結果確定時に有効なMarkerが存在する場合、飛行中・付着済み・切り離し済みにかかわらず、即座にGameplay上無効化して`Ended`へ遷移します。
+
+```text
+Flying
+AttachedToEnemy
+AttachedToSurface
+DetachedFromEnemy
+↓ Battle結果確定
+Ended
+```
+
+無効化後は、以下へ参加しません。
+
+- Target候補判定
+- Target座標の公開
+- 飛行・重力更新
+- Enemy / 地面 / 壁との衝突・付着判定
+- 付着先Enemyへの追従更新
+- 付着先喪失時の`DetachedFromEnemy`遷移
+- Palette Bullet爆風によるGameplay消滅判定
+- 新しいMarkerとのGameplay上の置換判定
+
+Battle結果確定前にすでに確定したAttackEvent Target座標snapshotは、Marker側から巻き戻しません。そのsnapshotのBattle終了時取消・無効化は、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正本とします。
+
+結果確定と同一frameのTarget決定・AttackEvent処理については、[ゲーム全体](/spec/game/)、[戦闘概要](/spec/combat/)、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)の結果確定規則に従い、本ページで独自の再判定を行いません。
+
+---
+
+### Target座標の公開停止
+
+Battle結果確定時に、現在のMarkerをTarget候補一覧から除外し、Target座標の公開を停止します。
+
+```text
+Battle結果確定
+↓
+Marker Target公開gateを閉じる
+↓
+現在MarkerをTarget Providerから登録解除
+↓
+以後のTarget問い合わせへMarker座標を返さない
+```
+
+無効化後にMarkerのworld座標や表示objectが残っていても、新しいAttackEventのTarget決定へ使用しません。
+
+Target問い合わせ側が無効化前に取得したMarker参照を保持していた場合も、問い合わせ実行時にMarkerの`battleId`とGameplay有効性を再確認します。`Ended`または旧BattleのMarker参照からTarget座標を取得しません。
+
+表示用Transformを更新する場合も、その座標をGameplay用Target Providerへ再公開しません。
+
+---
+
+### `battleId`による旧Marker参照の拒否
+
+Marker本体、Target Provider登録、Target座標問い合わせ、飛行・衝突・付着callbackには、所属Battleの`battleId`を対応付けます。
+
+MarkerをGameplay処理へ使用する直前に、少なくとも次を確認します。
+
+```text
+MarkerのbattleId
+==
+現在のBattleのbattleId
+
+かつ
+
+現在のBattleが結果未確定
+
+かつ
+
+MarkerがGameplay上有効
+```
+
+いずれか一つでも満たさない場合、そのMarker参照・callbackを拒否し、副作用のないno-opとして終了します。
+
+旧`battleId`のMarker参照によって、以下を行ってはなりません。
+
+- Target座標を公開する
+- Target候補として選択される
+- 飛行・重力・衝突・付着処理を再開する
+- 付着先Enemyへ追従する
+- 新Battleの有効Markerを置換または消滅させる
+- 新BattleのMarker Owner状態やcleanup状態を変更する
+
+Battle結果確定後に遅れて届いたMarker生成要求も、結果確定済みまたは`battleId`不一致として拒否します。
+
+---
+
+### 表示objectとGameplay処理の分離
+
+Battle結果確定後、Markerの表示をどのように終了するかは、演出方針に応じて次のどちらも許可します。
+
+- 表示objectを即時消去する
+- 残像・消滅VFXなどの表示専用演出として一時的に残す
+
+表示専用として残す場合も、MarkerのGameplay状態は`Ended`です。少なくとも次を無効化します。
+
+- Gameplay用Collider / Trigger
+- Target Provider登録
+- Target座標公開
+- 物理衝突による付着処理
+- Palette Bullet爆風とのGameplay相互作用
+- Enemy追従をGameplay結果へ接続する参照
+
+表示専用objectのTransformやAnimatorを演出目的で更新することはできますが、Damage、Hit、Target提供、Marker置換などのGameplay効果を発生させません。
+
+表示objectや消滅VFXの終了は、Marker Ownerの必須cleanup完了条件およびResult操作解禁条件に含めません。表示を即時消去するか演出として残すかにかかわらず、MarkerのGameplay無効化完了後はResult操作解禁を妨げません。
+
+---
+
+### 次のBattleへの持ち越し禁止
+
+Retryまたは次のBattleでは、新しい`battleId`を使用します。前BattleのMarker状態・Target Provider登録・参照を新Battleへ持ち越しません。
+
+次のBattle開始前に、旧BattleのMarkerについて少なくとも次が成立している必要があります。
+
+- Gameplay状態が`Ended`である
+- Target候補一覧から除外済みである
+- Target座標公開が停止済みである
+- Gameplay用Collider / Triggerが無効である
+- Marker Ownerの現在Marker参照から除外済みである
+
+Result演出中に表示専用objectを残す場合、その残留はResult中だけの演出として扱い、次のBattleのGameplayを有効化する前に消去するか、旧Battle専用の表示scopeごと終了します。次のBattleへMarker objectとして持ち越しません。
+
+消去処理の完了直前など一時的に旧表示objectが存在しても、`battleId`不一致とGameplay無効状態によって新Battleへ影響させません。
+
+---
+
+### cleanupの処理順と冪等性
+
+Marker Ownerは、現在の`battleId`に対するBattle結果確定通知を一度だけ受理し、次の順序でcleanupします。
+
+```text
+1. BattleResultFinalized(battleId, result)を受理
+↓
+2. Marker生成受付・Target公開gateを閉じる
+↓
+3. 現在MarkerをTarget Providerから登録解除する
+↓
+4. 状態にかかわらずGameplay上`Ended`へ遷移させる
+↓
+5. 飛行・衝突・付着・追従処理を無効化する
+↓
+6. Marker Ownerの現在Marker参照を終了する
+↓
+7. 必須cleanup完了条件を確認する
+↓
+8. battleId付きでMarker Ownerの必須cleanup完了を通知する
+```
+
+同じBattle結果確定通知を複数回受け取っても、Target Provider登録解除、Collider無効化、参照終了を重複実行して不正状態を発生させない冪等処理とします。
+
+Markerが存在しない場合も、Target公開gateと旧`battleId`拒否が成立していることを確認した上でcleanup完了とします。
+
+---
+
+### 必須cleanup完了条件
+
+Marker Ownerの必須cleanupは、現在の`battleId`について次のすべてを満たした時点で完了とします。
+
+- Marker生成受付が停止している
+- Marker Target公開gateが閉じている
+- 有効なMarkerがTarget Providerへ登録されていない
+- 飛行中・付着済みを含む旧BattleのMarkerがすべてGameplay上`Ended`である
+- Target座標を新しく公開できない
+- 飛行・衝突・付着・追従callbackがGameplay状態を変更できない
+- 旧`battleId`のMarker参照を拒否できる
+- Marker Ownerの現在Marker参照が終了している
+- 表示専用objectが残っていてもGameplayへ再接続できない
+
+すべてを満たした後、上位のcleanup集約Ownerへ、`battleId`付きでMarker Ownerの必須cleanup完了を通知します。
+
+```text
+Marker必須cleanup完了
+↓
+CleanupCompleted(battleId)
+↓
+上位cleanup集約Ownerへ通知
+```
+
+次の完了は待ちません。
+
+- Marker表示objectの消去
+- 残像・消滅VFX
+- Gameplay効果を持たない表示専用Animation
+
+Result操作の解禁はMarker Owner単独では判断しません。全必須Ownerのcleanup完了を集約した上位Ownerが、[ゲーム全体](/spec/game/)の規則に従って判断します。
 
 ---
 
@@ -375,5 +588,16 @@ Battle結果が確定した時点で、Markerは[戦闘概要](/spec/combat/)の
 - 最大飛行距離・最大飛行時間は付着後に適用しない
 - Palette Bulletの爆風へ接触したMarkerは威力に関係なく消滅する
 - Marker消滅後も、すでに確定済みのAttackEvent Target座標は変更しない
+- 各Markerは生成時に所属Battleの`battleId`を保持する
+- Battle結果確定後はMarkerの状態にかかわらずTarget候補として扱わない
+- Battle結果確定時にTarget Provider登録を解除し、Target座標公開を停止する
+- 飛行中・付着済み・切り離し済みのMarkerをすべてGameplay上`Ended`へ遷移させる
+- Battle結果確定後はMarkerの飛行・衝突・付着・追従処理を継続しない
+- 旧`battleId`のMarker参照・callback・生成要求を拒否する
+- 旧BattleのMarker状態・Target Provider登録・Owner参照を次のBattleへ持ち越さない
+- 表示専用Markerや消滅VFXを残す場合もGameplay効果を持たせない
+- 表示専用objectの終了をMarker Ownerの必須cleanup完了条件に含めない
+- Marker OwnerのBattle終了cleanupは重複通知に対して冪等とする
+- 必須cleanup完了後、`battleId`付きで上位cleanup集約Ownerへ通知する
 
 <PageRelations />
