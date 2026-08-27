@@ -69,7 +69,7 @@ Battle結果 = Game Over
 ↓
 共通Result画面をGame Over variantで表示
 ↓
-表示開始直後はResult操作をlock可能
+表示開始直後はResult操作をlockする
 ↓
 必須Owner cleanup完了
 ↓
