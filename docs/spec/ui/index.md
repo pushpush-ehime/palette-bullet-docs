@@ -47,7 +47,7 @@ Battle結果 = Clear
 ↓
 共通Result画面をClear variantで表示
 ↓
-表示開始直後はResult操作をlock可能
+表示開始直後はResult操作をlockする
 ↓
 必須Owner cleanup完了
 ↓
@@ -189,7 +189,7 @@ resultをそのままvariantへ対応付ける
 
 Result画面は、Battle結果確定後に表示を開始できます。必須Ownerのcleanup完了を待ってから初めて画面を表示する必要はありません。
 
-ただし、表示開始時点ではResult操作をlockできます。
+表示開始時点ではResult操作をlockします。
 
 ```text
 Battle結果確定
