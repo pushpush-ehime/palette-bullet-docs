@@ -11,24 +11,28 @@ relatedTasks: []
 
 ## 目的
 
-本ページでは、PlayerのHPが0になった場合の死亡処理と`RootState = Dead`について定義します。
+本ページでは、PlayerのHPが0になった場合の`RootState = Dead`成立、Game Over候補の通知、およびGameが確定した最終Battle結果に従う死亡側の処理を定義します。
 
 本ページでは主に以下を扱います。
 
 - 死亡条件
 - `RootState → Dead`
+- Game Over候補の通知
 - Deadの優先順位
 - Dead開始時のState終了
 - 先行入力の破棄
-- 死亡モーション
+- 最終Battle結果確定後のClear／Game Over分岐
+- Game Over確定時の死亡モーション
 - Dead中の操作制限
-- 死亡画面
+- 共通Result画面のGame Over variantへの接続
 - Retry
 - ステージリスタート
 - リスタート時のPlayer State初期化
 - HP・スタミナの復元
 
 HPやスタミナ自体については「Playerステータス」を正とします。
+
+Battle結果の候補収集、同一フレームのClear優先規則、最終結果の確定、共通Result画面、およびResultからのrouteは[ゲーム全体](/spec/game/)を正とします。本ページではPlayer側の`Dead`成立と、確定結果を受けた後の死亡側処理だけを定義します。
 
 ## Deadとは
 
@@ -44,7 +48,9 @@ RootState
 
 Deadは他のPlayer Stateより優先します。
 
-死亡条件が成立した場合、現在行っているGameplay Action、被弾、Interactionなどを終了して`Dead`へ遷移します。
+死亡条件が成立した場合、現在行っているGameplay Action、被弾、Interactionなどを終了して、最終Battle結果の確定を待たずに`Dead`へ遷移します。
+
+`Dead`の成立はPlayer内部状態の確定であり、最終Battle結果がGame Overに確定したことや、死亡演出を開始してよいことを意味しません。死亡演出、Game Over Result、およびRetry受付は、Gameから通知された最終Battle結果に従って開始します。
 
 ---
 
@@ -67,10 +73,18 @@ CurrentHP <= 0
 ↓
 CurrentHP <= 0
 ↓
+CurrentHP = 0
+↓
 死亡条件成立
+↓
+RootState = Dead
+↓
+GameへGame Over候補を通知
 ```
 
 HPは死亡時に`0`として扱います。
+
+`RootState = Dead`はHPが0になった時点で成立させます。Gameによる最終Battle結果の確定まで`Dead`遷移を保留しません。一方、Game Over候補の通知だけで死亡演出やGame Over Resultを開始してはいけません。
 
 ## 被弾による死亡
 
@@ -89,12 +103,12 @@ SmallHit / BigHitを開始しない
 ↓
 RootState = Dead
 ↓
-死亡モーション
+Game Over候補を通知
 ```
 
 致死ダメージを受けた場合、最後の`SmallHit / BigHit`モーションを挟みません。
 
-そのまま死亡モーションへ移行します。
+その後の死亡モーションは最終Battle結果がGame Overの場合だけ開始します。同一フレームのClearによって最終結果がClearとなった場合は、`Dead`を維持したまま死亡モーションを開始しません。
 
 
 ## Deadの優先順位
@@ -315,8 +329,12 @@ RootState = Dead
 ↓
 通常操作停止
 ↓
-死亡モーション開始
+GameへGame Over候補を通知
+↓
+RootState = Deadを維持したまま最終Battle結果を待つ
 ```
+
+Playerの行動終了、先行入力破棄、`RootState = Dead`、および通常操作停止は、最終Battle結果の確定前でも直ちに成立します。死亡演出、Game Over Result、およびRetry受付はこの処理へ直結させません。
 
 ## Dead中の移動
 
@@ -373,18 +391,75 @@ Dead中はGameplay操作を使用できません。
 
 Dead中に行われたGameplay入力は先行入力として保持しません。
 
+ResultのContinue／RetryはGameplay入力ではなく、Gameplay Stateから分離されたResult操作です。`RootState = Dead`を解除してResult操作を受け付けるのではなく、Game／UI側のResult受付gateに従います。
+
+# 最終Battle結果確定後の分岐
+
+Game Over候補を通知した後は、Gameから通知された最終Battle結果だけを使用してPlayerの死亡側処理を分岐します。Player側でHPやEnemy状態を再確認してBattle結果を決め直しません。
+
+```text
+CurrentHP = 0
+↓
+RootState = Dead
+↓
+Game Over候補を通知
+↓
+Gameが同一フレームのBattle終了候補を収集して最終結果を確定
+│
+├─ Clear
+│   ↓
+│   RootState = Deadを維持
+│   ↓
+│   死亡モーション／死亡演出・Game Over Result・Retry受付を開始しない
+│   ↓
+│   Clear Resultだけを表示
+│
+└─ Game Over
+    ↓
+    死亡モーション開始
+    ↓
+    Game Over Resultへ接続
+```
+
+## 同一フレームでClearが確定した場合
+
+Playerの死亡条件とClear条件が同一フレームに成立した場合、GameはClearを最終Battle結果として確定します。
+
+この場合も、すでに成立した次のPlayer状態は巻き戻しません。
+
+- `CurrentHP = 0`
+- `RootState = Dead`
+- そのフレームまでにPlayerへ適用済みのDamageと状態変更
+
+一方、最終結果はClearであるため、次のGame Over側処理は開始しません。
+
+- 死亡モーション、およびGame Over向けの死亡演出
+- Game Over Result
+- Game Over専用の入力待機
+- Retry受付
+
+Playerは`RootState = Dead`を維持したままClear Resultへ接続します。現在のBattle内で`Gameplay`へ戻したり、死亡をなかったことにしたりしません。Clear ResultのContinueによる拠点／Stage選択への遷移は、Game／UI側の仕様に従います。
+
+## Game Overが確定した場合
+
+最終Battle結果がGame Overの場合に限り、Playerの死亡モーションと付随する死亡演出を開始し、その終了後に共通Result画面のGame Over variantへ接続します。
+
+Game Over確定後も`RootState = Dead`を維持し、PlayerのGameplay操作は再開しません。RetryはGame Over Resultの操作が解禁された後にだけ受け付けます。
+
 # 死亡モーション
 
-Deadへ遷移した直後に死亡モーションを開始します。
+死亡モーションおよび付随する死亡演出は`RootState = Dead`への遷移だけでは開始せず、最終Battle結果がGame Overに確定した後に開始します。
 
 ```text
 RootState = Dead
++
+最終Battle結果 = Game Over
 ↓
 死亡モーション開始
 ↓
 死亡モーション終了
 ↓
-死亡画面
+共通Result画面のGame Over variant
 ```
 
 死亡モーション中も`RootState = Dead`を維持します。
@@ -403,48 +478,59 @@ HP = 0
 ↓
 被弾Reactionをスキップ
 ↓
-死亡モーション
+RootState = Dead
+↓
+最終Battle結果を待つ
+│
+├─ Clear：死亡モーションを開始しない
+└─ Game Over：死亡モーションを開始する
 ```
 
-死亡モーションを優先します。
+致死時は被弾Reactionより`Dead`を優先しますが、死亡モーションの開始可否は最終Battle結果に従います。
 
 
-# 死亡画面
+# Game Over Result
 
-死亡モーション終了後、リザルトまたは死亡画面を表示します。
+従来「死亡画面」としていた画面は、共通Result画面の`Game Over` variantとして扱います。Player側から独立した死亡画面用RootStateは追加しません。
 
 ```text
-死亡モーション終了
+最終Battle結果 = Game Over
 ↓
-死亡画面表示
+死亡モーション
+↓
+Game Over Result表示
 ```
 
-死亡画面表示中もPlayerの`RootState`は`Dead`のままとします。
+Game Over Result表示中もPlayerの`RootState`は`Dead`のままとします。UI側でPlayer HPを参照してGame Overを再判定せず、Gameから通知された確定結果だけを表示します。
 
-死亡画面を新しいPlayer RootStateとして追加しません。
+同一フレームのClearによって最終Battle結果がClearとなった場合は、Game Over Resultを表示せず、Clear variantだけを表示します。
 
-死亡画面側では、ステージをやり直すための`Retry`を実行できます。
+Game Over Resultには、現在のStageを最初から再開する`Retry`を表示します。Result操作のlockと解禁条件は[ゲーム全体](/spec/game/)およびUI仕様を正とします。
 
 
 # Retry
 
-Retryを選択した場合、現在のステージを最初からやり直します。
+RetryはGame Over Resultからのみ受け付けます。Retryを選択した場合、終了したBattleの状態を再利用せず、現在のステージを新しいBattleとして最初からやり直します。
 
 ```text
-Dead
+最終Battle結果 = Game Over
 ↓
 死亡モーション
 ↓
-死亡画面
+Game Over Result
 ↓
-Retry
+Result操作解禁後にRetry
 ↓
-ステージを最初から開始
+旧Battleの状態を破棄
+↓
+現在のステージを最初から開始
 ```
 
 死亡地点からその場で復活する方式は使用しません。
 
 チェックポイントからの復帰も、現在の仕様では使用しません。
+
+同一フレームのClearによって最終Battle結果がClearとなった場合はRetryを受け付けません。
 
 
 ## Retry時のPlayerステータス
@@ -508,7 +594,7 @@ ReactionState = None
 
 ## ステージ側のリセット
 
-Retryではステージを最初からやり直します。
+Retryでは旧BattleのRuntime状態を再利用せず、新しいBattle IDを持つBattleとして現在のステージを最初からやり直します。
 
 ただし、
 
@@ -526,7 +612,7 @@ Retryではステージを最初からやり直します。
 
 ## Dead終了
 
-DeadはRetryによって新しいステージ開始処理へ移行する際に終了します。
+Game Over時の`Dead`は、Retryによって新しいステージ開始処理へ移行し、Playerを初期化する際に終了します。
 
 ```text
 RootState = Dead
@@ -541,6 +627,8 @@ RootState = Gameplay
 ```
 
 Deadから直接Gameplayへその場で復活する処理は行いません。
+
+同一フレームClear時は、現在のBattle内で`Dead`を終了しません。Clear ResultのContinueによって拠点／Stage選択へ遷移するまで`Dead`を維持し、遷移先SceneのPlayer初期化によってそのSceneの初期`RootState`を設定します。
 
 ## 死亡処理の全体フロー
 
@@ -563,19 +651,33 @@ HP確認
     ↓
     RootState = Dead
     ↓
-    死亡モーション
+    Game Over候補を通知
     ↓
-    死亡画面
-    ↓
-    Retry
-    ↓
-    ステージを最初から開始
-    ↓
-    HP / Stamina全回復
-    ↓
-    Player State初期化
-    ↓
-    RootState = Gameplay
+    Gameが最終Battle結果を確定
+    │
+    ├─ Clear
+    │   ↓
+    │   RootState = Deadを維持
+    │   ↓
+    │   死亡モーション／死亡演出・Game Over Result・Retryなし
+    │   ↓
+    │   Clear Result
+    │
+    └─ Game Over
+        ↓
+        死亡モーション
+        ↓
+        Game Over Result
+        ↓
+        Retry
+        ↓
+        現在のステージを最初から開始
+        ↓
+        HP / Stamina全回復
+        ↓
+        Player State初期化
+        ↓
+        RootState = Gameplay
 ```
 
 
@@ -588,16 +690,20 @@ Deadに関係する主なRootState遷移を以下に示します。
 | `Gameplay` | 死亡条件成立 | `Dead` |
 | `Interacting` | 死亡条件成立 | `Dead` |
 | `Conversation` | 死亡条件成立 | `Dead` |
-| `Dead` | Retryによるステージ再開始 | `Gameplay` |
+| `Dead` | Game Over ResultのRetryによる新しいステージ開始 | `Gameplay` |
+| `Dead` | 同一フレームClear後のContinue | 現在Battleでは`Dead`を維持し、遷移先Sceneの初期`RootState`へ初期化 |
 
 ## 各ページとの責務分離
 
 | 内容 | 管理ページ |
 | --- | --- |
 | `Dead` RootState | 本ページ |
-| 死亡条件成立後の処理 | 本ページ |
-| 死亡モーション | 本ページ |
-| 死亡画面への移行 | 本ページ |
+| HP 0による死亡条件成立とGame Over候補通知 | 本ページ |
+| Battle終了候補の収集、Clear優先、最終Battle結果の確定 | ゲーム全体 |
+| 同一フレームClear時の`Dead`維持と死亡側演出の抑止 | ゲーム全体 / 本ページ |
+| Game Over確定後の死亡モーション | 本ページ |
+| 共通Result画面のvariantと表示 | ゲーム全体 / UI |
+| Result操作のlock・解禁とContinue／Retry route | ゲーム全体 / UI |
 | Retry時のPlayer初期化 | 本ページ |
 | HP・スタミナ | Playerステータス |
 | ダメージ・被弾 | Playerリアクション｜被弾 |
@@ -611,7 +717,7 @@ Deadに関係する主なRootState遷移を以下に示します。
 - 死亡モーションの具体的な内容
 - 死亡モーションの長さ
 - 死亡時のSE・VFX・カメラ演出
-- 死亡画面の具体的なUI
+- Game Over Resultの具体的なレイアウト・表示文言
 - Retry選択までの操作方法
 - ステージリスタート時のロード・フェード演出
 
