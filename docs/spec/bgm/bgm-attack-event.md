@@ -218,7 +218,7 @@ AttackEventごとに独立した複数の時計を進める方式にはしませ
 Battle開始時は、実音源の再生開始より前にsystem側のpre-roll区間を設けます。冒頭のNormal AttackEventについても、このpre-roll中に`Preview / Charge Start Progress`がFire Music Positionへ到達でき、AttackEventの予告とCharge受付を開始できます。
 
 ```text
-Battle / MusicChart基準時計開始
+Battle／Gameplay／MusicChart時計を同じ基準点から同時開始
 ↓
 system pre-roll
 ├─ 冒頭AttackEventの予告開始が可能
