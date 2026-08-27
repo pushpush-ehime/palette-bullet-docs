@@ -49,6 +49,8 @@ status: 仮仕様
 - Charge成功と自然破裂が同一フレームに成立する場合はCharge成功が優先され、対象個体は自然破裂しません。
 - Reservedになったシャオンダマは、対応するAttackEventで使用されるまで一般Lifetimeと未使用時の自然破裂から保護されます。
 - Clear時に残ったシャオンダマは、一斉に割れる終了演出として処理できますが、Weak攻撃やDamageは発生しません。
+- Charge成功によって`Reserved`へ移行したShaondamaは、その瞬間の現在World座標に留まり、浮遊移動を停止します。
+- `Reserved`個体は、対応するAttackEventの発射タイミングに、その位置から発射されます。（パレットブレット＝シャオンダマ）です。
 
 ## 詳細仕様
 
@@ -153,11 +155,15 @@ Charge成功がcommitされ、対象個体が`Reserved`へ移行した時点で�
 
 1. Playerの新しい選択対象から除外する
 2. 最低保証数から除外する
-3. 一般Lifetimeの進行を停止する
-4. Normalの場合は未使用時の自然破裂対象から除外する
-5. 選択可能数の変化を最低保証判定側へ通知する
+3. 浮遊移動を停止する
+4. `Reserved`へ移行した瞬間の現在World座標に留める
+5. 一般Lifetimeの進行を停止する
+6. Normalの場合は未使用時の自然破裂対象から除外する
+7. 選択可能数の変化を最低保証判定側へ通知する
 
 `Reserved`へのcommitと最低保証数からの除外を別フレームへ分けません。`Reserved`個体を一時的に選択可能数へ残し、不足検出を遅らせる処理は行いません。
+
+`Reserved`中のShaondamaは、浮遊アルゴリズムによる移動を再開せず、Playerや共通の発射位置へ移動させません。対応する発射タイミングまで、`Reserved`へ移行した位置に留まります。
 
 ### 不足検出結果の通知
 
@@ -327,12 +333,17 @@ Charge successによってReservedへ移行したシャオンダマは、未使�
 
 ### 消費・Palette Bullet化
 
-AttackEventで使用対象に確定したReserved Shaondamaは、対応する発射タイミングでPalette Bullet化されます。
+AttackEventで使用対象に確定したReserved Shaondamaは、対応する発射タイミングまで、`Reserved`へ移行した位置に留まります。
 
+対応する発射タイミングでは、その時点の現在World座標を発射開始位置としてPalette Bullet化します。
+
+- Palette Bullet化した時点で、Shaondamaとしての浮遊状態と`Reserved`状態を終了します。
+- 同一個体をShaondamaとPalette Bulletの両方として残しません。
 - 元のworld objectを未使用浮遊状態へ戻しません。
 - 一般Lifetimeやsource時刻自然破裂を再開しません。
 - 同じ個体からPalette Bullet化、自然破裂、Lifetime終了を重複実行しません。
-- 実効音程・色・Damage dataの受け渡しは[玉のデータ](/spec/shaondama-music/orb-data)と[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正本とします。
+- 同じobjectを状態遷移させるか、情報を引き継いだ別objectへ置き換えるかは実装方式とします。
+- 個体情報・有効RGB情報・実効音程・Damage dataの受け渡しは、[玉のデータ](/spec/shaondama-music/orb-data)、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
 
 ### Pause
 
@@ -403,7 +414,7 @@ Retry地点とPlayer／Enemy／BGM等の再初期化値はGame・Stage／Room側
 | 出現演出完了・制御移譲前 | 不可 | 算入しない | 未開始 | 対象外 | 出現済み | 発生しない |
 | 選択可能な浮遊中 | 可 | 算入する | 進行 | 未使用Normalは到達時に自然破裂候補 | 維持 | 自然破裂時のみ発生 |
 | Charge判定中・未`Reserved` | 判定対象 | 算入する | 進行 | 同frame success commitならCharge優先。未成立なら自然破裂 | commitまたは自然破裂まで維持 | Charge不成立時の自然破裂のみ |
-| `Reserved` | 不可 | 算入しない | 停止 | 未使用時の自然破裂対象外 | AttackEvent解決まで維持 | 発生しない |
+| `Reserved` | 不可 | 算入しない | 停止 | 未使用時の自然破裂対象外 | 対応する発射タイミングまでReserved移行時のWorld座標に留まる | 発生しない |
 | 消費済み・Palette Bullet化 | 不可 | 算入しない | 終了 | 対象外 | Shaondama objectとしては終了 | 発生しない |
 | 一般Lifetime到達・Wildcard | 不可 | 算入しない | 終了 | 固定sourceなし | 割れて消滅 | 発生しない |
 | 一般Lifetime到達・未使用Normal | 可 | 算入する | source時刻まで終了を保留 | source時刻で自然破裂 | source時刻まで維持 | source時刻に発生 |
