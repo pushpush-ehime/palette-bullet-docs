@@ -20,10 +20,12 @@ relatedTasks: []
 * `ActionState = Parrying`への遷移
 * スタミナ消費
 * Parrying内部Phase
-* パリィ判定
+* Parry判定batch
+* Normal Parry / Just Parry
 * 成功・失敗・空振り
 * 連続パリィ
 * Parrying中の再入力
+* HitStop中のParry入力保持
 * Aimingとの関係
 * 接地喪失による終了
 * ReactionStateによる終了
@@ -216,17 +218,21 @@ Parrying
 ├─ Startup Phase
 │
 ├─ Parry Window Phase
+│   └─ 成功batch処理後は早期再入力可能
 │
 └─ Recovery Phase
     │
     ├─ 再入力受付前
-    │
-    └─ Parry再入力受付区間
+    └─ 空振り時のParry再入力受付区間
 ```
 
 これらは別のPlayer Stateではありません。
 
 Parrying開始から終了まで、`ActionState`は`Parrying`のままです。
+
+Parry成功後の早期再入力受付は、独立したPhaseやPlayer Stateではありません。
+
+そのParryingで成功batchが成立したことを条件として、通常のRecovery後半より前から新しいParryingへの再開始を許可する専用規則です。
 
 ## Startup Phase
 
@@ -258,51 +264,114 @@ Parry Window Phase
 パリィ判定有効
 ```
 
-このPhase中に、有効な敵攻撃を受けた場合にパリィ成功となります。
+このPhase中に、そのParryingの成功枠が未使用の状態で有効な敵攻撃を受けた場合、パリィ成功となります。
 
-1回のParryingでパリィできる攻撃は**1回のみ**です。
+1回のParryingで成功できるのは、**1つのParry判定batchのみ**です。
 
-### 1回目の攻撃
+### Parry判定batch
 
-Parry Window Phase中にまだパリィ成功していない状態で攻撃を受けた場合、パリィが成立します。
+Parry判定batchは、パリィ成功結果を一度に確定し、そのParryingの成功枠を消費する単位です。
+
+同一Physics StepでPlayerのParry判定へ接触した有効な邪音玉を、1つのParry判定batchとして収集します。
+
+各接触callbackの到着順によって1弾ずつ成否を確定してはいけません。
+
+同一Physics Step内の対象を収集した後、batch全体をまとめて判定します。
+
+batchへ参加できるのは、そのPhysics Stepの判定時点で有効かつ、まだDamage、Parry成功、Wildcard変換のいずれも確定していない邪音玉です。
+そのPhysics Stepより前に、Damage、Parry成功、Wildcard変換のいずれかが確定済みの邪音玉はbatchへ参加できません。
+
+同一Physics Step内の接触候補を収集している間は、対象邪音玉のDamage、Parry成功、Wildcard変換を確定しません。batch判定完了後に、各対象の最終結果を確定します。同一Physics Step内のcallback到着順によってDamageを先に確定してはいけません。
+
+邪音玉ごとの有効性と重複解決防止については「邪音玉」を正とします。
+
+邪音玉以外の有効なParry対象にも「1回のParryingにつき1成功batch」の上限を適用しますが、対象固有の成功結果は各攻撃仕様を正とします。
 
 ```text
 Parry Window Phase
++
+成功枠が未使用
 ↓
-敵攻撃
+同一Physics Stepで邪音玉A、B、Cが接触
 ↓
-パリィ成功
+A、B、Cを1つのbatchとして収集
 ↓
-ダメージ無効
+batch全体をNormal / Just判定
 ↓
-Parrying継続
+A、B、CがすべてParry成功
+↓
+各邪音玉のDamageを無効化
+↓
+邪音玉1弾につきWildcard変換要求を1回発行
+↓
+batch処理完了後に成功枠を消費
 ```
 
-パリィ成功によってParrying自体を終了しません。
+同じbatch内の有効な邪音玉は、弾数にかかわらずすべてParry成功とします。
 
-また、成功時にParryモーションを最初から再生し直しません。
+最初に到着したcallbackだけで成功枠を消費し、同一Physics Step内の後続callbackを失敗させてはいけません。
 
-現在のParryモーションをそのまま継続します。
+batch内の全対象に成功結果を適用した後、そのParryingの成功枠を消費します。
 
-### パリィ成功後
+### 成功batch処理後
 
-一度パリィに成功したParryingでは、それ以降の攻撃に対してパリィ判定を行いません。
+成功枠を消費したParryingでは、次のPhysics Step以降に接触した攻撃に対してパリィ判定を行いません。
 
 ```text
 Parrying
 ↓
-攻撃A
+Physics Step Nでbatch AがParry成功
 ↓
-パリィ成功
+成功枠を消費
 ↓
-同じParrying中に攻撃B
+Physics Step N+1以降に攻撃Bが接触
 ↓
-パリィ不成立
+同じParryingのままならParry不成立
 ```
 
 その後に受けた攻撃は通常の被弾判定へ進みます。
 
-次の攻撃をパリィするためには、新しいParryingを開始する必要があります。
+次の攻撃をパリィするためには、新しいParry入力によって新しいParryingを開始する必要があります。
+
+パリィ成功だけでは現在のParryingを終了せず、Parryモーションも最初から再生し直しません。
+
+新しいParryingが開始されなければ、現在のParryモーションをそのまま継続します。
+
+## Normal Parry / Just Parry
+
+Parry Window内には、通常の成功範囲であるNormal Parry Windowと、その内側に配置するより狭いJust Parry Windowを設けます。
+
+```text
+Normal Parry Window
+└─ Just Parry Window
+```
+
+batch判定時点がJust Parry Window内であれば、そのbatchをJust Parryと評価します。
+
+Normal Parry Window内かつJust Parry Window外であれば、Normal Parryと評価します。
+
+同じbatch内のすべての邪音玉には、batch判定時点の同じNormal / Just評価を適用します。
+
+callbackごと、または邪音玉ごとにNormal / Justを別々に評価してはいけません。
+
+Normal ParryとJust Parryは、Damage無効化、Reaction抑止、Wildcard変換、成功枠消費については同じ結果になります。ただし、スタミナ精算は異なります。
+
+| 結果 | Normal Parry | Just Parry |
+| --- | --- | --- |
+| Damage | 無効 | 無効 |
+| 通常被弾・ReactionState | 発生させない | 発生させない |
+| 邪音玉の変換 | 1弾につきWildcard 1個 | 1弾につきWildcard 1個 |
+| 成功枠 | batch処理後に消費 | batch処理後に消費 |
+| HitStop | 1batchにつき1回 | 1batchにつき1回 |
+| スタミナ精算 | Parrying開始時に消費したコストを維持 | 現在のParrying開始時に消費した`ParryStaminaCost`を1回だけ返却し、実質消費0 |
+
+Just ParryによってWildcardの生成数、種別、Gameplay性能を増減させません。
+
+Normal / Justの違いは、スタミナ精算、VFX、SE、画面効果、およびHitStopの強さ・長さによって表現します。
+
+HitStopの具体的な音楽同期規則は「BGMとGameplayの接続」を正とし、本ページではHitStop中のParry入力だけを定義します。
+
+Parry由来Wildcardをいつ選択可能にするかは本ページでは確定せず、「万能写音玉」の仕様に委譲します。
 
 ## Recovery Phase
 
@@ -320,11 +389,54 @@ Parryモーション終了
 ActionState = None
 ```
 
-Recovery Phaseの後半には、次のParryingを開始するための**Parry再入力受付区間**を設けます。
+Recovery Phaseの後半には、空振り時でも次のParryingを開始できる**空振り時のParry再入力受付区間**を設けます。
+
+すでにParry成功batchが成立している場合は、この区間を待たずに成功後の早期再入力規則を使用できます。
 
 ## Parry再入力
 
-Parrying中のParry再入力は、モーション後半に設定されたParry再入力受付区間のみ受け付けます。
+Parrying中に新しいParryingを開始する経路は、以下の2つです。
+
+* Parry成功後の早期再入力
+* 空振り時のRecovery後半における通常再入力
+
+どちらの場合も、Holdではなく新しく行われたParry Pressが必要です。
+
+### Parry成功後の早期再入力
+
+そのParryingでParry成功batchが成立した後は、通常のRecovery後半を待たずにParry再入力を受け付けます。
+
+HitStop外で新しいParry Pressを受けた場合、その時点で新しいParryingの開始条件とスタミナを確認します。
+
+開始条件を満たし、必要なスタミナが残っている場合のみ、現在のParryingを終了して新しいParryingを即座に最初から開始します。
+
+```text
+Parrying
+↓
+Parry成功batch成立
+↓
+新しいParry Press
+↓
+新しいParryingの開始条件とスタミナを確認
+↓
+開始可能
+↓
+新しいParry分のスタミナを消費
+↓
+現在のParryingを終了
+↓
+新しいParryingを開始
+↓
+Startup Phaseから再生
+```
+
+この再開始によって、現在のParryモーションを新しいParryモーションで上書きします。
+
+成功後の早期再入力は、Recovery Phaseへ入る前や空振り時の再入力受付開始前であっても使用できます。
+
+### 空振り時の通常再入力
+
+そのParryingでParry成功batchが成立していない場合は、従来どおりRecovery Phase後半の空振り時再入力受付区間だけでParry再入力を受け付けます。
 
 これは先行入力ではありません。
 
@@ -337,9 +449,9 @@ Parrying
 ↓
 Recovery Phase
 ↓
-Parry再入力受付区間
+空振り時のParry再入力受付区間
 ↓
-Parry入力
+新しいParry Press
 ↓
 新しいParryingの開始条件確認
 ↓
@@ -364,28 +476,80 @@ Parrying
 
 となります。
 
-新しいParryingを開始するたびに、Parry1回分のスタミナを消費します。
+成功後の早期再入力と空振り時の通常再入力のどちらでも、新しいParryingを開始するたびにParry1回分のスタミナを消費します。
 
 実装上は現在のParryingを再開始し、以下をすべて初期状態へ戻します。
 
 * Parryモーションの再生位置
 * Startup Phase
-* Parry Window Phase
+* Normal Parry Window
+* Just Parry Window
 * Recovery Phase
-* そのParryingですでにパリィ成功したかどうか
+* そのParryingの成功枠
+* 成功batchの処理状態
+* HitStop中の保持入力
 
-そのため、再開始されたParryingでは再び1回の攻撃をパリィできます。
+そのため、再開始されたParryingでは再び1つのParry判定batchを成功させられます。
+
+## HitStop中のParry入力
+
+Normal ParryとJust Parryのどちらでも、成功batchに対してHitStopを発生させます。
+
+同じbatch内の邪音玉数にかかわらず、HitStopは1batchにつき1回だけ発生させます。
+
+HitStop中に新しく行われたParry Pressは、1回分だけ専用の保持枠へ保存できます。
+
+```text
+Parry成功batch
+↓
+HitStop開始
+↓
+新しいParry Press
+↓
+1回分だけ保持
+↓
+HitStop終了
+↓
+新しいParryingの開始条件とスタミナを再確認
+```
+
+保持対象は、HitStop中に新しく行われたPressだけです。
+
+HitStop開始前からParry入力をHoldしている場合、そのHoldを新しいPressとして扱いません。
+
+HitStop中に複数回Pressされても、複数のParryingを予約しません。すでに1回分を保持している場合、追加のPressによって予約数を増やしてはいけません。
+HitStop中に最初に受け付けた有効なParry Pressを保持します。保持後の追加Pressでは、保持入力の内容、受付時刻、有効期限を更新しません。
+
+Parry Pressを保持した時点では、スタミナを消費しません。
+
+HitStop終了時に、`RootState = Gameplay`、`MovementState = Grounded`、`ReactionState = None`などの開始条件と、必要なスタミナを改めて確認します。
+
+開始可能な場合に限り、保持入力を消費し、新しいParry分のスタミナを消費して現在のParryingを終了し、新しいParryingを最初から開始します。
+
+スタミナ不足などによって開始できない場合は再開始せず、保持入力を破棄します。現在のParryingが強制終了していなければ、そのParryingを継続します。
+
+保持入力には調整可能な有効時間`ParryHitStopInputBufferDuration`を設定し、HitStop終了時点で有効な入力だけを再評価します。
+
+次の場合は、HitStopの終了を待たずに保持入力を破棄します。
+
+* Battle結果が確定した
+* パリィ不成立の被弾によってParryingが強制終了した
+* `RootState = Dead`が成立した
+* 接地を失った
+* その他の理由で現在のParryingが強制終了した
+
+破棄した入力によって、後からParryingを自動再開してはいけません。
 
 ## Parry再入力時のスタミナ不足
 
-Parry再入力受付区間でParry入力が行われても、新しいParryingを開始するためのスタミナが不足している場合は再開始しません。
+成功後の早期再入力、HitStop終了時の保持入力再評価、または空振り時の通常再入力において、新しいParryingを開始するためのスタミナが不足している場合は再開始しません。
 
 ```text
 Parrying
 ↓
-Parry再入力受付区間
+再入力受付
 ↓
-Parry入力
+新しいParry Press
 ↓
 新しいParryingの開始条件確認
 ↓
@@ -404,16 +568,20 @@ Parry入力
 
 新しいParryingを開始できることを確認する前に、現在のParryingを終了してはいけません。
 
-## 再入力受付前のParry入力
+入力保持中にスタミナが不足していることだけを理由として、HitStop中に現在のParryingを先に終了してはいけません。
 
-Parry再入力受付区間へ入る前にParry入力が行われた場合、その入力は無視します。
+## 空振り時の受付前Parry入力
+
+そのParryingでParry成功batchが成立していない状態で、空振り時のParry再入力受付区間へ入る前にParry入力が行われた場合、その入力は無視します。
 
 ```text
 Parrying
 ↓
+Parry成功なし
+↓
 再入力受付前
 ↓
-Parry入力
+新しいParry Press
 ↓
 入力を無視
 ↓
@@ -424,7 +592,9 @@ Parry入力
 
 スタミナも消費しません。
 
-Parry再入力受付区間へ入った後に、改めてParry入力を行う必要があります。
+空振り時のParry再入力受付区間へ入った後に、改めてParry入力を行う必要があります。
+
+Parry成功後の早期再入力と、空振り時の通常再入力を同じ受付規則として扱ってはいけません。
 
 ## Parry入力のHold
 
@@ -446,17 +616,23 @@ Parry入力をHold
 
 Holdしているだけでは追加のスタミナも消費しません。
 
+HitStop中の専用保持枠についても、Holdではなく新しく行われたPressだけを対象とします。
+
 ## パリィ成功
 
-Parry Window Phase中に、そのParryingでまだパリィ成功していない状態で有効な敵攻撃を受けた場合、パリィ成功となります。
+Parry Window Phase中に、そのParryingの成功枠が未使用の状態で有効なParry判定batchを処理した場合、パリィ成功となります。
 
 成功時は以下の処理を行います。
 
-* 対象攻撃のダメージを無効化する
+* batch内の対象攻撃のダメージをすべて無効化する
+* batch内の邪音玉1弾につきWildcard変換要求を1回だけ発行する
 * 通常の被弾を発生させない
 * `ReactionState`を変更しない
 * `ActionState = Parrying`を維持する
 * 現在のParryモーションを継続する
+* batch全体に1つのNormal / Just評価を適用する
+* batch全体に対してHitStopを1回だけ発生させる
+* batch処理完了後に、そのParryingの成功枠を消費する
 
 ```text
 ActionState   = Parrying
@@ -470,7 +646,11 @@ ReactionState = None
 
 パリィ成功専用のPlayer Stateは作成しません。
 
-パリィ成功によってスタミナを追加消費または回復することはありません。
+Normal Parry成功では、Parrying開始時に消費したスタミナを返却しません。Just Parry成功では、現在のParrying開始時に消費したParryStaminaCostを一度だけ返却し、実質的なスタミナ消費を0にします。同一batchの重複処理によって複数回返却してはいけません。
+
+ただし、成功後のParry再入力によって新しいParryingを開始する場合は、その新しいParryingの開始分としてスタミナを消費します。
+
+邪音玉の攻撃projectileとしての終了と重複解決防止は「邪音玉」、Wildcardの生成内容と重複生成防止は「万能写音玉」を正とします。
 
 ## パリィ失敗
 
@@ -478,8 +658,10 @@ ReactionState = None
 
 * Startup Phase中に攻撃を受ける
 * Parry Window Phase終了後に攻撃を受ける
-* 同じParryingですでに1回パリィ成功している
+* 同じParryingの成功枠がすでに消費されており、後続のPhysics Stepで攻撃を受ける
 * その他、対象攻撃がパリィ対象ではない
+
+同一Physics Stepで接触した有効な邪音玉は1つのbatchとして扱うため、callbackの到着が遅かったことだけを理由として、そのbatch内の邪音玉をパリィ失敗にしてはいけません。
 
 パリィが成立しない攻撃を受けた場合は、通常の被弾として処理します。
 
@@ -504,13 +686,17 @@ ReactionState = SmallHit / BigHit
 
 ## 空振り
 
-Parrying中に敵の攻撃を一度もパリィしなかった場合は、空振りとなります。
+Parrying中にParry成功batchが一度も成立しなかった場合は、空振りとなります。
 
 空振りによる追加のState変更やペナルティは発生しません。
 
 消費したスタミナは返却しません。
 
-Parry再入力が行われなければ、モーション終了までParryingを継続します。
+空振り時は成功後の早期再入力を使用できません。
+
+Recovery Phase後半の空振り時再入力受付区間へ入るまで、新しいParry Pressを受け付けず、受付前の入力も保持しません。
+
+空振り時の通常再入力が行われなければ、モーション終了までParryingを継続します。
 
 ```text
 Parrying
@@ -551,7 +737,7 @@ Parry再入力によって新しいParryingを開始した場合は、その時�
 ```text
 Parrying
 ↓
-再入力受付区間でParry入力
+成功後の早期再入力または空振り時の通常再入力
 ↓
 新しいParrying開始条件成立
 ↓
@@ -631,7 +817,9 @@ ActionState   = None
 
 消費したスタミナは返却しません。
 
-保持しているParry入力は存在しないため、接地喪失後に自動的にParryingを再開することはありません。
+HitStop中のParry Pressを保持している場合は、接地喪失時にその保持入力を破棄します。
+
+接地喪失後に、破棄した入力によってParryingを自動再開することはありません。
 
 ## 他Actionとの関係
 
@@ -647,7 +835,7 @@ Parrying中に他のGameplay Actionを開始することはできません。
 | DragCharging | × |
 | Aim | × |
 | Jump | × |
-| Parry | 再入力受付区間のみ再開始 |
+| Parry | 成功後は早期再入力可。空振り時はRecovery後半のみ。HitStop中は1 Pressだけ保持 |
 
 `×`となっている入力は無視します。
 
@@ -672,6 +860,8 @@ ReactionState = SmallHit / BigHit
 ParryingよりReactionStateによる割り込みを優先します。
 
 被弾によって終了した場合、Parryingを自動的に再開始しません。
+
+HitStop中のParry Pressを保持している場合は、被弾による強制終了時にその保持入力を破棄します。
 
 消費済みのスタミナも返却しません。
 
@@ -698,7 +888,11 @@ ActionStateを終了
 
 RootState変更による終了後にParryingを自動再開することはありません。
 
+HitStop中のParry Pressを保持している場合は、RootState変更時にその保持入力を破棄します。
+
 消費済みのスタミナは返却しません。
+
+Battle結果が確定した場合も、Battle終了時の共通契約に従ってParryingと保留中のGameplay入力を停止し、HitStop中の保持入力を破棄します。
 
 ## Parryingの終了
 
@@ -707,10 +901,13 @@ Parryingの主な終了条件を以下に示します。
 | 終了原因 | ActionState | スタミナ | 備考 |
 | --- | --- | --- | --- |
 | モーション正常終了 | `None` | 返却しない | 通常終了 |
-| Parry再入力 | `Parrying` | 新しいParry分を追加消費 | 現在のParryingを終了し、新しいParryingを即時開始 |
+| 成功後の早期再入力 | `Parrying` | 新しいParry分を追加消費 | 現在のモーションを上書きし、新しいParryingを即時開始 |
+| 空振り時の通常再入力 | `Parrying` | 新しいParry分を追加消費 | Recovery後半で現在のParryingを終了し、新しいParryingを即時開始 |
+| HitStop保持入力からの再開始 | `Parrying` | 実際の開始時に新しいParry分を追加消費 | HitStop終了時に条件とスタミナを再確認 |
 | 接地喪失 | `None` | 返却しない | `MovementState = Airborne`へ変更 |
 | `SmallHit` | `None` | 返却しない | ReactionStateを優先 |
 | `BigHit` | `None` | 返却しない | ReactionStateを優先 |
+| Battle結果確定 | Battle終了時の共通契約に従う | 返却しない | 保持入力を破棄し、新しいParryingを開始しない |
 | RootState変更 | Gameplay内部Action終了 | 返却しない | 強制終了 |
 | `Dead` | Gameplay内部Action終了 | 返却しない | Deadを最優先 |
 
@@ -736,15 +933,26 @@ Parry固有の主な調整項目を以下に示します。
 | --- | --- | --- |
 | `ParryMotionDuration` | Parryモーション全体の時間 | 未定 |
 | `ParryStartup` | Parrying開始からパリィ判定開始までの時間 | 未定 |
-| `ParryWindow` | パリィ判定が有効な時間 | 未定 |
-| `ParryRestartAcceptTiming` | Parry再入力を受け付け始めるタイミング | 未定 |
-| `ParryEvaluationWindow` | 段階評価に使用するタイミング範囲 | 未定 |
+| `NormalParryWindow` | Normal Parryが成立するParry Window全体の時間範囲 | 未定 |
+| `JustParryWindow` | `NormalParryWindow`内に配置する、Just Parryが成立するより狭い時間範囲 | 未定 |
+| `ParryRestartAcceptTiming` | 空振り時にParry再入力を受け付け始めるRecovery後半のタイミング | 未定 |
+| `NormalParryHitStopDuration` | Normal Parry時のHitStop時間 | 未定 |
+| `JustParryHitStopDuration` | Just Parry時のHitStop時間 | 未定 |
+| `NormalParryHitStopStrength` | Normal Parry時のHitStopの強さ | 未定 |
+| `JustParryHitStopStrength` | Just Parry時のHitStopの強さ | 未定 |
+| `ParryHitStopInputBufferDuration` | HitStop中に受けた1回分のParry Pressを保持できる時間 | 未定 |
+| `NormalParryFeedback` | Normal Parry時のVFX、SE、画面効果 | 未定 |
+| `JustParryFeedback` | Just Parry時のVFX、SE、画面効果 | 未定 |
 
 Parry1回あたりのスタミナ消費量`ParryStaminaCost`は「Playerステータス」で管理します。
 
-`ParryRestartAcceptTiming`はRecovery Phase後半になるよう調整します。
+HitStop中に入力を保持しただけでは`ParryStaminaCost`を消費せず、実際に新しいParryingを開始した時点で消費します。
 
-具体的な時間は、連続パリィ時の操作感とモーションのつながりを確認しながら決定します。
+`JustParryWindow`は必ず`NormalParryWindow`の内側へ収めます。
+
+`ParryRestartAcceptTiming`は空振り時のRecovery Phase後半になるよう調整します。Parry成功後の早期再入力開始には使用しません。
+
+具体的な時間、HitStopの強さ、VFX、SE、画面効果は、連続パリィ時の操作感、モーションのつながり、Normal / Justの識別性を確認しながら調整します。
 
 ## 各ページとの責務分離
 
@@ -752,12 +960,17 @@ Parry1回あたりのスタミナ消費量`ParryStaminaCost`は「Playerステ�
 | --- | --- |
 | Parryingの開始・Phase・判定・終了 | 本ページ |
 | Parry開始時のスタミナ確認・消費タイミング | 本ページ |
-| Parry再入力による再開始 | 本ページ |
+| 同一Physics StepのParry判定batch収集とbatch全体の評価 | 本ページ |
+| 1回のParryingで成功できるbatch数 | 本ページ |
+| Normal / Justの時間評価とGameplay上の共通結果 | 本ページ |
+| 成功後早期・空振り時・HitStop保持入力による再開始 | 本ページ |
 | Parry再入力時のスタミナ確認 | 本ページ |
-| 1回のParryingでパリィ可能な回数 | 本ページ |
 | パリィ成功・失敗・空振り | 本ページ |
 | ActionState間の遷移可否 | Playerアクション遷移 |
 | スタミナ最大値・消費量・回復 | Playerステータス |
+| 邪音玉ごとのDamage無効化・projectile終了・重複解決防止 | 邪音玉 |
+| 邪音玉1弾からWildcard 1個への変換・重複生成防止・選択可能化 | 万能写音玉 |
+| HitStop中のBGM Audio・3時計・AttackEvent | BGMとGameplayの接続 |
 | Aimingのカメラ・移動・向き制御 | Playerアクション｜照準 |
 | Player通常移動の停止 | Player基本移動 |
 | Grounded / Airborne | Player移動仕様 |
@@ -766,11 +979,10 @@ Parry1回あたりのスタミナ消費量`ParryStaminaCost`は「Playerステ�
 
 ## 未決事項
 
-* パリィのタイミング評価を何段階にするか
-* 段階評価ごとのタイミング範囲と効果
-* `ParryRestartAcceptTiming`の具体的な位置
 * 体当たりなど、邪音玉以外の攻撃をパリィした場合に敵をひるませるか
-* パリィ成功時にHitStopを使用するか
-* パリィ成功時の演出・SE・VFX
+
+Normal / Justの2段階評価とHitStopの採用自体は確定事項です。
+
+各Window、空振り時の再入力受付開始、Normal / JustそれぞれのHitStop、入力保持時間、VFX、SE、画面効果の具体値は、未決仕様ではなく調整パラメータとして扱います。
 
 <PageRelations />
