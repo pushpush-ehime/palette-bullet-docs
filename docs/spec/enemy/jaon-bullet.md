@@ -12,7 +12,7 @@ status: 仮仕様
 ## ページ概要
 
 - 対象担当：プログラム班・企画班
-- 関連ページ：[敵](/spec/enemy/)、[Playerアクション｜パリィ](/spec/player/player-action-parry)、[Player｜被弾](/spec/player/player-reaction-damaged)
+- 関連ページ：[敵](/spec/enemy/)、[Playerアクション｜パリィ](/spec/player/player-action-parry)、[Player｜被弾](/spec/player/player-reaction-damaged)、[万能写音玉](/spec/shaondama-music/wildcard-orb)
 
 ## 目的
 
@@ -20,7 +20,9 @@ status: 仮仕様
 
 発射の条件・間隔・狙い方は「邪音玉の発射」ページで定義します（作成中）。
 
-現段階では、**Battle結果確定後のJaon Bullet共通契約**を先に確定します。通常飛行、Hit、Damage、Parry成功時の処理、およびWildcardへの接続の詳細は仮仕様または未決のままとし、後続の「Parry／Jaon Bullet／Wildcard」で確定します。
+現段階では、**Battle結果確定後のJaon Bullet共通契約**に加えて、Player側のParry判定batchから成功結果を受け取った後の弾単位の終了処理とWildcard変換要求を確定します。
+
+弾速、通常飛行、通常命中時のDamage量、壁・地形との衝突、発射元Enemy浄化後の扱いは今回変更せず、仮仕様または未決のままとします。これらは後続のJaon Bullet設計で確定します。
 
 ## プレイヤーから見た挙動
 
@@ -43,9 +45,103 @@ status: 仮仕様
 
 - 飛翔中：直線移動を続ける
 - プレイヤーに命中：ダメージを与えて消滅する（被弾処理は[Player｜被弾](/spec/player/player-reaction-damaged)に従う）
-- パリィされた場合：攻撃として無効化される。無効化された邪音玉がその後どうなるか（消滅するか、別の物に変化するか）は未決
+- Parry判定batch参加中：同一Physics StepでPlayerのParry判定へ入った他の有効な邪音玉と同じbatchへ参加できる。個別callbackの到着順だけではDamageまたはParry成功を確定しない
+- パリィされた場合：Damageを発生させず、攻撃projectileとして終了する。Parry成立時のworld位置を使用し、邪音玉1弾につきWildcard変換要求を1回だけ発行する
 - 寿命切れ：消滅する
 - Battle結果確定後：飛行中か判定処理中かにかかわらず、即座にGameplay無効となる。表示を残す場合は表示専用とする
+
+## Parry判定batchと弾単位の解決
+
+Parry判定batchの収集、Normal / Just評価、1回のParryingで成功できるbatch数、およびbatch処理後の成功枠消費は、[Playerアクション｜パリィ](/spec/player/player-action-parry)を正本とします。
+
+本ページでは、邪音玉がbatchへ参加する条件と、Parry側から成功結果を受け取った各邪音玉の弾単位処理を定義します。
+
+### 同一Physics Stepのbatch参加
+
+同一Physics StepでPlayerのParry判定へ入った有効な邪音玉は、同じParry判定batchへ参加できます。
+
+batchへ参加できる邪音玉は、次の条件をすべて満たす必要があります。
+
+- 現在のBattleと一致する有効な`battleId`を保持している
+- Battle結果確定によるGameplay無効化が行われていない
+- 攻撃projectileとして有効である
+- その邪音玉についてDamage、Parry成功、Wildcard変換のいずれも確定していない
+- Player側から有効なParry対象として受理されている
+
+同じ邪音玉から同一Physics Step内に複数のCollider、Trigger、Overlap、Hit callbackが届いても、同じbatchへ重複参加させません。
+
+各邪音玉は個別callbackの到着時点でNormal / Justを判定しません。同じbatch内の邪音玉には、Player Parry側がbatch判定時点で確定した同一のNormal / Just評価を適用します。
+
+接触callbackの到着順によって、最初の1弾だけをParry成功にしたり、同じPhysics Stepの後続弾を通常Damageとして先に確定したりしてはいけません。
+
+batchを収集している間は、同じ接触から発生したDamage候補の最終確定を保留します。batchがParry成功した場合はParry結果を優先し、batch内の各邪音玉からのDamageを成立させません。
+
+batchがParry成功しなかった場合は、通常のHit・Damage処理へ進みます。通常Hit・Damageの詳細は今回変更しません。
+
+### Parry成功結果を受け取ったときの処理
+
+Parry側からbatchの成功結果を受け取った各邪音玉は、次の順に弾単位の処理を行います。
+
+```text
+Parry成功結果を受信
+↓
+battleId・Gameplay有効性・未解決を確認
+↓
+Parry成立時のworld位置をsnapshot
+↓
+その邪音玉の最終結果をParry成功として一度だけ確定
+↓
+Damageと通常被弾要求を無効化
+↓
+攻撃projectileとして終了
+↓
+Wildcard変換要求を1回だけ発行
+```
+
+Parry成功した邪音玉は、PlayerへDamageを発生させません。すでに作成されている未確定のDamage候補や被弾リアクション要求がある場合も破棄します。
+
+攻撃projectileとして終了した時点で、Gameplay上の飛行、衝突、Hit、Damage、Parry受付を停止します。反射弾や別の攻撃projectileとして残しません。
+
+本体、軌跡、消滅VFX、SEなどを一時的に残す場合は表示専用とし、その位置や接触をGameplay処理へ再利用しません。objectを即時破棄するかpoolへ返すかなどの実装方式は本ページでは固定しません。
+
+Player Parry側の成功枠は、同じbatch内の全邪音玉を処理した後にPlayer Parry側が消費します。各邪音玉が個別に成功枠を消費したり、弾数分のParrying成功を要求したりしてはいけません。
+
+各邪音玉からHitStopを個別に発生させません。同じbatchに対するNormal / Just評価と1回のHitStopはPlayer Parry側を正本とします。
+
+### Wildcard変換要求
+
+Parry成功した邪音玉は、**1弾につき1個**のWildcard変換要求を発行します。
+
+変換位置には、各邪音玉についてsnapshotしたParry成立時のworld位置を使用します。同じbatch内の複数弾をbatch中心などの1座標へまとめず、各弾固有の位置を渡します。
+
+Wildcard変換要求には、少なくとも次の対応関係を維持できる情報を渡します。
+
+- 変換元の邪音玉個体
+- 変換元と同じ`battleId`
+- Parry成立時のworld位置
+
+重複生成の判定に使用する具体的な識別情報は、[万能写音玉](/spec/shaondama-music/wildcard-orb)を正本とします。
+
+Normal ParryとJust Parryのどちらでも、Wildcardの生成数、種別、変換位置の決定方法、Gameplay性能を同じにします。Just Parryを理由として追加のWildcard変換要求を発行してはいけません。
+
+邪音玉はWildcard変換要求を発行した後も、同じcallbackや遅延callbackから変換要求を再発行しません。
+
+Parry由来Wildcardをいつ選択可能にするかは本ページでは確定せず、[万能写音玉](/spec/shaondama-music/wildcard-orb)へ委譲します。
+
+### Damageとの排他性と重複防止
+
+同じ邪音玉について、通常DamageとParry成功を同時に成立させてはいけません。Parry成功時は、その成功結果と対応するWildcard変換要求をそれぞれ1回だけ成立させます。
+
+Damage、Parry成功、Wildcard変換要求のいずれも、同じ邪音玉から複数回成立させてはいけません。
+
+同一Physics StepでParry候補とDamage候補が競合する場合は、callbackの到着順ではなくPlayer Parry側のbatch結果を先に解決します。
+
+- batchがParry成功：Damageを成立させず、Parry成功とWildcard変換要求1回を成立させる
+- batchがParry不成立：Parry成功とWildcard変換を成立させず、通常のHit・Damage処理へ進める
+
+Parry成功が確定した後に届いたDamage、Hit、Parry、変換の重複callbackは破棄します。通常Damageなど別の最終結果がすでに正当に確定している邪音玉へ、遅れて届いたParry成功結果を適用してはいけません。
+
+この排他解決は邪音玉1弾ごとに冪等に行い、複数Colliderや複数callbackによって結果を増やしません。
 
 ## Battle結果確定時の共通契約
 
@@ -60,8 +156,8 @@ Gameplay無効化後のJaon Bulletは、次の対象または発生元として�
 - PlayerへのDamage
 - Playerや地形などとのGameplay上の衝突
 - Hitおよび被弾リアクション要求
-- Parry受付、通常Parry判定、Just Parry判定
-- Parry成功後の変換・生成・反射などの後続処理
+- Parry受付、Normal Parry判定、Just Parry判定
+- Parry成功後のWildcard変換要求などの後続処理
 - その他のGameplay状態変更
 
 Battle結果確定と同じ更新処理内でも、結果確定後に届いた衝突、Hit、Damage、Parry callbackは破棄します。結果確定前にCombat側へ受理済みのDamageや終了候補がある場合は、Game／Combatの同一frame確定規則へ委譲し、本ページから巻き戻しや再送を行いません。
@@ -77,7 +173,7 @@ Jaon Bulletが保持する`battleId`が現在のBattleと一致しない場合�
 - 衝突、Hit、Trigger、Overlap通知
 - Damage候補と被弾リアクション要求
 - Parry受付とParry判定結果
-- 変換、生成、反射などの後続要求
+- Wildcard変換などの後続要求
 - 寿命・距離判定などから届く遅延callback
 
 Retryや次のStageで新しいBattleを開始する場合は、新しい`battleId`を使用します。旧BattleのJaon Bullet object、判定結果、参照、callbackを、新しいBattleのPlayer、Parry、Damage、Wildcard処理へ接続しません。
@@ -108,11 +204,12 @@ Battle結果確定後に、Jaon Bullet本体、軌跡、消滅VFX、SEを表示�
 
 上記をすべて満たした時点で内部cleanup完了とし、Jaon Bullet Ownerの必須cleanup完了を一度だけ通知します。表示専用object、VFX、SEの終了は待ちません。
 
-この共通契約は、後続で通常飛行、Hit、Parry、Wildcard接続の詳細を確定した後も維持します。後続仕様は、Battle結果確定後にGameplay効果を再開させる例外を追加してはいけません。
+この共通契約は、今回確定したParry結果とWildcard変換要求、および後続で確定する通常飛行、Hit、Damage、壁・地形との衝突などにも適用します。後続仕様は、Battle結果確定後にGameplay効果を再開させる例外を追加してはいけません。
 
 ## 他システムとの接続
 
-- **パリィ**：邪音玉はパリィの対象であり、パリィ成功時は攻撃として無効化される（[Playerアクション｜パリィ](/spec/player/player-action-parry)）
+- **パリィ**：同一Physics Stepのbatch収集、Normal / Just評価、成功枠消費、1batchにつき1回のHitStopはPlayer Parry側を正本とする。本ページはbatch参加条件と成功結果を受け取った後の弾単位処理を管理する（[Playerアクション｜パリィ](/spec/player/player-action-parry)）
+- **Wildcard**：Parry成功した邪音玉1弾につき、Parry成立時のworld位置を使用して変換要求を1回発行する。生成の重複防止と選択可能化はWildcard側を正本とする（[万能写音玉](/spec/shaondama-music/wildcard-orb)）
 - **プレイヤーへのダメージ**：命中時の被弾リアクション（SmallHit／BigHit）はPlayer側でダメージ量から自動判定せず攻撃側が指定する仕様のため、邪音玉がどちらを与えるかを本仕様で定める必要がある（未決。[Player｜被弾](/spec/player/player-reaction-damaged)）
 - **シャオンダマ**：浮遊中・Reserved中のシャオンダマと邪音玉が接触した場合の挙動は未決（[シャオンダマ・音楽連動](/spec/shaondama-music/)）
 - **Battle終了**：結果確定後のJaon Bullet固有のGameplay無効化とcleanupは本ページ、Battle結果確定とResult接続は`game/index.md`と`combat/index.md`を正本とする
@@ -123,6 +220,10 @@ Battle結果確定後に、Jaon Bullet本体、軌跡、消滅VFX、SEを表示�
 - Battle結果確定後のJaon BulletからDamage、衝突、Hit、Parry、変換・生成を成立させない
 - 旧`battleId`のJaon Bulletまたは遅延callbackを現在・次のBattleへ接続しない
 - 表示専用objectへGameplay上有効なCollider、Damage判定、Parry判定を残さない
+- 同一Physics Step内のcallback到着順によって、同じbatchに参加できる後続の邪音玉をParry失敗にしない
+- Parry成功した邪音玉からDamageを成立させたり、攻撃projectileとして飛行・衝突を継続させたりしない
+- 同じ邪音玉からParry成功、Damage、Wildcard変換要求を重複成立させない
+- Just Parryを理由としてWildcardの生成数、種別、Gameplay性能を変更しない
 
 ## パラメータ
 
@@ -137,7 +238,6 @@ Battle結果確定後に、Jaon Bullet本体、軌跡、消滅VFX、SEを表示�
 
 - 弾速・寿命・ダメージ量の数値
 - 被弾リアクション区分（SmallHit／BigHitのどちらを与えるか）
-- パリィで無効化された邪音玉のその後（消滅するか、別の物に変化するか）
 - 障害物（壁・地形）に当たったときの挙動
 - 浮遊中・Reserved中のシャオンダマと接触した場合の挙動
 - 発射した敵が浄化された瞬間に、発射済みの邪音玉を残すか消すか
