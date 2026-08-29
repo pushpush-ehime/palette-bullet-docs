@@ -15,14 +15,16 @@ status: 仮仕様
 本カテゴリでは、ゲーム内の個別機能そのものではなく、
 複数の担当者が安全かつ効率的に開発するための共通基盤・Editorツール・検証機能を定義します。
 
-対象には、主に以下を含みます。
+現在、主に以下の共通開発基盤・開発支援ツールを扱います。
 
 - Playerのアクション遷移・State管理基盤
-- MusicChart制作・確認ツール
-- Excel等を使用したゲームデータ管理・Unity Import
-- Gameplay Eventの追跡・デバッグ
-- Battle条件の再現テスト
-- コード上の接続契約・公開要素の一覧化
+- MusicChart Workbench
+- Project Code Catalog
+- Planner調整Parameter管理・Excel連携
+- Gameplay Runtime Trace
+
+このほか、必要性と責務が明確になった開発支援ツールは、
+将来候補として整理したうえで個別仕様化を検討します。
 
 ## ゲーム仕様との責務境界
 
@@ -52,27 +54,33 @@ Gameplay上の意味やValidation規則は各正本仕様を参照し、
 | 項目 | 目的 | 現在の状態 |
 | --- | --- | --- |
 | [アクション遷移・ステートマシン](./action-state-manage) | Playerの複雑なAction・State遷移を安全に管理する | 検討保留 |
-| [MusicChart制作・確認ツール](./music-chart-workbench) | MIDI、BGM、AttackEvent、Timingを同一時間軸上で確認・設定・検証する | 現在検討中 |
-| Excelゲームデータ管理・Unity Import | ストーリーや調整値を表形式で管理しUnityへ反映する | 後続検討 |
-| Gameplay Event Trace Viewer | AttackEventからDamage等までの処理経路を追跡する | 将来候補 |
-| Battle Scenario Runner | 同一frame競合等の境界条件を再現する | 将来候補 |
-| RGB Damage Sandbox | RGB Damage、倍率、clamp、浄化結果を確認する | 将来候補 |
-| Code Contract Catalog | クラス、Event、公開変数、接続契約を一覧化する | 将来候補 |
+| [MusicChart制作・確認ツール](./music-chart-workbench) | MIDI、BGM Audio、MusicChart、AttackEvent、Timing、Random Section、Validation、再Import差分、Runtime状態を同一の音楽時間軸上で確認・設定・検証する | 仮仕様作成済み |
+| [Project Code Catalog](./project-code-catalog) | Unityプロジェクトのコード構造・依存関係・実装Evidence・Test・仕様書Reference等を機械収集し、AIや人間が追加調査対象を絞れるようにする | 仮仕様作成済み |
+| [Planner調整Parameter管理・Excel連携](./planner-tuning-parameter) | ProgrammerがPlannerへ公開してよいGameplay Parameterを明示し、Definition、Value、Excel Export／Import、Validation、Diff／Conflictを管理する | 仮仕様作成済み |
+| [Gameplay Runtime Trace](./gameplay-runtime-trace) | Input、Player State、Gameplay Event、Entity、Context Snapshot等を同一時系列で記録・可視化し、Runtimeで実際に起きた処理を追跡する | 仮仕様作成済み |
+| Battle Scenario Runner | 特定のBattle条件や同一frame競合等を意図的に再現・検証する | 将来候補 |
+| RGB Damage Sandbox | RGB Damage、倍率、clamp、浄化結果等を独立環境で確認する | 将来候補 |
 
-現段階では、未検討の支援ツールについて空の個別仕様ページを先に作成しません。
-必要性と責務が明確になったものから順に個別ページを追加します。
+未検討の支援ツールについて空の個別仕様ページを先に作成せず、
+必要性と責務が明確になったものから個別ページを追加します。
 
-## 現在の優先順位
+## 現在の状態
 
-現在は、次の順で検討します。
+MusicChart Workbench、Project Code Catalog、
+Planner調整Parameter管理・Excel連携、Gameplay Runtime Traceは、
+それぞれ仮仕様として個別ページを作成済みです。
 
-1. MusicChart制作・確認ツール
-2. Excelゲームデータ管理・Unity Import
-3. Gameplay Event TraceおよびScenario検証
-4. アクション遷移・State管理基盤の再検討
+これらは、Implementation Decisionが一部残っていても、
+目的・責務・初期版対象範囲・非目標・完了条件を基準として、
+実装設計および実装タスク設計へ移行できる状態として扱います。
 
-アクション遷移・State管理基盤は、現在作成中の基盤と
-Player本番実装の統合方針を判断できる段階まで保留します。
+アクション遷移・State管理基盤は、
+現在作成中の基盤とPlayer本番実装の統合方針を再検討する必要があるため、
+意図的に検討を保留します。
+
+本ページでは、上記基盤の実装優先順位を新たに固定しません。
+具体的な実装順は、各基盤の依存関係とプロジェクト上の必要性を確認したうえで
+実装タスク設計時に決定します。
 
 ## 共通方針
 
@@ -90,13 +98,19 @@ Player本番実装の統合方針を判断できる段階まで保留します�
 
 以下は将来候補として管理し、現段階では個別ページを作成しません。
 
-- MusicChart Runtime Monitor
-- Excelゲームデータ管理・Unity Import
-- Gameplay Event Trace Viewer
 - Battle Scenario Runner
 - RGB Damage Sandbox
-- Code Contract Catalog
 
-MusicChart Runtime Monitorについても、まずMusicChart制作・確認ツールの
-静的データ表示・編集・Validationを完成させ、
-Runtime側から取得すべき情報が明確になった段階で分離を検討します。
+MusicChart Runtime Monitorは独立した将来候補として扱いません。
+完成版では[MusicChart制作・確認ツール](./music-chart-workbench)の機能として含め、
+MusicChartのRuntime進行状況、Audioとの同期差、Current AttackEvent等を確認するために使用します。
+プロトタイプではRuntime Monitorの実装優先度を低くして構いません。
+
+GameplayのRuntime追跡機能は
+[Gameplay Runtime Trace](./gameplay-runtime-trace)として個別仕様化済みです。
+
+コード構造・Evidenceの機械収集は
+[Project Code Catalog](./project-code-catalog)として個別仕様化済みです。
+
+Planner向けのGameplay Parameter調整とExcel連携は
+[Planner調整Parameter管理・Excel連携](./planner-tuning-parameter)として個別仕様化済みです。
