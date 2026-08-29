@@ -2,13 +2,13 @@
 title: 開発基盤
 description: Palette Bulletの共通開発基盤・開発支援ツール
 pageType: task-category
-category: 共通技術
+category: 開発基盤
 categoryOrder: 110
 order: 0
 status: 仮仕様
 ---
 
-# 共通技術
+# 開発基盤
 
 ## 目的
 
