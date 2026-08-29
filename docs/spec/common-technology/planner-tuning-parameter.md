@@ -40,8 +40,7 @@ Parameter Definition
 自動生成／同期
 ├─ Tuning Data
 ├─ Excel Export
-├─ Validation情報
-└─ Project Code Catalog上の参照情報
+└─ Validation情報
 ↓
 PlannerがExcelでCurrent Valueを調整
 ↓
@@ -53,6 +52,13 @@ Unity Tuning Dataへ反映
 ↓
 Gameplayが参照
 ```
+
+Project Code Catalogとの接続は、
+本基盤がCatalog生成物へ参照Metadataを直接書き込む方式とはしません。
+
+Programmerがコード上へ明示したPlanner調整Parameter Definitionを、
+Project Code Catalog側がコード構造・Attribute・Parameter ID等のEvidenceとして
+機械収集できる関係とします。
 
 ---
 
@@ -233,9 +239,11 @@ Parameter Definitionから、
 - Tuning Data
 - Excel Export
 - Validation情報
-- Project Code Catalog上の参照Metadata
 
 等を派生させます。
+
+Project Code Catalogはこれらの派生データの出力先にはせず、
+コード上の明示的なParameter Definitionを独立してEvidenceとして収集します。
 
 ### 3. Catalogは発見、Programmerは公開、PlannerはValue調整
 
@@ -1010,7 +1018,7 @@ Range Validation
 ↓
 Metadata Validation
 ↓
-Cross Parameter Validation
+Cross Parameter Validation（後続対応時）
 ↓
 Diff
 ↓
@@ -1053,7 +1061,7 @@ Import前には、
 - Parameter DefinitionがExport時から変化した
 - Source Bindingが変化した
 - Parameterが削除された
-- Cross Parameter Validation
+- Cross Parameter Validation（後続対応時）
 
 表示例：
 
@@ -1096,7 +1104,8 @@ Normal Parry Window >= Just Parry Window
 InitialCount <= MaximumCount
 ```
 
-Cross Parameter Validationを初期版へどこまで含めるかは未決です。
+Cross Parameter Validationは、初期版の必須完了条件には含めず、
+後続機能として追加します。
 
 ただし、
 将来追加するためにParameter IDベースでRuleを定義できる設計を妨げないようにします。
@@ -1266,8 +1275,8 @@ Export時とImport時で配置が変化してもParameter IDで照合できる�
 | Diff表示 | 必須 |
 | 3-way Conflict検出 | 必須 |
 | Conflict時の人間判断 | 必須 |
-| Orphaned Parameter検出 | 推奨 |
-| Cross Parameter Validation | 初期版または後続 |
+| Orphaned Parameter検出 | 必須 |
+| Cross Parameter Validation | 後続 |
 | Runtime Hot Reload | 後続 |
 | 高度なTuning Dashboard | 後続 |
 | 自動Gameplayコード書き換え | 初期版対象外 |
@@ -1390,11 +1399,6 @@ Gameplayコードの変更はProgrammerがレビュー可能な形で行いま�
 
 以下は現時点では確定しません。
 
-### 名称・ページ
-
-- 正式な機能名称
-- 仕様ページの正式ファイル名
-
 ### Parameter宣言
 
 - `PlannerTunable` Attribute等の具体構文
@@ -1449,7 +1453,6 @@ Gameplayコードの変更はProgrammerがレビュー可能な形で行いま�
 ### Validation
 
 - Cross Parameter Validationの定義方法
-- Cross Parameter Validationを初期版必須にするか
 - Validation Ruleの保存場所
 - WarningとErrorの区分
 
@@ -1475,13 +1478,17 @@ Project Code Catalogとの責務は以下のとおりです。
 ```text
 Project Code Catalog
 =
-コード構造・Evidenceを機械収集
+コード上に存在する構造・Attribute・Parameter Definition等を
+Evidenceとして機械収集
 
 Planner Tuning Parameter基盤
 =
-明示公開されたParameterの
+Programmerが明示公開したParameterの
 Definition・Value・Excel往復・Validationを管理
 ```
+
+本基盤がProject Code Catalog生成物へDefinitionを二重登録するのではなく、
+同じコード上の明示Definitionを、それぞれの責務に従って扱います。
 
 将来的にAsset／Data Catalogが作成された場合は、
 Tuning Data Asset実値との責務境界を再整理します。
