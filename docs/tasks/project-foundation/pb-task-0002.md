@@ -3,7 +3,7 @@ title: "Project Code Catalog Core・Schema・Symbol収集基盤"
 description: Project Code Catalogの内部Model、Git Snapshot、Stable Symbol ID、C# Symbol収集処理を実装し、後続のEvidence収集・出力機能が利用できる基礎契約を完成させる
 pageType: task
 taskId: PB-TASK-0002
-category: "その他"
+category: 開発基盤
 team: プログラム
 relatedSpecs:
   - /spec/common-technology/project-code-catalog
