@@ -266,6 +266,32 @@ Gameplay Runtime Traceは、
 Project Code Catalogの静的解析機能を、
 Gameplay Runtime Trace側で再実装しません。
 
+### MusicChart Workbench
+
+[MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench)の
+Runtime MonitorもRuntime情報を扱いますが、Gameplay Runtime Traceとは責務を分離します。
+
+```text
+MusicChart Workbench Runtime Monitor
+=
+MusicChart制作・確認の文脈で、
+MusicChart時計、Audio位置、Current AttackEvent、
+Preview／Charge受付状態、Loop occurrence、
+シャオンダマ先行生成状況等をLive表示する
+
+Gameplay Runtime Trace
+=
+Input、Player State、Gameplay Event、Entity、Damage等を含む
+複数System横断のRuntime事実を時系列Evidenceとして
+記録・保存・Filter・Exportする
+```
+
+Gameplay Runtime Traceは、
+MusicChart WorkbenchのEditor制作・編集・Validation機能を再実装しません。
+
+また、MusicChart WorkbenchのRuntime Monitor表示を成立させるために、
+Gameplay Runtime TraceのSession記録やJSON／JSONL Exportを必須依存にはしません。
+
 ### Battle Scenario Runner
 
 将来的に検討する`Battle Scenario Runner`とは以下のように分離します。
@@ -806,10 +832,60 @@ Gameplay規則そのものを定義する一覧ではありません。
 - Error
 - Warning
 
-主要Gameplay Eventの正式一覧は未決です。
+主要Gameplay Eventの完全な正式一覧は未決です。
 
-Trace基盤自体はゲーム全体へ拡張可能にしつつ、
-導入は段階的に行える構造とします。
+ただし、初期版完了判定に使用する最低限のTrace範囲は、
+以下の2種類の代表経路を追跡できることとします。
+
+### 初期版で必須とする代表経路
+
+#### 1. Player入力／State経路
+
+少なくとも以下を同一Timeline上で関連付けられることを必須とします。
+
+```text
+Raw Input
+↓
+Input Action
+↓
+Gameplay Request
+↓
+Player State確認
+↓
+Action開始／拒否／中断
+```
+
+これにより、
+「入力が届かなかった」「State Gateで拒否された」等を切り分けられることを
+初期版の最低条件とします。
+
+#### 2. AttackEventから結果までの横断経路
+
+少なくとも以下のカテゴリをまたぐ代表Eventを、
+Correlation ID等で一続きに追跡できることを必須とします。
+
+```text
+AttackEvent
+↓
+Projectileまたは攻撃結果生成
+↓
+Hit／Damage Candidate
+↓
+Enemy Damage反映
+↓
+PurifyまたはBattle上の確定結果
+```
+
+すべてのAttackEvent種類、Projectile種類、Enemy種類を
+初期版で網羅する必要はありません。
+
+初期版では、
+基盤が複数Systemをまたぐ一連の処理を記録・関連付けできることを
+代表経路で確認できればよいものとします。
+
+上記以外のGameplay Eventは、
+Trace基盤自体をゲーム全体へ拡張可能にしつつ、
+段階的にTrace Pointを追加できる構造とします。
 
 ---
 
@@ -987,6 +1063,13 @@ Parent EV-105
 を辿りやすくなります。
 
 すべてのEventへParentを強制する必要はありません。
+
+Parent／Child Eventは初期版で高優先の追加目標としますが、
+**初期版完了Gateには含めません。**
+
+初期版ではCorrelation IDとEvent Sequenceによって
+一連の処理と順序を追跡できることを必須とし、
+直接因果を表すParent／Child関係は可能な範囲から追加します。
 
 Event Graphの具体構造は未決です。
 
@@ -1410,6 +1493,9 @@ Bundleには必要に応じて以下を含めます。
 Runtime問題を見つけた瞬間に、
 直前のTraceを残せる機能を高優先で検討します。
 
+ただし、直近N秒保存は初期版で高優先の追加目標とし、
+**初期版完了Gateには含めません。**
+
 例：
 
 ```text
@@ -1457,7 +1543,9 @@ Bookmark候補情報：
 - 任意Comment
 
 Bookmarkはプロトタイプ優先度を中程度とし、
-初期版必須にするかは未決です。
+**初期版完了Gateには含めません。**
+
+初期版運用で必要性が確認された場合に追加できる構造を維持します。
 
 ---
 
@@ -1616,7 +1704,7 @@ Runtime調査の基礎となる機能を優先します。
 | Event ID | 必須 |
 | Entity ID | 必須 |
 | Correlation ID | 必須 |
-| Event前後関係 | 高 |
+| Event前後関係 | 高。初期版完了Gate外 |
 | Context Snapshot | 必須 |
 | Timeline Viewer | 必須 |
 | Event詳細表示 | 必須 |
@@ -1625,8 +1713,8 @@ Runtime調査の基礎となる機能を優先します。
 | Session Summary | 必須 |
 | Git／Build Snapshot | 必須 |
 | 選択範囲Export | 必須 |
-| 直近N秒保存 | 高 |
-| Bookmark | 中 |
+| 直近N秒保存 | 高。初期版完了Gate外 |
+| Bookmark | 中。初期版完了Gate外 |
 | Screenshot | 低 |
 | 3D軌跡 | 低 |
 | 完全Replay | 後続 |
@@ -1643,7 +1731,14 @@ Trace基盤自体はゲーム全体対応を前提とします。
 すべてのGameplay Systemへ一度に導入する必要はなく、
 段階的にTrace Pointを追加できる構造とします。
 
-導入順の例：
+初期版完了判定では、前述のとおり最低限、
+
+1. Raw Input → Input Action → Gameplay Request → Player State → Action結果
+2. AttackEvent → 攻撃結果生成 → Hit／Damage → Enemy反映 → Purify等のGameplay上の確定結果
+
+の2種類の代表経路を追跡できることを必須とします。
+
+そのうえで、Trace Pointの導入順は以下を例とします。
 
 1. Input
 2. Player State
@@ -1660,6 +1755,9 @@ Trace基盤自体はゲーム全体対応を前提とします。
 実装タスクの依存関係や、
 現在のデバッグ優先度に応じて変更できます。
 
+代表経路以外の全Eventカテゴリを網羅していないことだけを理由に、
+初期版未完了とは扱いません。
+
 ---
 
 ## 初期版完了条件
@@ -1674,21 +1772,21 @@ Trace基盤自体はゲーム全体対応を前提とします。
 6. Input Actionを記録できる
 7. Player State変更を記録できる
 8. 主要Gameplay Eventを登録・記録できる
-9. Event IDを一意に生成できる
-10. Entity IDをEventへ関連付けられる
-11. Correlation IDをEventへ関連付けられる
-12. Event順序を決定的に復元できる
-13. Parent／Child等のEvent前後関係を表現できることを目標とする
-14. 重要Event時にContext Snapshotを保存できる
-15. Timeline上でEventを確認できる
-16. Lane単位でEventを確認できる
-17. Eventを選択して詳細を確認できる
-18. Entity／Correlation等でFilterできる
-19. AI向けJSON／JSONLをExportできる
-20. 人間向け要約をExportできる
-21. Session Summaryを生成できる
-22. 選択した時間範囲だけExportできる
-23. 直近N秒のTraceを保存できることを目標とする
+9. Raw Input → Input Action → Gameplay Request → Player State → Action結果の代表経路を追跡できる
+10. AttackEvent → 攻撃結果生成 → Hit／Damage → Enemy反映 → Purify等のGameplay上の確定結果の代表経路を追跡できる
+11. Event IDを一意に生成できる
+12. Entity IDをEventへ関連付けられる
+13. Correlation IDをEventへ関連付けられる
+14. Event順序を決定的に復元できる
+15. 重要Event時にContext Snapshotを保存できる
+16. Timeline上でEventを確認できる
+17. Lane単位でEventを確認できる
+18. Eventを選択して詳細を確認できる
+19. Entity／Correlation等でFilterできる
+20. AI向けJSON／JSONLをExportできる
+21. 人間向け要約をExportできる
+22. Session Summaryを生成できる
+23. 選択した時間範囲だけExportできる
 24. Trace生成元のRepository／Commit／Unity Version等を記録できる
 25. MusicChart Timeへ接続可能な構造を持つ
 26. Dropped Event等のTrace欠落を識別できる
@@ -1697,7 +1795,15 @@ Trace基盤自体はゲーム全体対応を前提とします。
 29. Gameplay正本仕様をTrace側で再定義しない
 30. Project Code Catalogの静的解析責務をTrace側へ重複実装しない
 
+以下は初期版で優先して実装可能ですが、初期版完了Gateには含めません。
+
+- Parent／Child等の直接的なEvent前後関係
+- 直近N秒保存
+- Bookmark
+
 ---
+
+
 
 ## 後続機能
 
@@ -1754,7 +1860,6 @@ Trace基盤自体はゲーム全体対応を前提とします。
 
 ### 基本識別子・Schema
 
-- 正式名称
 - Trace Event Schema
 - Event ID形式
 - Entity ID形式
@@ -1823,7 +1928,6 @@ Trace基盤自体はゲーム全体対応を前提とします。
 
 ### Bookmark／Screenshot
 
-- Bookmark機能を初期版へ含めるか
 - Bookmark Commentの保存方式
 - Screenshot保存方式
 - Screenshot Trigger
@@ -1854,6 +1958,7 @@ Gameplay Runtime Traceは以下の仕様を参照しますが、
 | 共通技術カテゴリ全体 | [共通技術](/spec/common-technology/) |
 | 静的コード構造・Evidence | [Project Code Catalog仕様](/spec/common-technology/project-code-catalog) |
 | Planner調整Parameter | [Planner調整Parameter管理・Excel連携仕様](/spec/common-technology/planner-tuning-parameter) |
+| MusicChart制作・Runtime Monitor | [MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench) |
 | Player Input | [入力・操作仕様](/spec/player/input-and-controls) |
 | Player State | [Player State仕様](/spec/player/states) |
 | Player Action遷移 | [Player Action遷移仕様](/spec/player/player-action-transitions) |
