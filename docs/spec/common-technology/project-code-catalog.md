@@ -213,11 +213,11 @@ Gameplay Runtimeに不要な依存や処理を追加しません。
 コード内で検出された仕様書ReferenceをCatalogへ保持し、
 AIがコードとWeb仕様書を相互に追跡できる材料にします。
 
-### 10. 将来のPlanner Parameter抽出へ必要な情報を保持する
+### 10. Planner調整Parameter基盤との接続に必要な情報を保持する
 
 Planner調整Parameterを本Catalog自身で決定しません。
 
-ただし、後続機能が判断に使用できるField／Property／Attribute／Default Value等を保持します。
+ただし、[Planner調整Parameter管理・Excel連携仕様](/spec/common-technology/planner-tuning-parameter)側が公開候補の確認材料として利用できるよう、Field／Property／Attribute／Default Value等を保持します。
 
 ---
 
@@ -1165,7 +1165,7 @@ Field / Property / Constant等を広く収集
 ↓
 Tuning Parameter Candidate
 ↓
-別仕様の選別規則
+Planner調整Parameter管理・Excel連携仕様のOpt-in／選別規則
 ↓
 Planner調整可能Parameter
 ↓
@@ -1343,9 +1343,8 @@ AIの構造理解に大きく寄与する項目を優先します。
 
 以下は現時点では確定しません。
 
-### 名称・出力
+### 出力
 
-- 正式な機能名称を`Project Code Catalog`とするか
 - 出力フォルダ
 - JSONとJSONLのどちらを中心形式とするか
 - JSON／JSONLの具体Schema
@@ -1417,15 +1416,15 @@ AIの構造理解に大きく寄与する項目を優先します。
 | --- | --- |
 | 共通技術カテゴリ全体 | [共通技術](/spec/common-technology/) |
 | MusicChart制作・確認用Editorツール | [MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench) |
-| Planner調整Parameter／Excel管理 | 本Catalogとは責務を分離し、後続の独立仕様として定義する |
+| Planner調整Parameter／Excel管理 | [Planner調整Parameter管理・Excel連携仕様](/spec/common-technology/planner-tuning-parameter) |
 
 Project Code Catalogは、
 コード上に存在する構造とEvidenceを機械収集するページです。
 
-Planner調整Parameter／Excel管理側では、
+[Planner調整Parameter管理・Excel連携仕様](/spec/common-technology/planner-tuning-parameter)では、
 Catalog等から得られた候補の中から、
-人間が調整可能にする値を別の規則で選別し、
-編集・Import・Validationする仕組みを定義します。
+ProgrammerがPlannerへ公開してよいParameterを明示し、
+Valueの編集・Excel Export／Import・Validation・Diff／Conflict処理を管理します。
 
 ---
 
