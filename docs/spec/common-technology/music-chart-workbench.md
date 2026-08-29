@@ -439,6 +439,14 @@ BGM Random Section仕様およびBGM MusicChart仕様に従って
 
 Random Sectionはプロトタイプでも可能な限り初期段階から対応します。
 
+ただし、静的なRandom Section作成・編集・Validationは、
+プロトタイプでの実装対象として優先して検討する一方、
+**プロトタイプ完了Gateには含めません。**
+
+初期実装で対応できない場合でも、
+MusicChart制作・Validation・再Import等のプロトタイプ必須機能が成立していれば、
+Workbench全体のプロトタイプ未完了とは扱いません。
+
 ### Random Section本体
 
 少なくとも以下を対象とします。
@@ -504,6 +512,9 @@ Workbenchでは、少なくとも以下の問題を確認できるようにし�
 
 静的なRandom Section作成・編集・Validationは、
 できるだけプロトタイプから対応します。
+
+ただし、前述のとおりプロトタイプ完了Gateには含めず、
+完成版では必須機能として扱います。
 
 ---
 
@@ -736,6 +747,33 @@ MusicChart Workbench完成版に必要な機能として扱います。
 ただし、プロトタイプでの実装優先度は低く、
 静的なMusicChart制作・Validation・再Import環境を先に整備して構いません。
 
+### Gameplay Runtime Traceとの責務境界
+
+MusicChart WorkbenchのRuntime Monitorと
+[Gameplay Runtime Trace](/spec/common-technology/gameplay-runtime-trace)は、
+どちらもRuntime情報を扱いますが責務を分離します。
+
+```text
+MusicChart Workbench Runtime Monitor
+=
+MusicChart制作・確認の文脈で、
+現在のMusicChart時計、Audio位置、Current AttackEvent、
+Preview／Charge受付状態、Loop occurrence、
+シャオンダマ先行生成状況等をLive表示する
+
+Gameplay Runtime Trace
+=
+Input、Player State、Gameplay Event、Entity、Damage等を含む
+複数System横断のRuntime事実を時系列Evidenceとして記録・保存・Exportする
+```
+
+Runtime Monitorは、Gameplay Runtime TraceのTimeline記録、
+Correlation追跡、Session保存、JSON／JSONL Export等を再実装しません。
+
+また、Gameplay Runtime Traceが存在しない場合でも、
+Runtime Monitorが各Runtime本体の確定状態を直接読み取って
+MusicChart確認に必要なLive表示を行える構造を妨げません。
+
 ### Runtime Monitorで表示する必須項目
 
 少なくとも以下を表示します。
@@ -929,7 +967,7 @@ Shortage
 | エラー位置への移動 | 必須 | 高 |
 | MIDI再Import | 必須 | 高 |
 | 差分・影響候補表示 | 必須 | 高 |
-| Random Section静的編集 | 必須 | 高～中高。初期版から対応方針 |
+| Random Section静的編集 | 必須 | 高～中高。初期版対応を目標とするが、プロトタイプ完了Gate外 |
 | Random抽選シミュレーション | 任意または補助 | 低 |
 | Runtime Monitor | 完成版必須 | 低 |
 | MIDI Note単体試聴 | 現時点で任意 | 非常に低 |
@@ -978,7 +1016,9 @@ Runtime Monitor自体は完成版仕様に含みますが、
 10. 再Import差分と影響候補を確認できる
 11. 不正データを暗黙に自動修正しない
 12. サウンド班・プランナー・プログラマーが同じAttackEventを識別できる
-13. Random Sectionの静的データを正本仕様に沿って確認・編集・検証できることを目標とする
+
+Random Sectionの静的データを正本仕様に沿って確認・編集・検証できることは、
+プロトタイプでの追加目標としますが、プロトタイプ完了条件には含めません。
 
 Runtime Monitorはプロトタイプ完了条件には含めません。
 
@@ -1029,7 +1069,8 @@ MIDI Note単体試聴は、
 - Audio波形表示：不要・対象外
 - 再Import後にどちらを表示するか：MIDI由来データは更新後、手動設定は保持値
 - Runtime Monitorを仕様に含めるか：完成版に含める
-- Random Sectionを完成版でどこまで対応するか：正本仕様どおりの静的編集・Validationを目標
+- Random Sectionを完成版でどこまで対応するか：正本仕様どおりの静的編集・Validationを必須とする
+- Random Sectionをプロトタイプ完了Gateに含めるか：含めない。プロトタイプでは追加目標とする
 
 ---
 
@@ -1046,6 +1087,7 @@ MIDI Note単体試聴は、
 | シャオンダマ生成Track・生成要求 | [BGM シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama) |
 | Random Sectionの抽選規則 | [BGM Random Section仕様](/spec/bgm/bgm-random-section) |
 | Charge Allocation・Current AttackEvent | [Charge Allocation仕様](/spec/draw-system/charge-allocation) |
+| 複数System横断のRuntime時系列Evidence | [Gameplay Runtime Trace仕様](/spec/common-technology/gameplay-runtime-trace) |
 
 ---
 
