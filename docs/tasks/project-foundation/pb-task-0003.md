@@ -3,7 +3,7 @@ title: "Project Code Catalog Evidence・Test・仕様書Reference・Dependency�
 description: Project Code Catalog CoreへEvidence、XML Documentation、Test、仕様書Reference、静的Dependencyを収集・関連付けし、追加調査対象を絞れる状態を作る
 pageType: task
 taskId: PB-TASK-0003
-category: "その他"
+category: 開発基盤
 team: プログラム
 relatedSpecs:
   - /spec/common-technology/project-code-catalog
