@@ -29,7 +29,8 @@ Gameplay Runtime TraceをPlayer入力経路へ接続し、
 - 物理キー／Mouse等のRaw InputをTraceで確認できる
 - Unity Input System上のInput Action発火を別Eventとして確認できる
 - Gameplay Requestへ変換されたか確認できる
-- Request時点のPlayer Stateを確認できる
+- Request時点のPlayer State Snapshotを確認できる
+- Runtimeで実際に確定したPlayer State変更を、State軸ごとのFrom／Toとして確認できる
 - Actionが開始したか、拒否されたか、中断されたか確認できる
 - Runtime本体が持つReasonがある場合、その理由をTraceへ残せる
 - 入力経路のEventを同じCorrelationとして追跡できる
@@ -100,16 +101,30 @@ Gameplay Requestまで到達
 
 ### 4. Player State／Action結果を記録する
 
-Gameplay Requestの処理結果として、少なくとも以下を追跡できるようにします。
+Gameplay Requestの処理結果として、Request時点のState Snapshotと、Runtimeで実際に確定したState変更を区別して記録します。
 
-- Request時点で必要なPlayer State
+Request時点では少なくとも、判定に関係するPlayer State Snapshotを確認できるようにします。
+
+State変更Eventでは、変更が起きた軸ごとに少なくとも以下を記録します。
+
+- State Axis：Root／Movement／Action／Aim／Reaction
+- From State
+- To State
+- Frame／Physics Step／Runtime Time
+- Runtime本体が提供するTrigger／Cause／Reason
+- 関連するGameplay Request／ActionとのCorrelation
+
+複数軸が同じ処理で変化した場合も、どの軸がどの値からどの値へ変わったか追跡できるようにします。
+
+Action結果として、少なくとも以下も追跡できるようにします。
+
 - Action Start
 - Action Rejected
 - Action Interrupted／Ended
 
-Player StateはRuntime本体が確定している値を記録してください。
+Request時State Snapshot、State変更Event、Action結果Eventは同じものとして潰さず、実際に変更がなかった拒否経路と、State遷移が確定した成功／中断経路を区別してください。
 
-Trace Recorder側でState条件を再判定して結果を作らないでください。
+Player StateはRuntime本体が確定している値を記録し、Trace Recorder側でState条件や遷移結果を再判定して作らないでください。
 
 ### 5. Reasonを追跡できるようにする
 
@@ -145,7 +160,9 @@ Input Action
 ↓
 Gameplay Request
 ↓
-Player State
+Request時State Snapshot
+↓
+Runtime確定State変更
 ↓
 Action Start／Reject／Interrupt
 ```
@@ -159,7 +176,8 @@ Action Start／Reject／Interrupt
 - Player操作に関するRaw Input Trace
 - Input Action Trace
 - Gameplay Request Trace
-- Player Stateの関連付け
+- Request時Player State Snapshotの関連付け
+- Runtime確定Player State変更（Axis／From／To）
 - Action Start／Reject／Interrupt結果
 - Runtime本体が提供するReason
 - 入力経路へのCorrelation ID付与
@@ -182,7 +200,9 @@ Action Start／Reject／Interrupt
 
 - [ ] Raw InputとInput Actionを別Eventとして確認できる
 - [ ] Input ActionからGameplay Requestまで到達したか確認できる
-- [ ] Request時点のPlayer StateをTraceから確認できる
+- [ ] Request時点のPlayer State SnapshotをTraceから確認できる
+- [ ] Root／Movement／Action／Aim／Reactionの実際の変更をAxis／From／To付きで確認できる
+- [ ] State変更がRuntime本体の確定通知から記録され、Trace側で推測されていない
 - [ ] Action Start／Reject／Interruptの結果を確認できる
 - [ ] Runtime本体が持つReasonをTraceへ記録できる
 - [ ] 一連の入力経路をCorrelation ID等で追跡できる
@@ -195,12 +215,13 @@ Action Start／Reject／Interrupt
 ## 確認手順
 
 1. Trace Recordingを開始して代表Actionの入力を行います。
-2. Raw Input → Input Action → Gameplay Request → Action StartがTimeline上で追えることを確認します。
-3. Actionを開始できないPlayer Stateを作り、同じ入力を行います。
-4. Gameplay Requestまで到達し、Action RejectとState／Reasonが記録されることを確認します。
-5. 必要に応じてAction中断が発生するケースを作り、Interrupt／Endまで追跡できることを確認します。
-6. Correlation Filterで、その入力に関係するEventだけを確認できることを確認します。
-7. 該当時間範囲をExportし、同じ経路を構造化データから追跡できることを確認します。
+2. Raw Input → Input Action → Gameplay Request → Request時State Snapshot → Runtime確定State変更 → Action StartがTimeline上で追えることを確認します。
+3. 成功経路でAction軸等のFrom／Toが実際のRuntime遷移と一致することを確認します。
+4. Actionを開始できないPlayer Stateを作り、同じ入力を行います。
+5. Gameplay Requestまで到達し、Action RejectとRequest時State／Reasonが記録され、発生していないState変更Eventが捏造されないことを確認します。
+6. 必要に応じてAction中断が発生するケースを作り、実際のState変更とInterrupt／Endまで追跡できることを確認します。
+7. Correlation Filterで、その入力に関係するEventだけを確認できることを確認します。
+8. 該当時間範囲をExportし、同じ経路とState変更のAxis／From／Toを構造化データから追跡できることを確認します。
 
 ## 前提・依存タスク
 
@@ -224,7 +245,8 @@ Raw Input→Input Action→Player State／Action
 
 - Traceは既存Player処理を観測するだけとし、入力やState遷移を変更しないでください。
 - Raw Input、Input Action、Gameplay Requestを同じEventへ潰さず、停止地点を切り分けられるようにしてください。
-- Player StateやReject ReasonをTrace側で独自計算しないでください。
+- Request時State Snapshotと実際のState変更Eventを混同しないでください。
+- Player State変更やReject ReasonをTrace側で独自計算せず、Runtime本体の確定情報を記録してください。
 - Trace Point追加のためにGameplay側へ過剰なデバッグ依存を持ち込まないでください。
 - 代表Action以外へ拡張しやすい接続方法にしてください。
 - 詳細なAction成立条件は各Player正本仕様を参照してください。

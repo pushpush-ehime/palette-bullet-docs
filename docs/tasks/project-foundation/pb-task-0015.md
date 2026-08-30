@@ -26,6 +26,7 @@ MusicChart Workbench上でRandom Sectionを静的データとして作成・編�
 
 ## 完成時にできるようになること
 
+- 実装開始前に正本仕様上のRandom Section／Candidate Identifier Contractを確定できる
 - Random Sectionを追加・削除・並べ替えできる
 - Sectionの開始／終了位置をTimeline上で確認・編集できる
 - Candidateを追加・削除・編集できる
@@ -52,7 +53,26 @@ Workbench側でRandom抽選規則を別仕様として再定義しないでく�
 
 ## 実施内容
 
-### 1. Random SectionをTimeline上で表示・編集する
+### 1. 実装開始前にRandom Section／Candidate Identifier Contractを確定する
+
+[MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench)では、Random SectionおよびRandom CandidateへStable ID／Display Code方式を採用するかが未決事項です。
+
+実装開始時点でも未確定の場合は、GUID、配列Index、Section範囲、Candidate位置、表示順等を実装内だけで正本Identifierとして採用しないでください。先に少なくとも以下を正本仕様へ追記し、レビューで確定します。
+
+- Random Section Definitionを永続的に識別する値
+- Random Candidate Definitionを永続的に識別する値
+- Candidateが通常AttackEventのIdentifier Contractを共有する範囲
+- 人間向けDisplay Codeを別に持つか
+- 並べ替え／Timing変更／再Import後も維持する範囲
+- 複製時の新規Identifier発行
+- 削除済みIdentifierの再利用可否
+- Section内およびMusicChart全体での一意性範囲
+
+この契約が未決のまま、Identifierに依存する保存、再Import追跡、Validation、Runtime Monitor接続を完成扱いにしません。
+
+契約確定後は、WorkbenchでSection／CandidateのIdentifierとDefinition順を確認でき、重複や欠落をValidationで検出できるようにします。
+
+### 2. Random SectionをTimeline上で表示・編集する
 
 PB-TASK-0012のTimelineへRandom Sectionの範囲を表示します。
 
@@ -67,7 +87,7 @@ PB-TASK-0012のTimelineへRandom Sectionの範囲を表示します。
 
 Sectionの範囲と音楽位置の関係が視覚的に分かるようにしてください。
 
-### 2. Candidate一覧を編集できるようにする
+### 3. Candidate一覧を編集できるようにする
 
 各Random SectionへAttackEvent Candidateを登録できるようにします。
 
@@ -86,13 +106,13 @@ CandidateはRandom専用の簡略データ型を新設せず、通常AttackEvent
 
 PB-TASK-0013のAttackEvent編集UIを可能な限り再利用してください。
 
-### 3. Random SectionとCandidateをTimeline上で確認する
+### 4. Random SectionとCandidateをTimeline上で確認する
 
 Section範囲と、その中に存在するCandidateを同じTimeline上で確認できるようにします。
 
 固定AttackEventとRandom Candidateも区別できるようにしてください。
 
-### 4. Random Section Validationを表示する
+### 5. Random Section Validationを表示する
 
 正本仕様に基づき、少なくとも以下の問題を確認できるようにします。
 
@@ -106,7 +126,7 @@ Section範囲と、その中に存在するCandidateを同じTimeline上で確�
 
 固定AttackEvent優先によってCandidateが使用されない状態は、正本仕様に従い少なくともWarningとして確認できるようにします。
 
-### 5. Validation対象へ移動できるようにする
+### 6. Validation対象へ移動できるようにする
 
 Validation一覧から、
 
@@ -116,7 +136,7 @@ Validation一覧から、
 
 へ移動できるようにします。
 
-### 6. 静的編集に限定する
+### 7. 静的編集に限定する
 
 本タスクではRandom SectionのDefinition作成・確認までを担当します。
 
@@ -124,6 +144,8 @@ Runtime抽選結果のLive表示や抽選シミュレーションは実装しま
 
 ## 対象範囲
 
+- Random Section／Candidate Identifier Contractの正本確定
+- Identifier／Definition順の表示と重複・欠落Validation
 - Random Section追加／削除／並べ替え
 - 開始／終了位置
 - 選択数
@@ -151,6 +173,10 @@ Runtime抽選結果のLive表示や抽選シミュレーションは実装しま
 
 ## 完了条件
 
+- [ ] Random Section／Candidate Identifier Contractが正本仕様で確定している
+- [ ] 未決方式を実装内だけで正本Identifierとして採用していない
+- [ ] Section／CandidateのIdentifierとDefinition順をWorkbenchで確認できる
+- [ ] Identifierの重複・欠落をValidationで検出できる
 - [ ] Random Sectionを作成・削除できる
 - [ ] Sectionの開始／終了位置を編集できる
 - [ ] Section範囲をTimeline上で確認できる
@@ -168,15 +194,19 @@ Runtime抽選結果のLive表示や抽選シミュレーションは実装しま
 
 ## 確認手順
 
-1. MusicChart上にRandom Sectionを作成し、開始／終了位置を設定します。
-2. 複数Candidateを登録し、それぞれChord／Arpeggio等を設定します。
-3. Timeline上でSection範囲とCandidate位置を確認します。
-4. 選択数を変更し、正しい設定が保存されることを確認します。
-5. CandidateをSection範囲外へ置き、Validation Error／Warningが表示されることを確認します。
-6. 選択数を不正値にし、Validationで検出できることを確認します。
-7. 固定AttackEventとCandidateを同位置へ置き、固定側優先に関するWarningを確認します。
-8. Validation項目から該当Section／Candidateへ移動できることを確認します。
-9. Validation後も値が自動修正されていないことを確認します。
+1. Random Section／Candidate Identifier Contractが正本仕様で確定済みであることを確認します。未確定なら先に仕様変更をレビューし、本タスク内だけで方式を決めないことを確認します。
+2. MusicChart上にRandom Sectionを作成し、開始／終了位置を設定します。
+3. 複数Candidateを登録し、それぞれChord／Arpeggio等を設定します。
+4. Section／CandidateのIdentifierとDefinition順を確認します。
+5. Section／Candidateを並べ替え、Timing変更、複製し、確定済み契約どおりにIdentifierが維持／新規発行されることを確認します。
+6. 重複または欠落Identifierを用意し、Validationで検出できることを確認します。
+7. Timeline上でSection範囲とCandidate位置を確認します。
+8. 選択数を変更し、正しい設定が保存されることを確認します。
+9. CandidateをSection範囲外へ置き、Validation Error／Warningが表示されることを確認します。
+10. 選択数を不正値にし、Validationで検出できることを確認します。
+11. 固定AttackEventとCandidateを同位置へ置き、固定側優先に関するWarningを確認します。
+12. Validation項目から該当Section／Candidateへ移動できることを確認します。
+13. Validation後も値が自動修正されていないことを確認します。
 
 ## 前提・依存タスク
 
@@ -199,6 +229,9 @@ MIDI再Import・Diff
         ↓
 PB-TASK-0015
 Random Section静的編集・Validation
+        ↓
+PB-TASK-0016
+Runtime Monitor
 ```
 
 ## 実装時の注意点
@@ -208,6 +241,8 @@ Random Section静的編集・Validation
 - Validationは正本仕様の結果を表示する役割に留めてください。
 - CandidateやSectionをValidation通過のために自動移動・削除しないでください。
 - Runtime抽選シミュレーションを本タスクの完成条件へ追加しないでください。
+- Random Section／Candidate Identifier Contractが未決なら正本仕様を先に更新し、このタスクのコード内だけで方式を正式決定しないでください。
+- 配列Index、Definition順、Section範囲、Candidate位置を、正本仕様の合意なく永続Identifierとして流用しないでください。
 - 後でRuntime Monitorへ接続できるよう、DefinitionとRuntime occurrenceを混同しない構造にしてください。
 
 ## 提出・報告方法

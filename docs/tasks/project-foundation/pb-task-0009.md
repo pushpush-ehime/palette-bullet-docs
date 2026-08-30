@@ -15,7 +15,7 @@ relatedSpecs:
 
 [PB-TASK-0008｜Gameplay Runtime Trace Core・Session・Event／Entity／Correlation ID・Snapshot](/tasks/project-foundation/pb-task-0008)で記録したTraceを、人間とAIが実際のデバッグに利用できる状態にします。
 
-このタスクでは、**Timeline Viewer、絞り込み、Event詳細表示、Session Summary、構造化Export、選択範囲Export**を担当します。
+このタスクでは、**Timeline Viewer、絞り込み、Event詳細表示、Session Summary、AI向け構造化Export、人間向け要約Export、選択範囲Export**を担当します。
 
 ## 完成時にできるようになること
 
@@ -25,6 +25,7 @@ relatedSpecs:
 - EntityやCorrelation ID等で問題に関係するEventだけへ絞り込める
 - Session全体の概要をSummaryで把握できる
 - TraceをAIが読める構造化データとしてExportできる
+- Traceの概要と主要Event経路を人間が読めるMarkdownまたは同等形式でExportできる
 - 問題周辺の時間範囲だけをTrace BundleとしてExportできる
 - Dropped Event等のTrace欠落情報もExport先で確認できる
 
@@ -111,7 +112,22 @@ JSON／JSONL、ファイル分割、ファイル名等の具体形式は実装�
 
 ただし、Event ID、時系列、Entity、Correlation、Payload、Snapshotとの対応関係が失われないようにしてください。
 
-### 6. 選択範囲Exportを実装する
+### 6. 人間向け要約Exportを実装する
+
+Session全体または選択範囲について、構造化データを直接開かなくても調査の入口にできるMarkdownまたは同等の人間可読形式をExportします。
+
+少なくとも以下を含めます。
+
+- Session／Build情報
+- 対象時間範囲
+- Event／Snapshot／Warning／Error／Dropped Event件数
+- 関連する主要Entity／Correlation ID
+- Traceに記録された主要Eventの時系列要約
+- 構造化Export内のEvent／Snapshotを特定できる参照情報
+
+人間向け要約はTimeline Viewerと同じTrace Modelから生成し、表示専用の別正本を作りません。また、Gameplay結果の正誤や原因を独自に判定・推測しません。
+
+### 7. 選択範囲Exportを実装する
 
 Session全体ではなく、問題が起きた前後だけをExportできるようにします。
 
@@ -121,6 +137,7 @@ Session全体ではなく、問題が起きた前後だけをExportできるよ�
 - 関連Snapshot
 - Entity／Correlation情報
 - Dropped Event等のTrace欠落情報
+- 同じ範囲から生成した人間向け要約
 
 AIへ毎回Session全体を渡さなくても調査できる状態を目標とします。
 
@@ -133,6 +150,7 @@ AIへ毎回Session全体を渡さなくても調査できる状態を目標と�
 - 基本Navigation
 - Session Summary
 - AI向け構造化Export
+- 人間向け要約Export
 - 選択時間範囲のTrace Bundle Export
 - ExportへのSession／Snapshot／Trace欠落情報の付与
 
@@ -160,6 +178,9 @@ AIへ毎回Session全体を渡さなくても調査できる状態を目標と�
 - [ ] Session Summaryを生成できる
 - [ ] SummaryがTrace内の記録事実を集計している
 - [ ] TraceをAI向け構造化形式でExportできる
+- [ ] Session全体または選択範囲の人間向け要約をExportできる
+- [ ] 人間向け要約から主要Eventと構造化データ上の識別子を追える
+- [ ] 人間向け要約がTraceにないGameplay判定や原因を生成しない
 - [ ] EventとSnapshot／Entity／Correlationの関係をExport後も追える
 - [ ] 選択した時間範囲だけをExportできる
 - [ ] ExportにSession MetadataとTrace欠落情報を含められる
@@ -172,7 +193,9 @@ AIへ毎回Session全体を渡さなくても調査できる状態を目標と�
 4. Entity／Correlation／CategoryでFilterし、対象Eventだけに絞れることを確認します。
 5. Session Summaryの件数が元Traceと一致することを確認します。
 6. Session全体を構造化Exportし、Event間の識別情報が保持されていることを確認します。
-7. 一部の時間範囲だけをExportし、関連SnapshotやSession情報と一緒に確認できることを確認します。
+7. 同じSessionを人間向け要約としてExportし、主要Event、件数、Entity／Correlation IDが元Traceと一致することを確認します。
+8. 一部の時間範囲だけをExportし、関連Snapshot、Session情報、人間向け要約を一緒に確認できることを確認します。
+9. 要約にTrace未記録の正誤判定や原因推測が追加されていないことを確認します。
 
 ## 前提・依存タスク
 
@@ -198,7 +221,8 @@ Timeline Viewer・Filter・Export
 ## 実装時の注意点
 
 - ViewerがGameplayの正誤を独自判定しないでください。
-- Summaryも、Traceに存在しない結果を推測しないでください。
+- Summaryおよび人間向け要約Exportも、Traceに存在しない結果や原因を推測しないでください。
+- 構造化Exportと人間向け要約は同じTrace Modelから生成し、別々の集計正本を作らないでください。
 - UIの見た目やLane構成の細部は実装担当判断で構いません。
 - Export用に表示文字列だけを保存するのではなく、Coreの構造化値を利用してください。
 - Trace量が多い場合でもFilterによって調査対象を絞れることを優先してください。

@@ -15,10 +15,13 @@ relatedSpecs:
 
 Planner Tuningの最終タスクとして、Excel Export後に**Unity側とExcel側の両方で変更が発生した場合でも、安全に差分を確認して反映できる仕組み**を完成させます。
 
+本タスクはPB-TASK-0006が生成した未反映Import Candidateを受け取り、Planner TuningのImport経路でTuning Dataへ値を確定反映する唯一のタスクです。
+
 また、Parameter Definitionの変更や削除によって、そのままImportできなくなったParameterを検出し、人間がMigration／保留／削除等を判断できる状態にします。
 
 ## 完成時にできるようになること
 
+- PB-TASK-0006からBase Snapshot／Excel Import Candidateを受け取り、Diff開始時点でUnity Current Snapshotを一度だけ取得できる
 - Base、Unity Current、Excelの3つを比較して変更状況を確認できる
 - Excelだけ変更、Unityだけ変更、同じ変更、Conflictを区別できる
 - Conflict時に自動上書きせず、人間が採用する値を選べる
@@ -47,7 +50,14 @@ Planner Tuningの最終タスクとして、Excel Export後に**Unity側とExcel
 
 ### 1. 3-way Diffを実装する
 
-PB-TASK-0006で保存したBase Snapshotと、Import時点のUnity Current、Excel Valueを比較します。
+PB-TASK-0006から次の2入力を受け取ります。
+
+- Excel Export時のBase Snapshot
+- Excel読込結果である未反映Import Candidate
+
+Unity Current Snapshotは**本タスクがDiff開始時点で一度だけ取得**し、Base Snapshot／Excel Import Candidateと合わせて3-way比較します。PB-TASK-0006が先行取得したUnity Current Snapshotを比較の正本として受け取らないでください。
+
+Unity Current SnapshotはDiff開始時点で一貫した状態として取得し、比較中の値変更によって判定が混在しないようにします。
 
 少なくとも以下を識別できるようにしてください。
 
@@ -101,6 +111,8 @@ Excel Export後にParameter Definitionが変化した場合、Current Valueの�
 
 変更内容によって再Export、Migration、人間確認等が必要か判断できる状態にしてください。
 
+PB-TASK-0006のBase Snapshotに保存したDefinition Metadata／Fingerprintを使用し、Import ValidationやParameterの意味・制約・編集可否に関係するDefinition変更を見落とさないようにします。
+
 ### 4. 危険な変更を暗黙処理しない
 
 特に以下は、自動変換して成功扱いにしないでください。
@@ -131,10 +143,14 @@ Migrationの内部データ形式やUIは実装担当判断とします。
 
 Diff、Validation、Conflict、Migration確認が完了したParameterだけを、最終的にTuning Dataへ反映できるようにします。
 
-未解決ConflictやMigration Requiredが残っている場合は、誤って一括確定しないようにしてください。
+Planner TuningのExcel Import経路では、**本タスクだけがTuning Dataへの確定反映を担当**します。PB-TASK-0006のExcel読込時には反映せず、本タスクで採用値が確定した後に一度だけcommitしてください。
+
+未解決ConflictやMigration Requiredが残っている場合は、誤って一括確定しないようにしてください。確定処理が失敗した場合も、Parameterの一部だけが反映された状態を残さないようにします。
 
 ## 対象範囲
 
+- PB-TASK-0006のBase Snapshot／Excel Import Candidate受取
+- Diff開始時点のUnity Current Snapshot取得
 - Base／Unity／Excelの3-way Diff
 - Conflict検出
 - Conflictの人間による解決
@@ -158,6 +174,8 @@ Diff、Validation、Conflict、Migration確認が完了したParameterだけを�
 
 ## 完了条件
 
+- [ ] PB-TASK-0006のBase Snapshot／Excel Import Candidateを入力にできる
+- [ ] Unity Current Snapshotを本タスクのDiff開始時点で一度だけ取得できる
 - [ ] Base／Unity／Excelの3-way比較ができる
 - [ ] No Change／Excel Changed／Unity Changed／Same Change／Conflictを区別できる
 - [ ] Conflictを自動Last-Write-Winsで解決しない
@@ -168,17 +186,21 @@ Diff、Validation、Conflict、Migration確認が完了したParameterだけを�
 - [ ] Definition変更時も既存Current Valueを不用意に失わない
 - [ ] Migrationが必要なParameterを人間が判断できる
 - [ ] 未解決Conflict／Migration Requiredを残したまま誤って確定しない
-- [ ] 解決後の値をTuning Dataへ安全に反映できる
+- [ ] 解決後の採用値を本タスクから一度だけTuning Dataへ安全に反映できる
+- [ ] PB-TASK-0006のExcel読込時点ではTuning Dataが変更されない
 
 ## 確認手順
 
-1. Base＝5、Unity＝5、Excel＝6で`Excel Changed`になることを確認します。
-2. Base＝5、Unity＝7、Excel＝5で`Unity Changed`になることを確認します。
-3. Base＝5、Unity＝6、Excel＝6で`Same Change`になることを確認します。
-4. Base＝5、Unity＝7、Excel＝6で`Conflict`になり、自動反映されないことを確認します。
-5. ConflictでUnity／Excelのどちらかを選び、選択した値だけが反映されることを確認します。
-6. Type、Range、ID等を変更したDefinitionを用意し、通常ImportではなくDefinition Changed／Migration対象として確認できることを確認します。
-7. DefinitionからParameterを削除し、保存済み値が即消去されずOrphaned／Missingとして確認できることを確認します。
+1. PB-TASK-0006でBase Snapshotと未反映Import Candidateを作成し、Excel読込だけではTuning Dataが変更されていないことを確認します。
+2. Diff開始直前にUnity Currentを変更し、その時点の値がUnity Current Snapshotへ取得されることを確認します。
+3. Base＝5、Unity＝5、Excel＝6で`Excel Changed`になることを確認します。
+4. Base＝5、Unity＝7、Excel＝5で`Unity Changed`になることを確認します。
+5. Base＝5、Unity＝6、Excel＝6で`Same Change`になることを確認します。
+6. Base＝5、Unity＝7、Excel＝6で`Conflict`になり、自動反映されないことを確認します。
+7. ConflictでUnity／Excelのどちらかを選び、確定操作後に選択した値が一度だけ反映されることを確認します。
+8. Type、Range、ID等を変更したDefinitionを用意し、通常ImportではなくDefinition Changed／Migration対象として確認できることを確認します。
+9. DefinitionからParameterを削除し、保存済み値が即消去されずOrphaned／Missingとして確認できることを確認します。
+10. 未解決項目または確定処理Errorがある場合、Tuning Dataが部分更新されないことを確認します。
 
 ## 前提・依存タスク
 
@@ -200,6 +222,8 @@ Planner Tuning 初期版完成
 
 ## 実装時の注意点
 
+- PB-TASK-0006ではExcel値をTuning Dataへ反映せず、本タスクで採用値を確定して一度だけ反映してください。
+- Unity Current Snapshotは本タスクがDiff開始時点で取得し、PB-TASK-0006側で先行取得した値を比較基準にしないでください。
 - ConflictをLast-Write-Winsで自動解決しないでください。
 - Range外値を自動Clampしないでください。
 - TypeやParameter IDを推測で自動Migrationしないでください。
