@@ -1,6 +1,6 @@
 ---
 title: "Planner Tuning Excel Export／Import・Validation・Base Snapshot"
-description: Planner向けExcelへの出力、編集済みExcelのImport、Import前Validation、Base Snapshot保存を実装し、安全なExcel往復を成立させる
+description: Planner向けExcelへの出力、編集済みExcelの読込候補生成、Import前Validation、Base Snapshot保存を実装し、後続3-way判定へ安全に引き渡す
 pageType: task
 taskId: PB-TASK-0006
 category: 開発基盤
@@ -15,17 +15,19 @@ relatedSpecs:
 
 [PB-TASK-0005｜Planner Tuning Core・Parameter Definition・Tuning Data基盤](/tasks/project-foundation/pb-task-0005)で管理できるようになったPlanner調整Parameterを、PlannerがExcelで確認・編集し、Unityへ戻せるようにします。
 
-このタスクでは、**Excelへの出力、Excelからの読込、Import前Validation、Base Snapshot保存**までを担当します。
+このタスクでは、**Excelへの出力、Excelからの読込、Import前Validation、未反映のImport Candidate生成、Base Snapshot保存**までを担当します。
+
+読み込んだExcel値のTuning Dataへの確定反映は行わず、PB-TASK-0007の3-way Diff／Conflict解決へ引き渡します。
 
 ## 完成時にできるようになること
 
 - Planner向けExcelをTuning Dataから生成できる
 - Plannerがコードを知らなくてもParameter名・説明・Current Valueを見て調整できる
-- Plannerが編集したExcelをUnityへ読み込める
-- ID、Type、Range等に問題があるExcelをImport前に止められる
-- Error時にTuning Dataが途中まで更新されない
-- Excel Export時点の値をBase Snapshotとして保持できる
-- 次タスクでBase／Unity／Excelの3-way Diffを行える状態になる
+- Plannerが編集したExcelを、Tuning Dataへ未反映のImport Candidateとして読み込める
+- ID、Type、Range等に問題があるExcelをImport Candidate確定前に止められる
+- Error時にも正常時にも、このタスクではTuning Dataを更新しない
+- Excel Export時点の値とDefinition状態をBase Snapshotとして保持できる
+- 次タスクへBase Snapshot／Unity Current／Excel Import Candidateを渡し、3-way Diffを行える状態になる
 
 ## 関連する仕様
 
@@ -63,13 +65,15 @@ Parameter IDやType等のProgrammer所有情報も照合用に保持しますが
 
 ExcelのSheet構成や見た目は実装担当判断とします。
 
-### 2. Excel Import
+### 2. Excel Import Candidateを生成する
 
-PlannerがCurrent Valueを編集したExcelをUnityへ読み込めるようにします。
+PlannerがCurrent Valueを編集したExcelをUnityへ読み込み、PB-TASK-0007へ渡す未反映のImport Candidateを生成します。
 
-ImportではParameter IDを基準にPB-TASK-0005のDefinition／Tuning Dataと照合してください。
+読込時はParameter IDを基準にPB-TASK-0005のDefinition／Tuning Dataと照合してください。Excelの各行について、少なくともParameter ID、Excel Value、Planner Note、検証結果を後続処理から参照できるようにします。
 
-全件を確認してからまとめて反映し、途中まで更新された状態を作らないようにします。
+全件を読み取り・ValidationしてからImport Candidateを成立させ、途中まで生成された候補を正式な入力として扱わないようにします。
+
+**本タスクではImport Candidateの値をTuning Dataへ反映しません。** 正常なExcelであっても、PB-TASK-0007がBase／Unity Current／Excelを比較し、必要なConflict／Migrationを解決した後にだけ確定反映します。
 
 ### 3. Import前Validation
 
@@ -96,31 +100,39 @@ Excel Export時点の状態を、次タスクの3-way Diffに利用できる形�
 
 - Parameter ID
 - Export時のCurrent Value
-- Export時のDefinitionを識別するために必要な情報
+- DefinitionのVersionまたは内容Fingerprint
+- Type
+- Default
+- Min／Max
+- Category
+- Source Binding
+- Status／Deprecated状態
+
+DefinitionのVersionを正式に持つ場合はその値を使用し、持たない場合は上記の比較対象から再現可能なFingerprintを生成します。
 
 Base SnapshotをExcel内、別Sheet、補助ファイル等のどこへ保持するかは実装担当判断とします。
 
 ### 5. 後続Conflict処理へ接続する
 
-このタスクではExcelとの安全な往復とValidationまでを完成させます。
+このタスクではExcelとの安全な往復、Validation、未反映Import Candidateの生成までを完成させます。
 
-次のタスクで、
+PB-TASK-0007へ次の3入力を明示的に渡します。
 
 ```text
-Base
-Unity Current
-Excel
+Base Snapshot
+Unity Current Snapshot
+Excel Import Candidate
 ```
 
-を比較し、Unity側とExcel側の両方が変更されている場合のDiff／Conflict処理を追加できる構造にしてください。
+PB-TASK-0007がこれらを比較し、Unity側とExcel側の両方が変更されている場合のDiff／Conflict処理と、解決後の確定反映を担当できる構造にしてください。
 
 ## 対象範囲
 
 - Planner向けExcel Export
 - Plannerが編集するCurrent Value／Planner Note
-- Excel Import
+- Excel読込と未反映Import Candidate生成
 - ID／Type／Range等のImport Validation
-- Error時の部分更新防止
+- Error時の不完全Candidate採用防止
 - Export時Base Snapshot
 - 後続3-way Diffへ渡すための情報保持
 
@@ -129,6 +141,7 @@ Excel
 - 3-way Diffの判定
 - Conflict検出・解決UI
 - Unity／Excelのどちらを採用するかの判断
+- Tuning Dataへの値の確定反映
 - Parameter ID変更のMigration
 - Type変更・Range変更等のDefinition Migration
 - Orphaned Parameterの最終削除処理
@@ -142,22 +155,24 @@ Excel
 
 - [ ] PB-TASK-0005のParameter Definition／Tuning DataからExcelを生成できる
 - [ ] PlannerがCurrent Valueを編集できる
-- [ ] 編集済みExcelをUnityへImportできる
+- [ ] 編集済みExcelから未反映のImport Candidateを生成できる
 - [ ] Parameter IDで正しいParameterへ照合できる
-- [ ] ID、Type、Range等の不正をImport前に検出できる
+- [ ] ID、Type、Range等の不正をImport Candidate成立前に検出できる
 - [ ] 不正値を暗黙Clampしない
-- [ ] Validation Error時にTuning Dataを部分更新しない
-- [ ] 正常なImportではCurrent Valueをまとめて反映できる
-- [ ] Export時のBase Snapshotを保存できる
-- [ ] Base Snapshotを次タスクの3-way Diffから利用できる
+- [ ] Validation Error時に不完全なImport Candidateを採用しない
+- [ ] 正常な読込でも本タスクではTuning Dataを変更しない
+- [ ] Export時のCurrent ValueとDefinition状態をBase Snapshotへ保存できる
+- [ ] Base Snapshot／Unity Current／Excel Import Candidateを次タスクから利用できる
 
 ## 確認手順
 
 1. PB-TASK-0005で作成した複数のTuning ParameterをExcelへExportします。
-2. ExcelでCurrent Valueを変更し、UnityへImportして値が反映されることを確認します。
-3. ID不正、Type不正、Range外値等を含むExcelをImportし、Errorとして止まることを確認します。
-4. Errorがある場合、既存Tuning Dataが途中まで更新されていないことを確認します。
-5. Export時のCurrent ValueがBase Snapshotとして保存されていることを確認します。
+2. ExcelでCurrent Valueを変更し、Unityへ読み込んでImport Candidateが生成されることを確認します。
+3. 読込後もTuning DataのCurrent Valueが変更されていないことを確認します。
+4. ID不正、Type不正、Range外値等を含むExcelを読み込み、Errorとして止まることを確認します。
+5. Errorがある場合、不完全なImport Candidateが採用されず、既存Tuning Dataも更新されていないことを確認します。
+6. Export後にUnity CurrentとExcel Valueを別々の値へ変更し、本タスクの読込時点ではどちらも上書きされないことを確認します。
+7. Export時のCurrent ValueとDefinition状態がBase Snapshotとして保存されていることを確認します。
 
 ## 前提・依存タスク
 
@@ -184,7 +199,7 @@ Diff・3-way Conflict・Definition変更・Migration
 
 - ExcelをParameter DefinitionやRuntime Valueの唯一の正本にしないでください。
 - Plannerが同じDefinitionをExcelへ手入力する仕組みにしないでください。
-- Importは全件Validation後にまとめて反映してください。
+- Excelは全件Validation後にImport Candidateとして確定し、Tuning Dataへの反映はPB-TASK-0007だけで行ってください。
 - Range外値等を自動補正して成功扱いにしないでください。
 - Excelの見た目、Sheet分割、Base Snapshotの保存方法等は実装担当判断で構いません。
 - 詳細なDefinition変更・Conflict処理は次タスクへ残してください。

@@ -27,6 +27,7 @@ PB-TASK-0012で作成するMusicChart WorkbenchのTimeline上で、AttackEvent�
 
 ## 完成時にできるようになること
 
+- 実装開始前に正本仕様上のAttackEvent Identifier Contractを確定できる
 - Timeline上でAttackEventを追加・選択・編集できる
 - Chord／Arpeggioを設定できる
 - MIDI Note表示からMusic Requirement Entryを設定できる
@@ -54,7 +55,25 @@ Workbench側でAttackEventのGameplay規則を再定義しないでください�
 
 ## 実施内容
 
-### 1. AttackEventをTimeline上で扱えるようにする
+### 1. 実装開始前にAttackEvent Identifier Contractを確定する
+
+[MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench)では、AttackEvent IDの最終方式とStable ID／Display Code方式の正式採用が未決事項です。
+
+実装開始時点でも未確定の場合は、GUID、配列Index、Fire Music Position、表示順等のいずれかを実装内だけで正本Identifierとして採用しないでください。先に少なくとも以下を正本仕様へ追記し、レビューで確定します。
+
+- AttackEvent Definitionを永続的に識別する値
+- 人間向けDisplay Codeを別に持つか
+- 並べ替え／Timing変更／再Import後も維持する範囲
+- 複製時の新規Identifier発行
+- 削除済みIdentifierの再利用可否
+- 同一Fire Music Position時に使用するDefinition順との関係
+- Random Candidateへ同じ方式を適用するか
+
+この契約が未決のまま、Identifierに依存する保存、再Import追跡、Runtime Monitor接続を完成扱いにしません。
+
+契約確定後は、WorkbenchでIdentifierとDefinition順を確認でき、重複や欠落をValidationで検出できるようにします。Identifierの生成・表示形式の細部は確定した正本契約の範囲内で実装担当判断とします。
+
+### 2. AttackEventをTimeline上で扱えるようにする
 
 PB-TASK-0012のTimelineへAttackEventを表示し、対象を選択して編集できるようにします。
 
@@ -66,11 +85,9 @@ PB-TASK-0012のTimelineへAttackEventを表示し、対象を選択して編集�
 - Fire Music Positionの設定
 - Chord／Arpeggioの設定
 
-同一Music Positionに複数のAttackEventが存在しても、別Eventとして識別できるようにしてください。
+同一Music Positionに複数のAttackEventが存在しても、確定済みIdentifier ContractとDefinition順によって別Eventとして識別できるようにしてください。
 
-識別子の最終形式は未決仕様を勝手に確定せず、現在のMusicChart構造に合わせて実装してください。
-
-### 2. Music Requirement Entryを編集できるようにする
+### 3. Music Requirement Entryを編集できるようにする
 
 PB-TASK-0012で表示したMIDI Noteを利用し、AttackEventへ必要なNoteを設定しやすくします。
 
@@ -83,13 +100,13 @@ PB-TASK-0012で表示したMIDI Noteを利用し、AttackEventへ必要なNote�
 
 Pitch Classを別の独立正本として二重入力させないでください。
 
-### 3. Harmony／Timing Overrideを編集できるようにする
+### 4. Harmony／Timing Overrideを編集できるようにする
 
 AttackEventに必要な手動設定として、正本仕様に存在するHarmonyやTiming Overrideを確認・編集できるようにします。
 
 設定項目の意味や成立条件はWorkbench側で独自判断せず、MusicChart／AttackEvent正本仕様に従ってください。
 
-### 4. Preview／Charge／Fire Timingを同一Timelineへ表示する
+### 5. Preview／Charge／Fire Timingを同一Timelineへ表示する
 
 選択したAttackEventについて、少なくとも以下を同じ時間軸上へ表示します。
 
@@ -103,7 +120,7 @@ Timing Overrideがある場合は、その結果として実際に使用され�
 
 system pre-roll、TempoMap、曲本編位置0との関係を崩さず表示します。
 
-### 5. Validation結果を表示する
+### 6. Validation結果を表示する
 
 MusicChart正本仕様で得られるValidation結果をWorkbench上へ表示します。
 
@@ -119,7 +136,7 @@ MusicChart正本仕様で得られるValidation結果をWorkbench上へ表示し
 
 Validation条件そのものをWorkbench専用ロジックとして二重実装しないでください。
 
-### 6. 問題箇所へ移動できるようにする
+### 7. 問題箇所へ移動できるようにする
 
 Validation一覧から対象を選択し、
 
@@ -131,7 +148,7 @@ Validation一覧から対象を選択し、
 
 大量のValidation結果があっても、どこを直せばよいか辿れる状態を目標とします。
 
-### 7. 自動補正を行わない
+### 8. 自動補正を行わない
 
 Validation Errorを解消するために、Workbenchが以下のような値を無断変更しないようにします。
 
@@ -146,6 +163,8 @@ Validation Errorを解消するために、Workbenchが以下のような値を�
 
 ## 対象範囲
 
+- AttackEvent Identifier Contractの正本確定
+- Identifier／Definition順の表示と重複・欠落Validation
 - AttackEventの追加・削除・選択・編集
 - Fire Music Position
 - Chord／Arpeggio
@@ -176,6 +195,10 @@ Validation Errorを解消するために、Workbenchが以下のような値を�
 
 ## 完了条件
 
+- [ ] AttackEvent Identifier Contractが正本仕様で確定している
+- [ ] 未決方式を実装内だけで正本Identifierとして採用していない
+- [ ] IdentifierとDefinition順をWorkbenchで確認できる
+- [ ] Identifierの重複・欠落をValidationで検出できる
 - [ ] Timeline上へAttackEventを表示できる
 - [ ] AttackEventを追加・削除・選択できる
 - [ ] Fire Music Positionを編集できる
@@ -194,14 +217,17 @@ Validation Errorを解消するために、Workbenchが以下のような値を�
 
 ## 確認手順
 
-1. PB-TASK-0012のWorkbenchでMusicChartを開きます。
-2. Chord AttackEventを追加し、MIDI Noteから複数のRequirement Entryを設定します。
-3. Arpeggio AttackEventを追加し、順序とEntry Timingを設定します。
-4. Preview／Charge受付開始／終了／FireがTimeline上で正しい順序と位置に表示されることを確認します。
-5. Timing Overrideを設定し、実効Timing表示が更新されることを確認します。
-6. 意図的に不正なTimingやNote設定を作り、Validation Error／Warningが表示されることを確認します。
-7. Validation項目から対象AttackEventと該当Timeline位置へ移動できることを確認します。
-8. Validation実行後も、不正値がWorkbenchによって勝手に修正されていないことを確認します。
+1. AttackEvent Identifier Contractが正本仕様で確定済みであることを確認します。未確定なら先に仕様変更をレビューし、本タスク内だけで方式を決めないことを確認します。
+2. PB-TASK-0012のWorkbenchでMusicChartを開き、IdentifierとDefinition順を確認します。
+3. Chord AttackEventを追加し、MIDI Noteから複数のRequirement Entryを設定します。
+4. Arpeggio AttackEventを追加し、順序とEntry Timingを設定します。
+5. AttackEventを並べ替え、Timing変更、複製し、確定済み契約どおりにIdentifierが維持／新規発行されることを確認します。
+6. 重複または欠落Identifierを用意し、Validationで検出できることを確認します。
+7. Preview／Charge受付開始／終了／FireがTimeline上で正しい順序と位置に表示されることを確認します。
+8. Timing Overrideを設定し、実効Timing表示が更新されることを確認します。
+9. 意図的に不正なTimingやNote設定を作り、Validation Error／Warningが表示されることを確認します。
+10. Validation項目から対象AttackEventと該当Timeline位置へ移動できることを確認します。
+11. Validation実行後も、不正値がWorkbenchによって勝手に修正されていないことを確認します。
 
 ## 前提・依存タスク
 
@@ -232,7 +258,8 @@ Runtime Monitor
 - Validation条件はMusicChart正本側と共有し、Workbench専用の別判定を増やさないでください。
 - exact MIDI Noteを基準とし、Pitch Classを二重入力させないでください。
 - Timing表示ではsystem pre-roll、Music Position、Audio位置を混同しないでください。
-- AttackEvent IDの未決事項を、このタスクだけで勝手に正式決定しないでください。
+- AttackEvent Identifier Contractが未決なら正本仕様を先に更新し、このタスクのコード内だけで方式を正式決定しないでください。
+- 配列Index、Definition順、Fire Music Positionを、正本仕様の合意なく永続Identifierとして流用しないでください。
 - 入力補助は行っても、AttackEvent内容の自動決定・自動補正は行わないでください。
 - 次タスクの再Import Diffでも同じAttackEventを追跡できる構造を意識してください。
 
