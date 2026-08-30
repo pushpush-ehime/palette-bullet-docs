@@ -255,4 +255,4 @@ Runtime Monitor
 ## 関連リンク
 
 - Notionタスク：<NotionTaskLink />
-- GitHub Pull Request：未登録
+- GitHub Pull Request：[pushpush-ehime/Palette-Bullet#33 MusicChart Workbench 基本画面・Timeline・MIDI・Audio Preview](https://github.com/pushpush-ehime/Palette-Bullet/pull/33)
