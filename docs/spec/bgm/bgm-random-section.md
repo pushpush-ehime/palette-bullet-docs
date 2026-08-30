@@ -83,6 +83,8 @@ Random Sectionは、基本的に以下の情報を持ちます。
 
 ```text
 Random Section
+├─ Stable ID
+├─ Display Code
 ├─ 開始位置
 ├─ 終了位置
 ├─ AttackEvent候補
@@ -92,6 +94,25 @@ Random Section
 AttackEvent候補そのもののデータ構造については、[BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)を正とします。
 
 MusicChart上での保持形式・入力責務については、[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)を正とします。
+
+---
+
+## Definition Identifier
+
+Random Section自身は、MusicChartへ保存する内部Stable IDと`RSEC-xxx`形式のDisplay Codeを持ちます。
+
+各Random Candidateは通常AttackEventと同じデータ構造を使用するため、Candidate専用の別IDではなく、AttackEvent共通のStable IDと`ATK-xxx`形式のDisplay Codeを使用します。
+
+Identifierは並べ替え、Section範囲変更、CandidateのSection間移動、MIDI再Importでは維持します。Section／Candidateを複製した場合は新しいIdentifierを発行し、削除済みIdentifierは再利用しません。
+
+Identifierは制作・Validation・ログ・Runtime occurrence追跡用であり、次のGameplay規則には使用しません。
+
+- Random抽選対象や選択確率
+- Candidateの処理順
+- 固定AttackEvent優先
+- BGM Loop時の再抽選結果
+
+保存・採番・Validationの詳細は[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)を正とします。
 
 ---
 
@@ -593,12 +614,15 @@ Gameplayとして採用する内容を決定
 
 主に、
 
+- Stable ID／Display Code
 - 開始位置
 - 終了位置
 - AttackEvent候補
 - 選択数
 
-をMusicChartへ設定できる状態にします。
+をMusicChartへ設定・保存できる状態にします。
+
+Identifierの欠落・重複をValidationで検出し、暗黙再採番で成功扱いにしません。
 
 また、
 
@@ -710,6 +734,9 @@ Gameplay側へ通知
 ## 基本ルール
 
 - Random Sectionは複数のAttackEvent候補から今回使用するEventを選択する
+- Random Sectionは専用Stable IDと`RSEC-xxx` Display Codeを持つ
+- Random Candidateは通常AttackEventと同じStable IDと`ATK-xxx` Display Codeを使用する
+- Identifierは抽選・処理順・固定AttackEvent優先を決定しない
 - AttackEvent自体のデータ構造は「BGM 攻撃イベント仕様」を正とする
 - Candidateの発生位置はRandom Sectionの範囲内に置く
 - 候補の音楽的妥当性はサウンド班が判断・提示する

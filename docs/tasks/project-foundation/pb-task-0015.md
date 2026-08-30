@@ -26,7 +26,7 @@ MusicChart Workbench上でRandom Sectionを静的データとして作成・編�
 
 ## 完成時にできるようになること
 
-- 実装開始前に正本仕様上のRandom Section／Candidate Identifier Contractを確定できる
+- 正本仕様で確定したRandom Section／Candidate Stable ID・Display Codeを保存・表示・Validationできる
 - Random Sectionを追加・削除・並べ替えできる
 - Sectionの開始／終了位置をTimeline上で確認・編集できる
 - Candidateを追加・削除・編集できる
@@ -53,24 +53,26 @@ Workbench側でRandom抽選規則を別仕様として再定義しないでく�
 
 ## 実施内容
 
-### 1. 実装開始前にRandom Section／Candidate Identifier Contractを確定する
+### 1. 確定済みRandom Section／Candidate Identifier Contractを実装する
 
-[MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench)では、Random SectionおよびRandom CandidateへStable ID／Display Code方式を採用するかが未決事項です。
+[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)、[BGM Random Section仕様](/spec/bgm/bgm-random-section)、[MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench)で確定したIdentifier Contractを使用します。
 
-実装開始時点でも未確定の場合は、GUID、配列Index、Section範囲、Candidate位置、表示順等を実装内だけで正本Identifierとして採用しないでください。先に少なくとも以下を正本仕様へ追記し、レビューで確定します。
+Random Sectionは次を持ちます。
 
-- Random Section Definitionを永続的に識別する値
-- Random Candidate Definitionを永続的に識別する値
-- Candidateが通常AttackEventのIdentifier Contractを共有する範囲
-- 人間向けDisplay Codeを別に持つか
-- 並べ替え／Timing変更／再Import後も維持する範囲
-- 複製時の新規Identifier発行
-- 削除済みIdentifierの再利用可否
-- Section内およびMusicChart全体での一意性範囲
+- 同一MusicChart内で衝突しない内部Stable ID
+- MusicChart単位で発行する`RSEC-xxx`形式のDisplay Code
 
-この契約が未決のまま、Identifierに依存する保存、再Import追跡、Validation、Runtime Monitor接続を完成扱いにしません。
+Random Candidateは通常AttackEventと同じデータ構造を使用し、Candidate専用の別ID形式を作りません。固定AttackEventと同じStable IDと共通の`ATK-xxx` Display Code系列を使用します。Identifierの発行・ValidationはPB-TASK-0013の共通基盤を再利用し、Candidate専用の別採番状態を作りません。
 
-契約確定後は、WorkbenchでSection／CandidateのIdentifierとDefinition順を確認でき、重複や欠落をValidationで検出できるようにします。
+Stable IDとDisplay Codeは作成時に一度だけ発行し、並べ替え、Section範囲／Candidate Timing変更、CandidateのSection間移動、MIDI再Importでは維持します。複製時と別MusicChartへのコピー時は新しいIdentifierを発行し、削除済みIdentifierを再利用しません。
+
+IdentifierはMusicChartの手動設定データへ保存し、Workbench専用SidecarやMIDIへ別正本として保存しません。削除済みDisplay Codeを再利用しないための次番号等の採番状態も、MusicChartの手動設定データへ保存します。
+
+Stable IDは固定AttackEvent、Random Candidate、Random Sectionを含む同一MusicChart全体で一意とし、Definition種別をまたぐ重複も許可しません。
+
+WorkbenchではSection／CandidateのStable ID、Display Code、Definition順を確認できるようにし、欠落・重複をValidation Errorとして検出します。既存データへの発行は明示的なMigration／修復操作で行い、Asset読込やMIDI再Import時に暗黙再生成しません。
+
+Identifierは追跡・表示用であり、Random抽選、Candidate順序、固定AttackEvent優先等のGameplay判定へ使用しません。
 
 ### 2. Random SectionをTimeline上で表示・編集する
 
@@ -144,8 +146,10 @@ Runtime抽選結果のLive表示や抽選シミュレーションは実装しま
 
 ## 対象範囲
 
-- Random Section／Candidate Identifier Contractの正本確定
-- Identifier／Definition順の表示と重複・欠落Validation
+- Random Section Stable ID／`RSEC-xxx`と採番状態の保存・発行・維持
+- Random Candidate共通AttackEvent Stable ID／`ATK-xxx`と採番状態の保存・発行・維持
+- Stable ID／Display Code／Definition順の表示と重複・欠落Validation
+- 既存データ向けの明示的Identifier Migration／修復
 - Random Section追加／削除／並べ替え
 - 開始／終了位置
 - 選択数
@@ -173,10 +177,16 @@ Runtime抽選結果のLive表示や抽選シミュレーションは実装しま
 
 ## 完了条件
 
-- [ ] Random Section／Candidate Identifier Contractが正本仕様で確定している
-- [ ] 未決方式を実装内だけで正本Identifierとして採用していない
-- [ ] Section／CandidateのIdentifierとDefinition順をWorkbenchで確認できる
-- [ ] Identifierの重複・欠落をValidationで検出できる
+- [ ] Random Sectionが内部Stable IDと`RSEC-xxx` Display Codeを保持できる
+- [ ] Random Candidateが通常AttackEventと同じStable ID契約と`ATK-xxx`系列を使用している
+- [ ] 並べ替え、Section範囲／Timing変更、Section間移動、MIDI再ImportでIdentifierが維持される
+- [ ] 複製と別MusicChartへのコピーでは新しいIdentifierが発行される
+- [ ] 削除済みIdentifierとDisplay Codeを再利用せず、採番状態をMusicChartへ保持する
+- [ ] Section／CandidateのStable ID／Display Code／Definition順をWorkbenchで確認できる
+- [ ] Stable ID／Display Codeの重複・欠落をValidation Errorとして検出できる
+- [ ] 固定AttackEvent、Random Candidate、Random SectionのStable ID重複をDefinition種別をまたいで検出できる
+- [ ] 既存データのIdentifierを明示的なMigration／修復で発行でき、読込時に暗黙再生成しない
+- [ ] IdentifierをRandom抽選・Candidate順序・固定AttackEvent優先へ使用していない
 - [ ] Random Sectionを作成・削除できる
 - [ ] Sectionの開始／終了位置を編集できる
 - [ ] Section範囲をTimeline上で確認できる
@@ -194,12 +204,12 @@ Runtime抽選結果のLive表示や抽選シミュレーションは実装しま
 
 ## 確認手順
 
-1. Random Section／Candidate Identifier Contractが正本仕様で確定済みであることを確認します。未確定なら先に仕様変更をレビューし、本タスク内だけで方式を決めないことを確認します。
+1. WorkbenchでRandom SectionのStable ID／`RSEC-xxx`と、CandidateのStable ID／`ATK-xxx`を確認します。
 2. MusicChart上にRandom Sectionを作成し、開始／終了位置を設定します。
 3. 複数Candidateを登録し、それぞれChord／Arpeggio等を設定します。
-4. Section／CandidateのIdentifierとDefinition順を確認します。
-5. Section／Candidateを並べ替え、Timing変更、複製し、確定済み契約どおりにIdentifierが維持／新規発行されることを確認します。
-6. 重複または欠落Identifierを用意し、Validationで検出できることを確認します。
+4. 固定AttackEventとRandom CandidateのDisplay Codeが同じ`ATK-xxx`系列で重複せず、Sectionが別の`RSEC-xxx`系列を使用することを確認します。
+5. Section／Candidateを並べ替え、Timing／範囲変更、Section間移動し、Identifierが維持されることを確認します。複製または別MusicChartへのコピーでは新しいIdentifierが発行され、削除後の新規作成でも削除済みDisplay Codeが再利用されないことを確認します。
+6. Stable ID／Display Codeの重複または欠落を用意し、固定AttackEvent、Candidate、Sectionの種別をまたぐStable ID重複を含めてValidation Errorとして検出できることを確認します。
 7. Timeline上でSection範囲とCandidate位置を確認します。
 8. 選択数を変更し、正しい設定が保存されることを確認します。
 9. CandidateをSection範囲外へ置き、Validation Error／Warningが表示されることを確認します。
@@ -241,8 +251,9 @@ Runtime Monitor
 - Validationは正本仕様の結果を表示する役割に留めてください。
 - CandidateやSectionをValidation通過のために自動移動・削除しないでください。
 - Runtime抽選シミュレーションを本タスクの完成条件へ追加しないでください。
-- Random Section／Candidate Identifier Contractが未決なら正本仕様を先に更新し、このタスクのコード内だけで方式を正式決定しないでください。
-- 配列Index、Definition順、Section範囲、Candidate位置を、正本仕様の合意なく永続Identifierとして流用しないでください。
+- Stable IDを機械参照の正本とし、Display Code、配列Index、Definition順、Section範囲、Candidate位置を永続参照Keyとして流用しないでください。
+- Stable ID／Display CodeをValidation通過のために暗黙再生成・再採番しないでください。
+- IdentifierをRandom抽選、Candidate順序、固定AttackEvent優先へ使用しないでください。
 - 後でRuntime Monitorへ接続できるよう、DefinitionとRuntime occurrenceを混同しない構造にしてください。
 
 ## 提出・報告方法

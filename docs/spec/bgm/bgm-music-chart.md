@@ -137,6 +137,8 @@ MusicChart
 │  └─ Charge Close Offset
 │
 ├─ Attack Events                      [手動設定]
+│  ├─ Stable ID
+│  ├─ Display Code
 │  ├─ Fire Music Position
 │  ├─ Type
 │  │  ├─ Chord
@@ -152,6 +154,8 @@ MusicChart
 │  └─ Timing Override [optional]
 │
 ├─ Random Sections                    [手動設定]
+│  ├─ Stable ID
+│  ├─ Display Code
 │  ├─ 開始位置
 │  ├─ 終了位置
 │  ├─ AttackEvent候補
@@ -913,12 +917,70 @@ Complete Chord判定やBuff発生条件は本ページでは再定義しませ�
 
 ---
 
+## Definition Identifier
+
+MusicChartへ手動設定する固定AttackEvent、Random Candidate、Random Sectionは、並べ替え、Timing変更、MIDI再Import、Runtime Monitor等で同じDefinitionを継続して追跡できるIdentifierを持ちます。
+
+本ページはMusicChartへ保存するIdentifierデータと不変条件を正本とし、Workbench上の表示・編集・Migration方法は[MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench)を正本とします。
+
+### AttackEvent Definition
+
+固定AttackEventとRandom Candidateは、共通のAttackEventデータ構造として次を持ちます。
+
+- 同一MusicChart内で衝突しない内部Stable ID
+- MusicChart内で人間が識別するDisplay Code：`ATK-001`、`ATK-002`等
+
+Random Candidate専用の別Identifier形式は作りません。固定AttackEventとRandom Candidateを合わせた同一MusicChart内のAttackEvent Definition全体で、Stable IDおよびDisplay Codeの重複を許可しません。
+
+### Random Section Definition
+
+Random Section自身は、AttackEventとは別に次を持ちます。
+
+- 同一MusicChart内で衝突しない内部Stable ID
+- MusicChart内で人間が識別するDisplay Code：`RSEC-001`、`RSEC-002`等
+
+Stable IDの一意性範囲は、固定AttackEvent、Random Candidate、Random Sectionを含む同一MusicChart全体です。Definition種別が異なっても、同じStable IDを使用しません。
+
+### 発行・維持規則
+
+Stable IDとDisplay CodeはDefinition作成時に一度だけ発行し、MusicChartの手動設定データとして保存します。
+
+以下では同じIdentifierを維持します。
+
+- 並べ替え
+- Fire Music Position／Section範囲／Timing／音楽的内容の変更
+- 同一MusicChart内での既存Definitionの移動
+- CandidateのSection間移動
+- MIDI再Import
+
+Definitionの複製および別MusicChartへのコピーでは、新しいStable IDとDisplay Codeを発行します。削除済みIdentifierは同じMusicChart内の別Definitionへ再利用しません。
+
+Display CodeはMusicChart単位の単調増加連番とし、`ATK`系列と`RSEC`系列で別々に採番します。固定AttackEventとRandom Candidateは同じ`ATK`採番状態を共有します。番号は1起点の10進数を最低3桁でゼロ埋めし、999を超えた場合も桁を増やして継続します。
+
+別MusicChartでは同じDisplay CodeおよびStable IDが存在し得ます。同一MusicChart内の機械参照にはStable IDを使用し、MusicChartをまたぐ参照ではMusicChart AssetのIdentityとStable IDを組み合わせます。人間向け参照ではMusicChart名とDisplay Codeを組み合わせます。
+
+削除済みDisplay Codeを再利用しないため、次番号等の採番状態もMusicChartの手動設定データとして保持します。採番状態の具体的なデータ表現はImplementation Decisionです。
+
+既存データにIdentifierがない場合は、明示的な一回限りのMigrationまたは修復操作で発行します。Asset読込、画面表示、MIDI再Importのたびに暗黙発行・再発行しません。
+
+### Gameplay規則との分離
+
+Stable IDおよびDisplay Codeは追跡・表示・Validation用であり、Gameplayの処理順、Random抽選、固定AttackEvent優先等を決定しません。
+
+AttackEventの論理順は従来どおりFire Music Positionを基準とし、同一位置ではMusicChart定義順を使用します。
+
+Runtime occurrenceは、少なくともAttackEvent DefinitionのStable IDとLoop occurrenceを対応付けて識別します。所有MusicChartの外へ持ち出す場合はMusicChartのIdentityも含めます。具体的なRuntime ID型は実装へ委譲します。
+
+---
+
 ## Fixed AttackEvent / Random Candidateの共通構造
 
 通常配置する固定AttackEventと、Random Section内のAttackEvent Candidateで、別々のAttackEventデータ形式は作りません。
 
 Random Candidateも通常AttackEventと同じ構造を使用し、少なくとも以下を表現できるようにします。
 
+- Stable ID
+- Display Code
 - `Fire Music Position`
 - `Type`
 - `Music Requirement Entries`
@@ -937,6 +999,8 @@ Random SectionはMIDIから自動生成せず、MusicChartへ手動設定しま�
 
 ```text
 Random Section
+├─ Stable ID
+├─ Display Code
 ├─ 開始位置
 ├─ 終了位置
 ├─ AttackEvent候補
@@ -1260,6 +1324,8 @@ MIDI側の、
 
 MIDIを再Importしても、Unity上で手動設定したデータは自動的に削除・上書きしません。
 
+AttackEvent、Random Candidate、Random SectionのStable IDとDisplay Codeも手動設定データとして維持し、再Import時に再発行・再採番しません。
+
 ただし、
 
 > **保持されることと、再Import後も内容が正しいことは別です。**
@@ -1359,6 +1425,10 @@ Editorの`OnValidate`、保存前処理、Import後処理、専用validation com
 5. 各AttackEventのPreview開始がBattle音楽runtime開始点より前へはみ出さない。特に最初のAttackEventを必ず確認する
 6. 各AttackEventのCharge受付開始がBattle音楽runtime開始点より前へはみ出さない。特に最初のAttackEventを必ず確認する
 7. AttackEvent個別Overrideを使用する場合も、解決後の実効値で同じ条件を満たす
+8. 固定AttackEventとRandom Candidateを含むすべてのAttackEvent DefinitionがStable IDとDisplay Codeを持ち、`ATK-xxx` Display Codeが同一MusicChart内で重複していない
+9. すべてのRandom Section DefinitionがStable IDとDisplay Codeを持ち、`RSEC-xxx` Display Codeが同一MusicChart内で重複していない
+10. 固定AttackEvent、Random Candidate、Random SectionのStable IDが、Definition種別をまたいで同一MusicChart内で重複していない
+11. Display CodeがAttackEventでは`ATK-xxx`、Random Sectionでは`RSEC-xxx`の採番契約を満たす
 
 Preview開始とCharge受付開始へ同じOffsetを使用する現行構造では、両者の同時成立を許可します。その他の境界についてもGameplay仕様が同時成立を許可する場合は等号を使用できますが、時間順を逆転させてはいけません。
 
@@ -1392,8 +1462,9 @@ Battle音楽runtime開始点以後か確認
 - Battle音楽runtime開始点より前のPreview／Charge処理を黙って破棄する
 - `Fire Music Position`またはTiming OffsetをRuntimeで自動移動する
 - BGM AudioまたはMIDIへ無音を自動挿入して辻褄を合わせる
+- 欠落・重複したIdentifierをAsset読込、MIDI再Import、Runtime開始時に暗黙再生成して成功扱いにする
 
-validation errorは、system pre-roll時間、AttackEvent Timing Settings、個別Override、Fire Music Position、または元の音楽データを明示的に修正して解消します。
+validation errorは、system pre-roll時間、AttackEvent Timing Settings、個別Override、Fire Music Position、元の音楽データを明示的に修正するか、Identifier Migration／修復操作を明示的に実行して解消します。
 
 具体的なError表示、保存を拒否するか警告付きで保存可能にするか、Build validationへ接続するかはEditor／Implementation Decisionとします。ただし、errorを無視してRuntimeで暗黙補正した状態を正式挙動にしてはいけません。
 
@@ -1553,6 +1624,12 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 MusicChartに必要な主要データ契約は確定しています。
 
 残る未決事項は、主に実装表現・調整値です。
+
+### Stable IDのC#表現
+
+Stable IDを`string`、GUID専用型、`Hash128`、専用Value Object等のどれで表現するかはImplementation Decisionです。
+
+ただし、作成後に維持されること、同一MusicChart内で衝突しないこと、複製時に新規発行すること、削除済みIDを再利用しないことは確定仕様です。
 
 ### exact MIDI NoteのC#表現
 

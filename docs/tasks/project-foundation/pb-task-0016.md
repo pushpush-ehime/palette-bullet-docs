@@ -109,7 +109,7 @@ system pre-roll中は、Audioが未再生で音源位置0にあることを正�
 
 Runtime本体が現在処理対象として確定したAttackEventについて、少なくとも以下を表示します。
 
-- AttackEvent DefinitionのIdentifierと、契約で採用する場合はDisplay Code
+- AttackEvent DefinitionのStable IDとDisplay Code
 - MusicChart上のDefinition順
 - 今回のRuntime occurrence
 - Fire Music Position
@@ -118,7 +118,7 @@ Runtime本体が現在処理対象として確定したAttackEventについて�
 - Fire待ち／Fire済み／対象外等の状態
 - Fireまでの残り時間
 
-Identifierと、契約で採用する場合のDisplay Codeは、PB-TASK-0013で正本仕様へ確定したIdentifier Contractを使用します。Runtime Monitor用の別Identifierを作りません。
+Stable IDとDisplay Codeは、PB-TASK-0013で実装する正本Identifier Contractを使用します。Runtime Monitor用の別Identifierを作りません。
 
 Current AttackEvent、Preview、Charge受付、Fire状態はRuntime本体の確定値を表示し、Workbench側でMusicChart定義と現在時刻から独自に成立判定しません。
 
@@ -134,7 +134,7 @@ Fireまでの残り時間は正式なMusicChart時計とTempoMapを用い、Temp
 
 Random Section内では、Runtime抽選で実際に選択されたCandidateを表示します。Workbench側でRandom抽選を再実行したり、同じSeedから結果を再計算して表示値を作ったりしません。
 
-Random Section／CandidateのIdentifierはPB-TASK-0015で正本仕様へ確定した契約を使用します。Identifier Contractが未確定の場合は、PB-TASK-0013／0015のGateを先に完了させます。
+Random Section／CandidateのStable IDとDisplay CodeはPB-TASK-0015で実装する正本Identifier Contractを使用します。Random Candidateは通常AttackEventと同じ`ATK-xxx`系列、Random Sectionは`RSEC-xxx`系列として表示します。
 
 ### 5. シャオンダマ先行生成状況を表示する
 
@@ -228,7 +228,7 @@ Gameplay Runtime Traceが利用可能な場合に共通Identifier等を表示へ
 - [ ] MusicChart時計と実際のAudio再生位置を別々に確認できる
 - [ ] system pre-rollを考慮した期待Audio位置と同期差を確認できる
 - [ ] pre-roll中のAudio未再生を異常な同期差として扱わない
-- [ ] Current AttackEvent DefinitionとRuntime occurrenceを区別できる
+- [ ] Current AttackEvent DefinitionのStable ID／Display CodeとRuntime occurrenceを区別できる
 - [ ] Preview／Charge受付／Fire状態をRuntime確定値から確認できる
 - [ ] Tempo変更をまたぐFireまでの残り時間を確認できる
 - [ ] 現在のLoop occurrenceを確認できる
@@ -291,7 +291,8 @@ Runtime Monitor
 - Fireまでの残り時間はAudio位置だけから算出しないでください。
 - Random CandidateをWorkbench側で再抽選しないでください。
 - Shaondama供給のReady／ShortageをWorkbench側で再判定しないでください。
-- IdentifierはPB-TASK-0013／0015で確定した契約を使用し、Runtime Monitor専用方式を作らないでください。
+- IdentifierはPB-TASK-0013／0015で実装するStable ID／Display Code契約を使用し、Runtime Monitor専用方式を作らないでください。
+- Runtime occurrenceはDefinitionのStable IDとLoop occurrenceを対応付け、Display Codeだけを機械参照Keyにしないでください。
 - Gameplay Runtime TraceのSession／Timeline／Export機能を重複実装しないでください。
 - UI Toolkit／IMGUI、同一WindowのTab／別Window等は実装担当判断で構いません。
 - 更新負荷がGameplay Timingへ影響しないよう、表示更新頻度やデータ転送量を調整してください。
