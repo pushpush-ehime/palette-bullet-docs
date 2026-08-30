@@ -31,6 +31,7 @@ MusicChart WorkbenchからMIDIを再Importしたときに、
 - Tempo／拍子／Track／Noteの変更点を確認できる
 - MIDI由来データは新しいImport結果へ更新される
 - AttackEvent等の手動設定は再Importだけでは勝手に書き換わらない
+- AttackEvent／Random Section／CandidateのStable IDとDisplay Codeを再Import後も維持できる
 - 変更されたTrack／Note／Tempo周辺に関係する設定を「影響候補」として確認できる
 - どのAttackEventやRandom Sectionを再確認すべきか辿れる
 - 差分・影響候補からTimeline上の対象位置へ移動できる
@@ -77,6 +78,8 @@ MIDI再Import時に何を更新し、何を保持するかは[BGM MusicChart仕�
 - system pre-roll
 - AttackEvent Timing Settings
 - AttackEvent
+- AttackEvent／Random CandidateのStable IDとDisplay Code
+- Random SectionのStable IDとDisplay Code
 - Music Requirement Entries
 - Harmony
 - Timing Override
@@ -95,6 +98,8 @@ MIDI由来データ
 ```
 
 という状態を明確にします。
+
+Stable IDとDisplay CodeはMusicChartの手動設定データとして保持し、MIDI再Importを理由に再発行・再採番しません。
 
 ### 3. MIDI差分を確認できるようにする
 
@@ -133,6 +138,8 @@ MIDI差分を基に、既存の手動設定のうち再確認した方がよい�
 
 「影響候補」は自動修正対象ではありません。
 
+影響候補のAttackEvent、Random Section、Random Candidateは、正本のStable IDで追跡します。Display Codeは人間向け表示に使用し、Timeline位置、配列Index、Definition順だけを永続的な照合Keyにしません。
+
 ### 5. 差分・影響候補から対象位置へ移動できるようにする
 
 差分一覧または影響候補から、
@@ -156,6 +163,8 @@ PB-TASK-0013で実装したValidation表示を再利用してください。
 - MIDI再Import操作
 - MIDI由来データの更新
 - 手動設定データの保持
+- Stable ID／Display Codeと採番状態の維持
+- Stable IDを使用した影響候補追跡
 - Tempo／拍子／Track／Note Diff
 - 影響候補抽出
 - 影響候補一覧
@@ -179,6 +188,10 @@ PB-TASK-0013で実装したValidation表示を再利用してください。
 - [ ] WorkbenchからMIDIを再Importできる
 - [ ] MIDI由来データが新しいImport結果へ更新される
 - [ ] 既存の手動設定が再Importだけでは変更されない
+- [ ] AttackEvent／Random CandidateのStable IDと`ATK-xxx` Display Codeが維持される
+- [ ] Random SectionのStable IDと`RSEC-xxx` Display Codeが維持される
+- [ ] `ATK-xxx`／`RSEC-xxx`の採番状態が維持される
+- [ ] 影響候補をStable IDで追跡し、Display Codeで人間が識別できる
 - [ ] Tempo／拍子の差分を確認できる
 - [ ] Track追加／削除／変更を確認できる
 - [ ] Note追加／削除／位置／Pitch等の変更を確認できる
@@ -192,12 +205,13 @@ PB-TASK-0013で実装したValidation表示を再利用してください。
 
 1. AttackEventやShaondama使用Trackを設定したMusicChartを用意します。
 2. 元MIDIのTempo、Track、Noteを一部変更したMIDIを再Importします。
-3. MIDI由来データだけが更新され、手動設定が保持されることを確認します。
-4. Tempo／Track／Noteの各差分が一覧で確認できることを確認します。
-5. 変更されたNoteに関係するAttackEvent等が影響候補として表示されることを確認します。
-6. 差分項目から該当Timeline位置へ移動できることを確認します。
-7. Validationを実行し、新しいMIDIとの不整合を確認できることを確認します。
-8. Workbenchが設定値を自動補正していないことを確認します。
+3. MIDI由来データだけが更新され、手動設定、Identifier、Display Code採番状態が保持されることを確認します。
+4. 再Import前後でAttackEvent／CandidateのStable IDと`ATK-xxx`、Random SectionのStable IDと`RSEC-xxx`が一致することを確認します。
+5. Tempo／Track／Noteの各差分が一覧で確認できることを確認します。
+6. 変更されたNoteに関係するAttackEvent等がStable IDで影響候補として追跡され、Display Code付きで表示されることを確認します。
+7. 差分項目から該当Timeline位置へ移動できることを確認します。
+8. Validationを実行し、新しいMIDIとの不整合を確認できることを確認します。
+9. Workbenchが設定値やIdentifierを自動補正・再採番していないことを確認します。
 
 ## 前提・依存タスク
 
@@ -220,6 +234,8 @@ MIDI再Import・Diff・影響候補確認
 ## 実装時の注意点
 
 - MIDI由来データと手動設定データの境界を崩さないでください。
+- Stable ID／Display CodeをMIDI由来データとして扱わず、再Importで再発行・再採番しないでください。
+- 影響候補の追跡にはStable IDを使用し、Display Code、位置、配列Indexだけで照合しないでください。
 - 再Importを「新MIDIに合わせて既存設定を自動で直す機能」にしないでください。
 - Diffは確認支援であり、Gameplay仕様の正誤判定ではありません。
 - NoteやTrackの類似性だけで勝手に参照先を置換しないでください。

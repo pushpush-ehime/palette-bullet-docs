@@ -27,7 +27,7 @@ PB-TASK-0012で作成するMusicChart WorkbenchのTimeline上で、AttackEvent�
 
 ## 完成時にできるようになること
 
-- 実装開始前に正本仕様上のAttackEvent Identifier Contractを確定できる
+- 正本仕様で確定したAttackEvent Stable ID／Display Codeを保存・表示・Validationできる
 - Timeline上でAttackEventを追加・選択・編集できる
 - Chord／Arpeggioを設定できる
 - MIDI Note表示からMusic Requirement Entryを設定できる
@@ -55,23 +55,27 @@ Workbench側でAttackEventのGameplay規則を再定義しないでください�
 
 ## 実施内容
 
-### 1. 実装開始前にAttackEvent Identifier Contractを確定する
+### 1. 確定済みAttackEvent Identifier Contractを実装する
 
-[MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench)では、AttackEvent IDの最終方式とStable ID／Display Code方式の正式採用が未決事項です。
+[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)と[MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench)で確定したIdentifier Contractを使用します。
 
-実装開始時点でも未確定の場合は、GUID、配列Index、Fire Music Position、表示順等のいずれかを実装内だけで正本Identifierとして採用しないでください。先に少なくとも以下を正本仕様へ追記し、レビューで確定します。
+各固定AttackEventとRandom Candidateについて、少なくとも以下を扱います。
 
-- AttackEvent Definitionを永続的に識別する値
-- 人間向けDisplay Codeを別に持つか
-- 並べ替え／Timing変更／再Import後も維持する範囲
-- 複製時の新規Identifier発行
-- 削除済みIdentifierの再利用可否
-- 同一Fire Music Position時に使用するDefinition順との関係
-- Random Candidateへ同じ方式を適用するか
+- 同一MusicChart内で衝突しない内部Stable ID
+- MusicChart単位で発行する`ATK-xxx`形式のDisplay Code
+- MusicChart上のDefinition順
 
-この契約が未決のまま、Identifierに依存する保存、再Import追跡、Runtime Monitor接続を完成扱いにしません。
+固定AttackEventとRandom Candidateは同じAttackEvent Identifier契約と`ATK-xxx`系列を使用し、Candidate専用の別ID形式を作りません。
 
-契約確定後は、WorkbenchでIdentifierとDefinition順を確認でき、重複や欠落をValidationで検出できるようにします。Identifierの生成・表示形式の細部は確定した正本契約の範囲内で実装担当判断とします。
+Stable IDとDisplay Codeは作成時に一度だけ発行し、並べ替え、Fire位置変更、Note／Harmony／Timing変更、同一MusicChart内の移動、MIDI再Importでは維持します。複製時と別MusicChartへのコピー時は新しいIdentifierを発行し、削除済みIdentifierを再利用しません。
+
+IdentifierはMusicChartの手動設定データへ保存し、Workbench専用SidecarやMIDIへ別正本として保存しません。削除済みDisplay Codeを再利用しないための次番号等の採番状態も、MusicChartの手動設定データへ保存します。
+
+Stable IDは、PB-TASK-0015で扱うRandom Sectionも含む同一MusicChart全体で一意になる契約です。PB-TASK-0013では少なくとも固定AttackEventとRandom Candidateの発行・Validationへこの契約を適用します。
+
+WorkbenchではStable ID、Display Code、Definition順を確認できるようにし、Stable ID／Display Codeの欠落・重複をValidation Errorとして検出します。既存データへの発行は明示的なMigration／修復操作で行い、Asset読込やMIDI再Import時に暗黙再生成しません。
+
+Stable IDとDisplay Codeは追跡・表示用です。Gameplayの論理順は従来どおりFire Music PositionとMusicChart定義順で決定し、Identifierを順序判定へ使用しません。
 
 ### 2. AttackEventをTimeline上で扱えるようにする
 
@@ -163,8 +167,9 @@ Validation Errorを解消するために、Workbenchが以下のような値を�
 
 ## 対象範囲
 
-- AttackEvent Identifier Contractの正本確定
-- Identifier／Definition順の表示と重複・欠落Validation
+- AttackEvent Stable ID／Display Codeと採番状態の保存・発行・維持
+- Stable ID／Display Code／Definition順の表示と重複・欠落Validation
+- 既存データ向けの明示的Identifier Migration／修復
 - AttackEventの追加・削除・選択・編集
 - Fire Music Position
 - Chord／Arpeggio
@@ -184,7 +189,7 @@ Validation Errorを解消するために、Workbenchが以下のような値を�
 - MIDI再Import／Diff
 - 再Import影響候補確認
 - Random Section編集
-- Random Candidate専用作業
+- Random Candidate専用の編集UI（共通AttackEvent Identifier基盤は対象内）
 - Runtime Monitor
 - AttackEventの自動生成
 - 音楽的に適切なAttackEventの自動判断
@@ -195,10 +200,15 @@ Validation Errorを解消するために、Workbenchが以下のような値を�
 
 ## 完了条件
 
-- [ ] AttackEvent Identifier Contractが正本仕様で確定している
-- [ ] 未決方式を実装内だけで正本Identifierとして採用していない
-- [ ] IdentifierとDefinition順をWorkbenchで確認できる
-- [ ] Identifierの重複・欠落をValidationで検出できる
+- [ ] 固定AttackEventとRandom Candidateが内部Stable IDと`ATK-xxx` Display Codeを保持できる
+- [ ] 固定AttackEventとRandom Candidateが同じIdentifier契約とDisplay Code系列を使用している
+- [ ] 並べ替え、Timing変更、同一MusicChart内の移動、MIDI再ImportでIdentifierが維持される
+- [ ] 複製と別MusicChartへのコピーでは新しいIdentifierが発行される
+- [ ] 削除済みIdentifierとDisplay Codeを再利用せず、採番状態をMusicChartへ保持する
+- [ ] Stable ID／Display Code／Definition順をWorkbenchで確認できる
+- [ ] Stable ID／Display Codeの重複・欠落をValidation Errorとして検出できる
+- [ ] 既存データのIdentifierを明示的なMigration／修復で発行でき、読込時に暗黙再生成しない
+- [ ] IdentifierをGameplayの順序判定へ使用していない
 - [ ] Timeline上へAttackEventを表示できる
 - [ ] AttackEventを追加・削除・選択できる
 - [ ] Fire Music Positionを編集できる
@@ -217,17 +227,19 @@ Validation Errorを解消するために、Workbenchが以下のような値を�
 
 ## 確認手順
 
-1. AttackEvent Identifier Contractが正本仕様で確定済みであることを確認します。未確定なら先に仕様変更をレビューし、本タスク内だけで方式を決めないことを確認します。
-2. PB-TASK-0012のWorkbenchでMusicChartを開き、IdentifierとDefinition順を確認します。
+1. PB-TASK-0012のWorkbenchでMusicChartを開き、Stable ID、`ATK-xxx` Display Code、Definition順を確認します。
+2. 固定AttackEventとRandom CandidateのDisplay Codeが同じ`ATK-xxx`系列から発行されることを確認します。
 3. Chord AttackEventを追加し、MIDI Noteから複数のRequirement Entryを設定します。
 4. Arpeggio AttackEventを追加し、順序とEntry Timingを設定します。
-5. AttackEventを並べ替え、Timing変更、複製し、確定済み契約どおりにIdentifierが維持／新規発行されることを確認します。
-6. 重複または欠落Identifierを用意し、Validationで検出できることを確認します。
-7. Preview／Charge受付開始／終了／FireがTimeline上で正しい順序と位置に表示されることを確認します。
-8. Timing Overrideを設定し、実効Timing表示が更新されることを確認します。
-9. 意図的に不正なTimingやNote設定を作り、Validation Error／Warningが表示されることを確認します。
-10. Validation項目から対象AttackEventと該当Timeline位置へ移動できることを確認します。
-11. Validation実行後も、不正値がWorkbenchによって勝手に修正されていないことを確認します。
+5. AttackEventを並べ替え、Timing変更、同一MusicChart内で移動し、Identifierが維持されることを確認します。
+6. AttackEventを複製または別MusicChartへコピーし、新しいIdentifierが発行されることを確認します。削除後に新規作成しても、削除済みDisplay Codeが再利用されないことを確認します。
+7. Stable ID／Display Codeの重複または欠落を用意し、Validation Errorとして検出できることを確認します。
+8. 既存データ向けMigration／修復を実行し、明示的な操作時だけIdentifierが発行されることを確認します。
+9. Preview／Charge受付開始／終了／FireがTimeline上で正しい順序と位置に表示されることを確認します。
+10. Timing Overrideを設定し、実効Timing表示が更新されることを確認します。
+11. 意図的に不正なTimingやNote設定を作り、Validation Error／Warningが表示されることを確認します。
+12. Validation項目から対象AttackEventと該当Timeline位置へ移動できることを確認します。
+13. Validation実行後も、不正値がWorkbenchによって勝手に修正されていないことを確認します。
 
 ## 前提・依存タスク
 
@@ -258,8 +270,9 @@ Runtime Monitor
 - Validation条件はMusicChart正本側と共有し、Workbench専用の別判定を増やさないでください。
 - exact MIDI Noteを基準とし、Pitch Classを二重入力させないでください。
 - Timing表示ではsystem pre-roll、Music Position、Audio位置を混同しないでください。
-- AttackEvent Identifier Contractが未決なら正本仕様を先に更新し、このタスクのコード内だけで方式を正式決定しないでください。
-- 配列Index、Definition順、Fire Music Positionを、正本仕様の合意なく永続Identifierとして流用しないでください。
+- Stable IDを機械参照の正本とし、Display Code、配列Index、Definition順、Fire Music Positionを永続参照Keyとして流用しないでください。
+- Stable ID／Display CodeをValidation通過のために暗黙再生成・再採番しないでください。
+- IdentifierをGameplay順序やAttackEvent成立判定へ使用しないでください。
 - 入力補助は行っても、AttackEvent内容の自動決定・自動補正は行わないでください。
 - 次タスクの再Import Diffでも同じAttackEventを追跡できる構造を意識してください。
 

@@ -372,13 +372,13 @@ Pitch Classを別の独立した正本値として二重入力させません。
 
 ## AttackEvent ID
 
-AttackEvent IDの最終方式は未確定です。
+AttackEvent IDの最終方式として、**内部用Stable IDと人間向けDisplay Codeの併用を正式採用します。**
 
-ただし、複数の担当者による確認、Validation、ログ、Runtime Monitor、
-再Import後の追跡を考えると、
-並べ替えやTiming変更で簡単に変化しない識別方法が必要です。
+複数の担当者による確認、Validation、ログ、Runtime Monitor、
+再Import後の追跡で同じDefinitionを見失わないよう、
+並べ替えやTiming変更で簡単に変化しないことを採用条件とします。
 
-### 考えられる方式
+### 検討した方式
 
 - 配列番号
 - MusicChart定義順
@@ -387,9 +387,9 @@ AttackEvent IDの最終方式は未確定です。
 - 内容Hash
 - GUID等の編集に依存しないStable ID
 
-### 現在の推奨案
+### 正式採用する方式
 
-内部用Stable IDと、人間向けDisplay Codeを併用する案を推奨します。
+内部用Stable IDと、人間向けDisplay Codeを併用します。
 
 ```text
 AttackEvent
@@ -401,13 +401,15 @@ AttackEvent
    └─ 任意の説明名
 ```
 
-Stable IDは、以下の条件を満たす案とします。
+Stable IDは正本となる永続Identifierとして、以下の条件を満たします。
 
-- AttackEvent作成時に一度だけ生成する
+- AttackEvent作成時に一度だけ、同一MusicChart内で衝突しない値を生成する
 - 並べ替えで変更しない
 - Fire位置を変更しても変更しない
 - Note、Harmony、Timingを変更しても変更しない
-- 複製時は新しいIDを発行する
+- MIDI再Importで変更しない
+- 同一MusicChart内で既存Definitionを移動しても変更しない
+- 複製時および別MusicChartへのコピー時は新しいIDを発行する
 - 削除したIDを別のEventへ再利用しない
 - 通常の画面操作では直接編集させない
 
@@ -421,13 +423,40 @@ Display Codeは、主に以下の用途に使用します。
 - ログ
 - 仕様書やタスク上の参照
 
-Display Codeも並べ替え時に自動で振り直さない案を推奨します。
+Display Codeも作成時に一度だけ発行し、並べ替え、Timing変更、MIDI再Importでは自動的に振り直しません。
 
-このStable ID＋Display Code方式を正式採用するか、
-Display Codeをどのように採番するかは未決事項です。
+Display CodeはMusicChart単位で単調増加する人間向け連番とし、次を使用します。
 
-Random SectionおよびRandom Candidateについても、
-同様のStable ID／Display Code方式を用いるかは未決事項とします。
+- 固定AttackEventおよびRandom Candidate：`ATK-001`、`ATK-002`等の共通系列
+- Random Section：`RSEC-001`、`RSEC-002`等の別系列
+
+`ATK`系列と`RSEC`系列は別々に採番し、番号は1起点の10進数を最低3桁でゼロ埋めします。999を超えた場合も桁を増やして継続します。
+
+削除済みDisplay Codeは同じMusicChart内で再利用しません。別MusicChartでは同じDisplay Codeが存在し得るため、人間向け参照ではMusicChart名と組み合わせて識別します。削除後も再利用を防げるよう、次番号等の採番状態をMusicChartの手動設定データへ保存します。
+
+同一MusicChart内ではStable IDを機械参照の正本とし、MusicChartをまたぐ参照ではMusicChart AssetのIdentityとStable IDを組み合わせます。Display Code、配列Index、Definition順、Fire Music Positionは永続参照Keyとして使用しません。Display Codeは会話・表示・報告用であり、Gameplayの処理順やRandom抽選結果を決定しません。
+
+固定AttackEventとRandom Candidateは同じAttackEventデータ構造とIdentifier契約を使用します。Random Candidate専用の別IDは作らず、AttackEventとしてのStable IDと`ATK-xxx`を持ちます。
+
+Random Section自身はAttackEventとは別のStable IDと`RSEC-xxx`を作成時に発行します。Section範囲変更やMIDI再Importでは維持し、複製時は新しいIdentifierを発行します。CandidateをSection間で移動してもCandidateのIdentifierを維持し、複製した場合だけ新しいIdentifierを発行します。
+
+Stable IDは固定AttackEvent、Random Candidate、Random Sectionを含む同一MusicChart全体で一意とし、Definition種別をまたぐ重複も許可しません。
+
+### 正本・Migration・Validation
+
+Stable IDとDisplay CodeはMusicChartの手動設定データへ保存します。MIDIやWorkbench専用Sidecarへ別正本として保存せず、MIDI再Importでも維持します。
+
+既存データにIdentifierがない場合は、明示的な一回限りのMigrationまたは修復操作で発行し、対象MusicChartが変更されたことを確認して保存できるようにします。Asset読込、画面表示、MIDI再Importのたびに暗黙再発行しません。
+
+少なくとも以下はValidation Errorとして検出します。
+
+- Stable IDの欠落
+- 同一MusicChart内でDefinition種別をまたぐStable ID重複
+- Display Codeの欠落
+- 固定AttackEventとRandom Candidateを含む`ATK-xxx`の重複
+- Random Sectionの`RSEC-xxx`重複
+
+Validationは問題を表示し、Identifierを無断で再採番・再生成して成功扱いにしません。
 
 ---
 
@@ -900,7 +929,9 @@ Occurrence
 ATK-014 / Loop 3
 ```
 
-内部的なOccurrence IDの具体形式は実装へ委譲します。
+Runtime occurrenceは、少なくともAttackEvent DefinitionのStable IDとLoop occurrenceを対応付けて識別します。Battle／Sessionをまたぐ一意性が必要な場合は、そのRuntime contextも組み合わせます。
+
+内部的なOccurrence IDの具体型やSerialization形式は実装へ委譲します。
 
 ### シャオンダマ先行生成状況
 
@@ -1049,9 +1080,6 @@ MIDI Note単体試聴は、
 
 以下は本ページ作成時点で未決です。
 
-- AttackEvent IDに内部Stable ID＋Display Code方式を正式採用するか
-- Display Codeの採番方法
-- Random Section／Candidate IDの具体方式
 - Validation ErrorがあるMusicChartの保存を許可するか
 - Error時のBattle／Build Gateの具体範囲
 - 未使用MusicChartのErrorでもBuildを止めるか
@@ -1064,6 +1092,10 @@ MIDI Note単体試聴は、
 
 以下は未決事項には含めません。
 
+- AttackEvent ID：内部Stable ID＋`ATK-xxx` Display Codeを正式採用
+- Random Candidate ID：通常AttackEventと同じIdentifier契約を使用
+- Random Section ID：専用Stable ID＋`RSEC-xxx` Display Codeを正式採用
+- Gameplay順序：IdentifierではなくFire Music PositionとMusicChart定義順を使用
 - 具体的な画面配置：実装担当へ委譲
 - Unity UI Toolkit／IMGUI等の選択：実装担当へ委譲
 - Audio波形表示：不要・対象外
