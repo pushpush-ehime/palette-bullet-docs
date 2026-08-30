@@ -27,7 +27,7 @@ relatedSpecs:
 - ID、Type、Range等に問題があるExcelをImport Candidate確定前に止められる
 - Error時にも正常時にも、このタスクではTuning Dataを更新しない
 - Excel Export時点の値とDefinition状態をBase Snapshotとして保持できる
-- 次タスクへBase Snapshot／Unity Current／Excel Import Candidateを渡し、3-way Diffを行える状態になる
+- 次タスクへBase Snapshot／Excel Import Candidateを渡し、次タスクがDiff開始時点に取得するUnity Current Snapshotと合わせて3-way Diffを行える状態になる
 
 ## 関連する仕様
 
@@ -101,14 +101,20 @@ Excel Export時点の状態を、次タスクの3-way Diffに利用できる形�
 - Parameter ID
 - Export時のCurrent Value
 - DefinitionのVersionまたは内容Fingerprint
+- Display Name
+- Description
 - Type
 - Default
 - Min／Max
+- Unit
+- Step
 - Category
+- Planner Editable
 - Source Binding
+- Specification Reference
 - Status／Deprecated状態
 
-DefinitionのVersionを正式に持つ場合はその値を使用し、持たない場合は上記の比較対象から再現可能なFingerprintを生成します。
+DefinitionのVersionを正式に持つ場合はその値を使用し、持たない場合は、Import ValidationおよびDefinition Changed判定に関係する**全Definition Metadata**から再現可能なFingerprintを生成します。上記の列挙は最低限の対象であり、Parameterの意味・制約・編集可否に影響するDefinition情報をFingerprint対象から省略しないでください。
 
 Base SnapshotをExcel内、別Sheet、補助ファイル等のどこへ保持するかは実装担当判断とします。
 
@@ -116,15 +122,16 @@ Base SnapshotをExcel内、別Sheet、補助ファイル等のどこへ保持す
 
 このタスクではExcelとの安全な往復、Validation、未反映Import Candidateの生成までを完成させます。
 
-PB-TASK-0007へ次の3入力を明示的に渡します。
+PB-TASK-0007へ次の2入力を明示的に渡します。
 
 ```text
 Base Snapshot
-Unity Current Snapshot
 Excel Import Candidate
 ```
 
-PB-TASK-0007がこれらを比較し、Unity側とExcel側の両方が変更されている場合のDiff／Conflict処理と、解決後の確定反映を担当できる構造にしてください。
+Unity Current SnapshotはPB-TASK-0007がDiff開始時点で一度だけ取得します。PB-TASK-0006が先行取得したSnapshotを後続比較の正本として渡さないでください。
+
+PB-TASK-0007がBase Snapshot、Diff開始時点のUnity Current Snapshot、Excel Import Candidateを比較し、Unity側とExcel側の両方が変更されている場合のDiff／Conflict処理と、解決後の確定反映を担当できる構造にしてください。
 
 ## 対象範囲
 
@@ -161,8 +168,8 @@ PB-TASK-0007がこれらを比較し、Unity側とExcel側の両方が変更さ�
 - [ ] 不正値を暗黙Clampしない
 - [ ] Validation Error時に不完全なImport Candidateを採用しない
 - [ ] 正常な読込でも本タスクではTuning Dataを変更しない
-- [ ] Export時のCurrent ValueとDefinition状態をBase Snapshotへ保存できる
-- [ ] Base Snapshot／Unity Current／Excel Import Candidateを次タスクから利用できる
+- [ ] Export時のCurrent ValueとImport／Definition Changed判定に必要なDefinition MetadataをBase Snapshotへ保存できる
+- [ ] Base Snapshot／Excel Import Candidateを次タスクから利用でき、Unity Current Snapshotは次タスクがDiff開始時点で取得する契約になっている
 
 ## 確認手順
 
