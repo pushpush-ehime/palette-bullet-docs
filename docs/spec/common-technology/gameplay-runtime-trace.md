@@ -1,6 +1,6 @@
 ---
 title: "Gameplay Runtime Trace仕様"
-description: Input・Player State・Gameplay Event・Entity・Context Snapshotを同一時系列で記録し、人間とAIがRuntime上で実際に起きた処理を追跡するためのデバッグ基盤
+description: Input・State Graph判断証拠・Gameplay Event・Entity・Context Snapshotを同一時系列で関連付け、人間とAIがRuntime上で実際に起きた処理を追跡するためのデバッグ基盤
 pageType: spec
 category: "共通技術"
 status: 仮仕様
@@ -116,9 +116,11 @@ Runtime上で実際に発生した事実をどのように記録・関連付け�
 - Raw Input Trace
 - Input Action Trace
 - Player State Trace
+- State Graph Trace Reference
 - Gameplay Event Trace
 - Entity ID
 - Event ID
+- State GraphのMachine／Battle／Action correlation
 - Correlation ID
 - Parent／Child Event
 - Context Snapshot
@@ -265,6 +267,55 @@ Gameplay Runtime Traceは、
 
 Project Code Catalogの静的解析機能を、
 Gameplay Runtime Trace側で再実装しません。
+
+### Player Action／State Graph基盤
+
+[Player Action／State Graph基盤](/spec/common-technology/action-state-manage)は、
+Playerの状態・遷移判断を行う唯一のRuntime authorityです。
+
+同基盤が生成するState Graph Traceは、次の詳細な判断証拠を所有します。
+
+- 遷移前後のActive Configuration
+- 候補Rule
+- Guard結果
+- winning Rule
+- 受理／拒否とReason Code
+- Context transaction
+- Buffer操作
+- lifecycle順序
+- 発行Command
+- Fault
+- `machineInstanceId`
+- `machineGeneration`
+- `battleId`
+- `actionRunId`
+- Eventのparent／root／origin identity
+
+Gameplay Runtime Traceは、Input、Physics、AttackEvent、Projectile、Damage、Battle等を含む
+全体Timeline上へ、そのState Graph Trace recordを参照・転送・関連付けします。
+
+| Trace | 責務 |
+| --- | --- |
+| State Graph Trace | State Graphが行った遷移判断の詳細証拠 |
+| Gameplay Runtime Trace | 複数Systemを横断したRuntime事実の全体観測 |
+
+Gameplay Runtime Trace側でGuardを再実行したり、
+Active Configurationから遷移理由を推測したり、
+State Graphと異なる受理／拒否結果を生成したりしてはいけません。
+
+関連付けには、少なくとも次を使用します。
+
+- `eventId`
+- `rootEventId`
+- `machineInstanceId`
+- `machineGeneration`
+- `battleId`
+- `actionRunId`
+- State Graph Trace record reference
+- Runtime revision
+
+State Graph Traceの詳細recordを転送する場合は、内容を別形式へ解釈し直さず、
+元recordへの参照または正規化済みpayloadとして保持します。
 
 ### MusicChart Workbench
 
@@ -452,7 +503,8 @@ Sessionには少なくとも以下を関連付けます。
 - Build Version
 - Scene
 - Stage
-- Battle ID
+- 対象Battle IDまたはBattle ID一覧
+- Player State Graphの`machineInstanceId`／`machineGeneration`一覧
 - Trace Schema Version
 - Trace Recorder Version
 - Recording Level
@@ -511,7 +563,12 @@ Trace Eventには、
 同frame・同時刻に複数Eventが発生する場合でも、
 記録順を復元できるSequence情報を持たせることを推奨します。
 
-具体的なSequence生成方式は未決です。
+Gameplay Runtime Trace全体のEvent Sequenceと、
+State Graph sealed batch内の`ingressSequence`は別の用途です。
+State Graph recordを関連付ける場合は両方を保持し、
+Global Timeline順とState Graph decision順を同一値として扱いません。
+
+具体的なGameplay Runtime Trace Sequence生成方式は未決です。
 
 ### Frame
 
@@ -656,11 +713,11 @@ Raw InputをInput Systemのどの層で取得するかは未決です。
 
 ## Player State Trace
 
-Playerについては、
-Runtime本体が確定したState変更をTraceします。
+Player Stateについては、
+Player State GraphがCommitしたActive ConfigurationとState Graph Traceを記録・参照します。
 
 少なくとも現在のPlayer State構造に合わせて、
-以下の軸を扱える構造とします。
+以下のRegionを扱える構造とします。
 
 - Root
 - Movement
@@ -671,49 +728,56 @@ Runtime本体が確定したState変更をTraceします。
 概念例：
 
 ```text
-Player State Change
+Player State Graph Decision
 
-Axis
-Action
+Event
+ParryRequested
 
-From
-None
+Before
+Action = None
+Aim = Aiming
 
-To
-Parrying
+After
+Action = Parrying
+Aim = Normal
+
+Outcome
+Committed
 ```
 
-別軸例：
+State変更を伴わない拒否、Buffer格納、stale Event、Faultも、
+State Graph Trace recordとしてTimelineへ関連付けます。
+拒否Eventを架空のState変更として表現してはいけません。
 
-```text
-Axis
-Aim
+### State判断に関連する情報
 
-From
-Aiming
+Player State Eventには、少なくとも次を関連付けられる構造とします。
 
-To
-Normal
-```
-
-### State変更に関連する情報
-
-取得可能な場合は、
-State変更結果だけでなく以下も関連付けます。
-
-- Trigger
-- Request
-- Cause
-- Rejection Reason
+- State Graph Trace record reference
+- `eventId`
+- `rootEventId`
+- `machineInstanceId`
+- `machineGeneration`
+- `battleId`
+- `actionRunId`
+- Runtime revision before／after
+- Trigger／Request
+- 遷移前後のActive Configuration
+- 候補Rule
+- Guard結果
+- winning Rule
+- 受理／拒否
+- Reason Code
 - Interrupt Reason
-- Parent Event
-- Correlation ID
+- 発行Command
+- Parent／origin Event
 
-ただし、
-Trace RecorderがState遷移条件を独自に再判定してReasonを作ることは避けます。
+Gameplay Runtime Trace Recorderは、
+State遷移条件を独自に再判定してReasonを作りません。
 
-Runtime本体がReason Code等を確定している場合、
-その値を記録する方向を優先します。
+State Graph Traceが確定したReason Code、Rule、Guard結果、revisionをそのまま参照し、
+State Graph Traceが存在しない場合にAnimator State、enum、Context Snapshot等から
+代替のPlayer State判断を合成してはいけません。
 
 ---
 
@@ -848,15 +912,21 @@ Raw Input
 ↓
 Input Action
 ↓
-Gameplay Request
+型付きGameplay Request
 ↓
-Player State確認
+State Graph Event
 ↓
-Action開始／拒否／中断
+State Graph Trace
+├─ Commit／Buffer／拒否／stale／Fault
+└─ Rule／Guard／Reason Code
+↓
+Action結果またはCommit後Command
 ```
 
 これにより、
-「入力が届かなかった」「State Gateで拒否された」等を切り分けられることを
+「入力が届かなかった」「Input Actionで止まった」
+「State Graph Ingressで拒否された」「Guardで拒否された」
+「Commit後のCommand配送でFaultした」等を切り分けられることを
 初期版の最低条件とします。
 
 #### 2. AttackEventから結果までの横断経路
@@ -891,7 +961,7 @@ Trace基盤自体をゲーム全体へ拡張可能にしつつ、
 
 ## Event ID
 
-すべてのTrace Eventは、
+すべてのGameplay Runtime Trace Eventは、
 Session内で一意に識別できるEvent IDを持ちます。
 
 概念例：
@@ -901,6 +971,19 @@ EV-0001821
 ```
 
 具体形式は未決です。
+
+State Graph EventまたはState Graph Trace recordを投影する場合は、
+元の`eventId`を失わず、そのまま保持または明示的に参照します。
+同じState Graph Eventへ意味の異なる別IDだけを付け、
+元Eventとの対応を失わせてはいけません。
+
+Gameplay Runtime Trace独自のrecord IDが別途必要な場合は、
+次を区別して保持します。
+
+- Gameplay Runtime Trace record ID
+- Source System
+- Source Event ID
+- State Graph Trace record reference
 
 Event IDは、
 Timeline上の選択、Parent／Child参照、AI Export、Bookmark等から利用できる必要があります。
@@ -1019,8 +1102,23 @@ HitStop
 
 等を関連付けられるようにします。
 
+State Graphに関係するEventでは、一つの汎用Correlation IDへ意味を集約せず、
+少なくとも次を用途別に保持します。
+
+| Identity | 用途 |
+| --- | --- |
+| `machineInstanceId` | 具体的なStateMachine instance |
+| `machineGeneration` | Player runtime incarnation |
+| `battleId` | Game／Combatが発行したBattle |
+| `actionRunId` | 一回のAction activation |
+| `eventId`／`rootEventId` | Eventとcausal chain |
+
+Gameplay Runtime Trace独自のCorrelation IDは、
+AttackEvent、Projectile、Damage等の複数System横断処理をまとめる用途で使用できます。
+その場合も、State Graphのidentityを上書きまたは一つの値へ統合しません。
+
 Correlation IDの具体形式と、
-どのシステムがCorrelationを発行・引き継ぐかは未決です。
+各Gameplay SystemがCorrelationを発行・引き継ぐ方法は未決です。
 
 ---
 
@@ -1062,9 +1160,19 @@ Parent EV-105
 
 を辿りやすくなります。
 
-すべてのEventへParentを強制する必要はありません。
+すべてのGameplay Runtime Trace EventへParentを強制する必要はありません。
 
-Parent／Child Eventは初期版で高優先の追加目標としますが、
+ただし、State Graph Traceから投影するrecordは、
+元recordに存在する次の因果identityを失ってはいけません。
+
+- `parentEventId`
+- `rootEventId`
+- `causalSequence`
+- `originBufferedEventId`
+
+これらをGameplay Runtime Trace側の推測で作り直しません。
+
+一般的なGameplay EventのParent／Child Eventは初期版で高優先の追加目標としますが、
 **初期版完了Gateには含めません。**
 
 初期版ではCorrelation IDとEvent Sequenceによって
@@ -1363,7 +1471,16 @@ Eventを一件ずつ検索・diffしやすいJSON／JSONL形式を推奨しま�
 
 - Session ID
 - Event ID
+- Source Event ID
+- State Graph Trace record reference
+- `rootEventId`／`parentEventId`／`originBufferedEventId`
+- `machineInstanceId`
+- `machineGeneration`
+- `battleId`
+- `actionRunId`
+- Runtime revision before／after
 - Sequence
+- State Graph `ingressSequence`
 - Event Type
 - Category
 - Frame
@@ -1377,6 +1494,7 @@ Eventを一件ずつ検索・diffしやすいJSON／JSONL形式を推奨しま�
 - Target Entity
 - Correlation ID
 - Parent Event
+- State Graph outcome／Reason Code／winning Rule
 - Payload
 - Snapshot Reference
 
@@ -1625,6 +1743,11 @@ Release Build等で不要なTrace負荷を避けられる設計とします。
 
 Recording Levelによって同じEvent Typeの意味を変更してはいけません。
 
+State Graph Traceの詳細をRecording Levelによって省略する場合も、
+Player State結果、Source Event ID、Machine／Battle／Action identity、
+Runtime revision、受理／拒否、Reason Code、元record参照の意味を変更してはいけません。
+Gameplay Runtime Trace側の省略を理由に、State Graph Runtimeの判断や保持方針を変更しません。
+
 Levelは主に、
 記録量・Payload量・Snapshot量を調整するものとします。
 
@@ -1657,6 +1780,7 @@ Session Metadataへ少なくとも以下を保持できる構造を推奨しま�
 - Buffer Overflow
 - Export Failure
 - Recorder Error
+- State Graph Trace reference missing／truncated
 - Recording Start遅延
 - Recording End異常
 
@@ -1699,7 +1823,8 @@ Runtime調査の基礎となる機能を優先します。
 | Fixed Step／Physics Step | 必須 |
 | Raw Input | 必須 |
 | Input Action | 必須 |
-| Player State変更 | 必須 |
+| State Graph Trace参照／Player State変更 | 必須 |
+| Machine Generation／battleId／actionRunId関連付け | 必須 |
 | 主要Gameplay Event | 必須 |
 | Event ID | 必須 |
 | Entity ID | 必須 |
@@ -1733,7 +1858,7 @@ Trace基盤自体はゲーム全体対応を前提とします。
 
 初期版完了判定では、前述のとおり最低限、
 
-1. Raw Input → Input Action → Gameplay Request → Player State → Action結果
+1. Raw Input → Input Action → 型付きGameplay Request → State Graph Trace → Action結果
 2. AttackEvent → 攻撃結果生成 → Hit／Damage → Enemy反映 → Purify等のGameplay上の確定結果
 
 の2種類の代表経路を追跡できることを必須とします。
@@ -1770,9 +1895,9 @@ Trace基盤自体はゲーム全体対応を前提とします。
 4. Fixed Step／Physics Stepを識別できる
 5. Raw Inputを記録できる
 6. Input Actionを記録できる
-7. Player State変更を記録できる
+7. Player State GraphがCommitしたState変更と拒否結果を記録・参照できる
 8. 主要Gameplay Eventを登録・記録できる
-9. Raw Input → Input Action → Gameplay Request → Player State → Action結果の代表経路を追跡できる
+9. Raw Input → Input Action → 型付きGameplay Request → State Graph Trace → Action結果の代表経路を追跡できる
 10. AttackEvent → 攻撃結果生成 → Hit／Damage → Enemy反映 → Purify等のGameplay上の確定結果の代表経路を追跡できる
 11. Event IDを一意に生成できる
 12. Entity IDをEventへ関連付けられる
@@ -1794,6 +1919,10 @@ Trace基盤自体はゲーム全体対応を前提とします。
 28. Trace無効時にGameplay Runtimeへ不要な大きな負荷を残さない
 29. Gameplay正本仕様をTrace側で再定義しない
 30. Project Code Catalogの静的解析責務をTrace側へ重複実装しない
+31. State Graph Trace recordを`eventId`、Machine、Battle、Action identityで関連付けられる
+32. State Graphが確定したRule、Guard、Reason Code、revisionを意味変更せず参照できる
+33. Gameplay Runtime Trace側でPlayer State遷移を再判定しない
+34. State Graph Trace参照の欠落を完全なEvidenceとして扱わない
 
 以下は初期版で優先して実装可能ですが、初期版完了Gateには含めません。
 
@@ -1837,6 +1966,9 @@ Trace基盤自体はゲーム全体対応を前提とします。
 本基盤では以下を非目標とします。
 
 - Gameplay仕様そのものをTrace側で再定義すること
+- Player State GraphまたはState Graph Traceの代替
+- Guard、Rule、遷移結果をGameplay Runtime Trace側で再評価すること
+- State Graphと異なる受理／拒否理由を生成すること
 - Project Code Catalogの代替
 - Battle Scenario Runnerの代替
 - 初期版で完全Replayを作ること
@@ -1867,6 +1999,15 @@ Trace基盤自体はゲーム全体対応を前提とします。
 - Parent／Child Event構造
 - Trace Session ID形式
 - Sequenceの生成方式
+
+### State Graph Trace接続
+
+- State Graph Trace record referenceの具体形式
+- 正規化済みrecordを参照だけするか、必要項目を転送するか
+- State Graph Trace ring buffer上書き後のReference表現
+- Gameplay Runtime Trace単体Exportへ含めるState Graph detail範囲
+- State Graph Trace reference欠落時のError／Warning表現
+- 2つのTrace Schema versionの対応表現
 
 ### 時間
 
@@ -1956,6 +2097,7 @@ Gameplay Runtime Traceは以下の仕様を参照しますが、
 | 内容 | 正とする仕様 |
 | --- | --- |
 | 共通技術カテゴリ全体 | [共通技術](/spec/common-technology/) |
+| Player State authority・State Graph Trace | [Player Action／State Graph基盤](/spec/common-technology/action-state-manage) |
 | 静的コード構造・Evidence | [Project Code Catalog仕様](/spec/common-technology/project-code-catalog) |
 | Planner調整Parameter | [Planner調整Parameter管理・Excel連携仕様](/spec/common-technology/planner-tuning-parameter) |
 | MusicChart制作・Runtime Monitor | [MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench) |
@@ -1987,3 +2129,4 @@ Gameplay Runtime Trace内へ再現機能を取り込みません。
 ## 関連タスク
 
 <PageRelations />
+
