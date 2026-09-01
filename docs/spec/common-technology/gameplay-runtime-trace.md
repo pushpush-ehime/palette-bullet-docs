@@ -843,7 +843,7 @@ Gameplay規則そのものを定義する一覧ではありません。
 
 - Marker Spawn
 - Marker Hit
-- Palette Bullet生成
+- Palette Bullet化
 - Palette Bullet Fire
 - Palette Bullet Hit
 - Explosion
@@ -1058,7 +1058,7 @@ AttackEvent Fire
 ↓
 Charge Result
 ↓
-Palette Bullet生成
+Palette Bullet化
 ↓
 Palette Bullet Fire
 ↓
