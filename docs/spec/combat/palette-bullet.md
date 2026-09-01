@@ -11,7 +11,7 @@ relatedTasks: []
 
 ## 目的
 
-本ページでは、Reserved状態のShaondamaから生成されるPalette Bulletについて、以下を定義します。
+本ページでは、Reserved状態のShaondamaがChargeされた状態：Palette Bulletについて、以下を定義します。
 
 - Palette Bullet化とShaondamaからの情報引き継ぎ
 - 発射開始位置
@@ -433,11 +433,11 @@ Gameplay無効化後は、既存のPalette Bulletから次を新しく成立さ�
 
 すでに爆発演出を開始している場合も、結果確定時点で残っているDamage判定、範囲query、MarkerへのGameplay効果を停止します。見た目として爆発していることを、Gameplay上の有効な爆発が継続している根拠にしません。
 
-Battle結果確定後に新しいPalette Bullet生成要求が届いた場合も拒否します。発射待ちのArpeggio Entryと未消費Reserved Shaondamaの取消・解放は、`bgm/bgm-attack-judgement.md`を正本とします。
+Battle結果確定後に新しいPalette Bullet化・発射要求が届いた場合も拒否します。発射待ちのArpeggio Entryと未消費Reserved Shaondamaの取消・解放は、`bgm/bgm-attack-judgement.md`を正本とします。
 
 ### `battleId`による旧Battleの拒否
 
-Palette Bulletは、生成元Battleの`battleId`を保持します。少なくとも次の通知、判定、候補には同じ`battleId`を引き継ぎます。
+Palette Bulletは、Palette Bullet化前から継続するbattleIdの`battleId`を保持します。少なくとも次の通知、判定、候補には同じ`battleId`を引き継ぎます。
 
 - 衝突、Hit、Trigger、Overlap通知
 - 飛行終了と爆発開始通知
