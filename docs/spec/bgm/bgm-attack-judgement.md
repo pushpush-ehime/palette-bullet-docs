@@ -315,6 +315,16 @@ Palette Bulletの直線飛行、衝突、Direct Contact RGB Damage、Explosion R
 
 同一フレーム内のDamage集約、丸め、Clamp、浄化値への反映、浄化成立判定は、[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とします。本ページではDamage値や浄化結果を再計算しません。
 
+## モード／コンダクトの参照境界
+
+Charge成功時点のモードをAllocation SlotまたはReserved Shaondamaへ固定しません。AttackEventの発火・発射処理では、Charge時点のモードではなく、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)の規則に従い、その時点で適用済みのモードを参照します。モード変更の適用とPalette Bulletの発射が同じ小節頭に成立する場合は、新しいモードを先に適用します。
+
+ただし、ArpeggioでAttackEvent発火時のモードを全Entryへ固定するか、各Palette Bulletの実発射時点で参照するかは未決です。本ページでは、どちらかを確定せず、既存のArpeggio snapshotへモードを追加しません。
+
+コンダクトはMusicChart上の静的なAttackEvent Definitionではなく、Stage挑戦中の具体的なAttackEvent occurrenceへ最大一つ付与される、occurrence全体の演奏・発射指示です。発火・発射処理では、付与前に同じoccurrenceへ`Reserved`済みだったShaondamaを含め、付与済みコンダクトをAttackEvent全体の指示として参照します。Slot、Shaondama、Chordの各音、Arpeggioの各Entryごとに別のコンダクトを持たせません。
+
+具体的な保持field、payload、Runtime Owner、Production Event／Command名は本ページでは確定しません。
+
 ## Click / Dragの違いを判定材料にしない
 
 発火時には、そのReserved Shaondamaが、
@@ -397,7 +407,7 @@ G Reserved Shaondama
 
 未充填Slotが存在することを理由に、AttackEvent全体をキャンセルしません。
 
-また、Empty Slotのために存在しないPalette Bulletを生成しません。
+また、Empty Slotには対応するReserved Shaondamaが存在しないため、Palette Bullet化・発射の対象も存在しません。仮の弾で未充填分を補完しません。
 
 ---
 
@@ -429,7 +439,7 @@ G [ ]
 
 通常AttackEventでは、原則として、
 
-> **1 Occupied Slot = 1 Reserved Shaondama = 1 Palette Bullet**
+> **1 Occupied Slot = 1 Reserved Shaondama = 1 Palette Bullet化対象**
 
 です。
 
@@ -447,12 +457,12 @@ G [●]
 Occupied Slot = 2
 Reserved Shaondama = 2
 ↓
-Palette Bullet = 2
+Palette Bullet化対象 = 2
 ```
 
 です。
 
-Empty Slotから架空のPalette Bulletを生成しません。
+Empty Slotには対応するReserved Shaondamaが存在しないため、Palette Bullet化・発射対象もありません。Slot数だけを根拠に仮の弾を補完しません。
 
 また、Slotの数値から新しいShaondama実体を作り直す構造にはしません。
 
@@ -577,7 +587,7 @@ C / G のReserved ShaondamaのみPalette Bullet化
 同一音楽タイミングで発射
 ```
 
-EmptyなE SlotからPalette Bulletを生成しません。
+EmptyなE Slotには対応するReserved Shaondamaが存在しないため、EのPalette Bullet化・発射は行いません。仮の弾も補完しません。
 
 ---
 
@@ -804,9 +814,9 @@ Palette Bullet化した個体を、後続Entryまたは別AttackEventでReserved
 
 ## Empty Slot
 
-Arpeggioでsnapshot時に`Empty`だったSlotは、そのSlotの音楽タイミングで何も発射しません。
+Arpeggioでsnapshot時に`Empty`だったSlotには対応するReserved Shaondamaが存在しないため、そのSlotの音楽タイミングにPalette Bullet化・発射する対象はありません。
 
-後からShaondamaを補完しません。
+後からReserved Shaondamaや仮の弾を補完しません。
 
 別Slotや別AttackEventからShaondamaを検索しません。
 
@@ -1478,6 +1488,7 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | 未確定Charge・未commit選択のBattle終了cleanup | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) / `player/player-action-charge.md` |
 | AttackEvent判定Ownerの必須cleanup完了条件・通知 | **本ページ** |
 | Palette Bulletの発射開始位置に使用する座標の規則 | [パレットブレット](/spec/combat/palette-bullet) |
+| モード／コンダクトのGameplay上の意味・付与／参照境界 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 | Direct Contact / Explosion RGB Damage候補の生成 | [パレットブレット](/spec/combat/palette-bullet) |
 | Damage候補の集約・丸め・Clamp・浄化判定 | [敵の被弾と浄化](/spec/enemy/damage-and-purify) |
 
@@ -1597,6 +1608,10 @@ Owner側参照を終了
 - 発火時には`charge-allocation.md`で確定済みのAllocation結果を使用する
 - 発火時に別AttackEvent検索・Slot再割り当て・Weak / Normal再判定を行わない
 - Charge成功時にはPalette Bullet化せず、ReservedとしてAttackEvent発火を待つ
+- モードはCharge時のAllocation SlotまたはReserved Shaondamaへ固定せず、統合仕様に従って発火・発射処理で参照する
+- 同じ小節頭でモード適用とPalette Bullet発射が成立する場合は、新しいモードを先に適用する
+- ArpeggioのモードをAttackEvent発火時に全体へ固定するか、各Palette Bulletの実発射時点で参照するかは未決とする
+- コンダクトは静的なAttackEvent Definition、Slot、Shaondama単位ではなく、具体的なAttackEvent occurrenceへ最大一つ付与される全体の指示として扱う
 - AttackEvent発火時にTarget座標を1回だけ確定する
 - 同じAttackEventが発射する全Palette BulletでTarget座標を共有する
 - 各Palette Bulletの発射開始位置には、弾丸化する瞬間の対象Shaondamaの現在World座標を使用する
@@ -1610,7 +1625,7 @@ Owner側参照を終了
 - `Zero Charge`は全要求Slotが`Empty`の場合とする
 - `Zero Charge`ではShaondama由来の攻撃を発生させない
 - 1 Occupied Slotから使用するReserved Shaondamaは1つだけとする
-- Empty Slotのために架空のPalette Bulletを生成しない
+- Empty SlotにはReserved Shaondamaが存在せず、Palette Bullet化・発射対象がないため、仮の弾を補完しない
 - Click / Dragの違いを発火時結果判定へ持ち込まない
 - Charge Actionの`success / miss`と発火時の`Complete / Incomplete / Zero Charge`を分離する
 - ChordはOccupied SlotのReserved Shaondamaを同一音楽タイミングでPalette Bullet化・発射する

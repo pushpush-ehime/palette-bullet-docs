@@ -241,6 +241,12 @@ Reserved中のShaondamaは世界上の対応実体として保持され、通常
 
 `Reserved`確定時には、Shaondama実体、Battle ID、AttackEvent、Slot、および必要なAllocation実効値を対応付けます。これはPalette Bullet実体の生成ではありません。
 
+この対応付けにはCharge時点のモードを含めません。モードをAllocation SlotまたはReserved Shaondamaへsnapshotせず、Allocation commit時点で固定しません。
+
+コンダクトもAllocation SlotまたはShaondama単位では保持しません。コンダクトは、現在のStage挑戦中の具体的なAttackEvent occurrence全体へ最大一つ付与される指示であり、同じoccurrenceの各Slotや各Shaondamaへ分割しません。
+
+モード／コンダクトのGameplay上の意味は、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正とします。具体的なschema、field、payload、Runtime Ownerは本ページでは固定しません。
+
 ---
 
 # Current AttackEventの決定
@@ -1257,7 +1263,7 @@ Reserved解除後やAttackEvent解決後の詳細ライフサイクルは、発�
 
 ## Charge成功時にはPalette Bullet化しない
 
-Charge成功時点ではPalette Bulletを生成しません。
+Charge成功時点ではShaondamaをPalette Bullet化しません。
 
 ```text
 Shaondama
@@ -2022,6 +2028,8 @@ Battle結果確定、各Ownerへのcleanup開始通知、cleanup完了の集約�
 * Weak AttackEventを通常AttackEventの蓄積上限へ含める
 * Weak Charge済みShaondamaを、後からCurrentになった通常AttackEventへ再割り当てする
 * Charge成功した瞬間にPalette Bullet化する
+* Charge時点のモードをAllocation SlotまたはReserved Shaondamaへsnapshotする
+* コンダクトをShaondamaまたはSlot単位へ分割して保持する
 * Charge successと自然破裂が同一フレームで競合したとき、commit前に自然破裂させる
 * Charge commit済みで`Reserved`となったShaondamaへ自然破裂を発生させる
 * Reserved中も通常Lifetimeを進行させ、AttackEvent解決前にShaondamaを通常Lifetimeで消滅させる

@@ -181,6 +181,8 @@ Palette Bullet化またはDamage通知へ進む前に、攻撃へ使用する個
 
 ### Palette Bullet化時のデータ引き継ぎ
 
+`Reserved`中はPalette Bullet化前のShaondamaであり、対応する発射タイミングにPalette Bullet化した後の状態とは区別します。Charge時点のモードをShaondama個体へ固定保存せず、コンダクトもShaondama個体の属性として保持しません。コンダクトはStage挑戦中の具体的なAttackEvent occurrence全体へ付与された指示として扱い、モードは発火・発射側が統合仕様に従って参照します。詳細は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。
+
 Reserved ShaondamaをPalette Bullet化する場合は、物理objectの生成方式にかかわらず、同じGameplay上の個体として次の情報を引き継ぎます。
 
 | 引き継ぐ情報 | 規則 |
