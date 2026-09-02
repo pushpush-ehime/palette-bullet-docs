@@ -573,6 +573,19 @@ ReactionState = None
 となります。
 
 
+## Retry時のMode／Conduct
+
+Retryでは、Player側から見たMode／Conductを次の状態から開始します。
+
+- 使用中モードをモード1へ戻す
+- 未適用のモード変更要求を解除する
+- 進行中のモード切替クールタイムを解除する
+- Player側の選択中コンダクトを解除し、コンダクト未選択状態から開始する
+- 前回のStage挑戦でAttackEvent occurrenceへ付与済みだったコンダクトを持ち越さない
+
+一方、拠点で作ったモード2～4の構成内容は失いません。これらはPlayer Stateの初期化とは別のMode／Conduct固有のRetry結果です。詳細は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とし、本ページではPlayer側のRetry結果だけを扱います。
+
+
 ## Retry時に引き継がないもの
 
 死亡前のGameplay状態はリスタート後に引き継ぎません。
@@ -705,6 +718,7 @@ Deadに関係する主なRootState遷移を以下に示します。
 | 共通Result画面のvariantと表示 | ゲーム全体 / UI |
 | Result操作のlock・解禁とContinue／Retry route | ゲーム全体 / UI |
 | Retry時のPlayer初期化 | 本ページ |
+| Mode／Conduct固有のRetry結果 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 | HP・スタミナ | Playerステータス |
 | ダメージ・被弾 | Playerリアクション｜被弾 |
 | Gameplay Action終了 | Playerアクション遷移 / 各Action仕様 |

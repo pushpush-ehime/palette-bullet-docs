@@ -69,6 +69,18 @@ AimState      = Aiming
 ReactionState = None
 ```
 
+## モードチェンジ／コンダクトとの責務境界
+
+モード変更要求とコンダクト選択はPlayer入力ですが、入力であることだけを理由に`ActionState`の開始・遷移として扱いません。本ページの遷移表、Action先行入力、およびDashキャンセル入力バッファは、現在記載している既存Actionだけを対象とします。
+
+* モード変更要求を`ActionState`遷移またはbuffered Actionとして追加しない
+* コンダクト選択を`ActionState`遷移として追加せず、その選択状態をAction先行入力やDashキャンセル入力バッファとして保持しない
+* クールタイム中に破棄されたモード入力を、クールタイム終了後に実行する予約入力として保持しない
+* モード変更要求またはコンダクト選択だけを理由に、Charge、Aim、Movementへ既存仕様にない中断を追加しない
+* Mode／Conduct入力と既存Actionが同Frameに成立した場合の処理順・優先順位を、本ページで推測して確定しない
+
+Mode／ConductのRuntime Owner、Palette State Graphとの接続形式、Production Event／Command／payload、およびInput Action実装は未決です。本ページでは、新しいState、遷移、buffer、Event、またはCommandを定義しません。Gameplay上の意味と未決事項は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、入力割り当ては[Player入力と操作](/spec/player/input-and-controls)を正本とします。
+
 ## 遷移記号
 
 本ページでは、ActionState間の遷移を以下の記号で表します。

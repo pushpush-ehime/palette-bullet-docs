@@ -145,6 +145,12 @@ BGM／MusicChart
 
 Playerの具体的なRootState、ActionState、および遷移条件はPlayer仕様を正本とします。
 
+### Mode／ConductのStage・Roomライフサイクル
+
+Mode／Conduct固有のStage／Room／Retryライフサイクルは、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。Stage挑戦開始時はモード1から開始し、未適用のモード変更要求、進行中のクールタイム、Player側の選択中コンダクト、および前回のStage挑戦でAttackEvent occurrenceへ付与されたコンダクトを持ち込みません。拠点で作ったモード2～4の構成内容は使用でき、Stage開始前に使用中モードを選んで開始する仕様にはしません。
+
+同じStage挑戦中の通常のRoom移動では、現在適用中のモード、モード2～4の構成内容、Player側の選択中コンダクト、およびHPなどのStage挑戦中の継続値を初期化しません。一方、Room移動中のモード入力受付、小節基準、Battle外区間での適用時点、未適用のモード変更要求をRoom境界で保持するか、およびクールタイムをRoom境界で保持・進行するかは未決です。
+
 ## Battle開始lifecycle
 
 Battle開始時は、以下の高レベルな順序で処理します。
@@ -282,10 +288,10 @@ Battle結果確定後は、次の処理を新しく成立させません。
 
 - PlayerのGameplay入力、および新しいActionへの遷移
 - 新しいAttackEvent、Arpeggio Entryの発火、およびAttackEvent Preview
-- 新しいCharge、Allocation、Reserved化、およびPalette Bullet化
+- 新しいCharge、Allocation、およびReserved化
 - 新しいHit、Damage、浄化、およびParry判定
 - 新しいTarget決定、およびMarkerによるTarget座標の提供
-- 新しいPalette Bullet、Marker、Jaon BulletなどのProjectile生成
+- `Reserved` ShaondamaのPalette Bullet化・発射、およびJaon Bulletなどその他のProjectileとMarkerの生成
 - 新しいシャオンダマ生成、および新しいEnemy Spawn
 - 停止後のMusicChart Eventや予約済みGameplay callbackによる状態変更
 - 旧Battleの遅延通知、生成結果、命中、Damage、cleanup完了通知による現在Battleの状態変更
@@ -370,6 +376,7 @@ Scene Reloadまたはin-place resetのどちらを使用するかは実装上の
 | 対象 | Retry後の状態 | 詳細の所有者 |
 |---|---|---|
 | Player | HP／Staminaを全回復し、ステージ開始時のState、位置、向きへ戻す | Player、Stage |
+| Mode／Conduct | 使用中モードをモード1へ戻し、未適用のモード変更要求、進行中のクールタイム、およびPlayer側の選択中コンダクトを解除する。前回のStage挑戦でAttackEvent occurrenceへ付与されたコンダクトは持ち越さず、拠点で作ったモード2～4の構成内容は保持する | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、[Player死亡](/spec/player/player-death) |
 | Enemy | ステージ開始時のEnemy集合、位置、浄化値、HP、行動状態へ戻す | Enemy、Stage |
 | Combat | 新しいBattle IDを持つ未確定結果のBattleとして開始し、旧Battleの通知・判定状態を破棄する | Combat |
 | BGM／MusicChart | 旧Battleの3時計、音楽同期イベント、およびAudio状態を停止・破棄し、新BattleのBattle開始lifecycleに従って時計停止状態から再構築する | BGM／MusicChart |
