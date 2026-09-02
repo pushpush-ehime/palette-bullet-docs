@@ -451,7 +451,7 @@ Gameplay自体のルールは、それぞれのカテゴリを正とします。
 | MusicChartの構造・Import / ReImport | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart)           |
 | AttackEventを音楽上どこへ・どのように設定するか   | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)              |
 | Random Sectionの候補・抽選ルール         | [BGM Random Section仕様](/spec/bgm/bgm-random-section)    |
-| サウンド班からUnityまでの制作・受け渡し工程        | **サウンド班制作フロー（新規作成予定）**                                  |
+| サウンド班からUnityまでの制作・受け渡し工程        | [サウンド班制作フロー](/spec/bgm/sound-production-workflow)              |
 | `NoteEvent`からシャオンダマを生成するルール     | [MIDI駆動生成](/spec/shaondama-music/midi-driven-spawning)  |
 | AttackEventのSlot割り当て・成立判定       | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
 | PlayerのCharge入力・Action          | [Playerアクション｜チャージ](/spec/player/player-action-charge)   |

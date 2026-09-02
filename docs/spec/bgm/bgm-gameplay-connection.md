@@ -302,7 +302,9 @@ Modeは、少なくとも完成済みの戦闘BGMへ、Playerが聞き分けら�
 
 ここでいう発射音は、Palette Bulletの発射時にPlayerへ聞こえる音を指します。Conductを音程音、Gameplay上の発射SE、またはその両方のどこへ適用するかは未決です。
 
-完成済みの戦闘BGMを継続して使用し、Player由来音を別レイヤーとして追加する既存構造と、戦闘BGM／Palette Bullet音程音／Gameplay SEのレイヤー分離を維持します。Mode／Conductを理由として、楽器やStemの切替、別アレンジへの交換、恒常的なTempo／拍子変更を採用済みとしません。
+完成済みの戦闘BGMを継続して使用し、Player由来音を別レイヤーとして追加する既存構造と、戦闘BGM／Palette Bullet音程音／Gameplay SEのレイヤー分離を維持します。現時点のMode仕様には、BGMの恒常的なTempo変更、拍子変更、楽器編成の変更、別アレンジへの交換、およびRuntimeでのStem／楽器レイヤー切替を含めません。
+
+Conductによる一時的な「だんだん速く／遅く」は将来候補であり、採用するか、および採用する場合のBGM／MusicChart同期方法は未決です。
 
 具体的なAudio Mixer／Mixer Group、DSP、Effect、パラメーター、Wet／Dry、Crossfade、残響Tail、ModeのBGM以外への適用範囲、およびConductの具体的な適用先は未決です。Gameplay上の意味と適用規則は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。
 
