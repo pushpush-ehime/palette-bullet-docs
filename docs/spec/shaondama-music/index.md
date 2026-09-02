@@ -19,6 +19,9 @@ status: 未決
   - [ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)
   - [シャオンダマ｜浮遊・挙動](/spec/shaondama-music/floating-behavior)
   - [Playerアクション｜チャージ](/spec/player/player-action-charge)
+  - [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)
+  - [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)
+  - [パレットブレット](/spec/combat/palette-bullet)
   - [万能シャオンダマ](/spec/shaondama-music/wildcard-orb)
 
 ## 目的
@@ -27,7 +30,9 @@ status: 未決
 
 通常シャオンダマは、MusicChart上の`NoteEvent`をもとに生成対象として決定され、ラジクジラを介して世界内へ出現します。
 
-世界内へ出現した後はラジクジラから独立したオブジェクトとして存在し、Playerが選択してChargeすることで`Palette Bullet`として利用されます。
+世界内へ出現した後はラジクジラから独立したオブジェクトとして存在し、Playerの選択対象になります。Charge成功時にはAttackEvent occurrenceへ割り当てられて`Reserved`となり、AttackEventの発火時に`Palette Bullet`化して発射されます。
+
+`Palette Bullet`は、世界内のシャオンダマと無関係に新しく生成される弾ではありません。割り当てられた`Reserved`のシャオンダマが、対応する発射タイミングで`Palette Bullet`化します。
 
 シャオンダマを何個・いつ・何から生成するか、ラジクジラからどのように出現させるか、出現後の具体的な浮遊・Lifetime・消滅、Chargeの詳細などは、それぞれの正本ページで定義します。
 
@@ -39,9 +44,10 @@ Playerから見た通常シャオンダマの基本的な流れは以下です�
 2. 通常シャオンダマがラジクジラを介して世界内へ出現する
 3. 出現したシャオンダマは、ラジクジラから独立したオブジェクトとして世界内に存在する
 4. Playerは世界内に存在するシャオンダマを選択対象として利用する
-5. 選択したシャオンダマは、Chargeを経て`Palette Bullet`化する
+5. Charge成功時に、選択したシャオンダマがAttackEvent occurrenceへ割り当てられて`Reserved`になる
+6. AttackEventの発火時に、対象の`Reserved`のシャオンダマが`Palette Bullet`化して発射される
 
-Chargeの入力、`ActionState`、開始・終了条件、成立条件、内部処理については[Playerアクション｜チャージ](/spec/player/player-action-charge)を正本とします。
+Chargeの入力、`ActionState`、開始・終了条件、成立条件は[Playerアクション｜チャージ](/spec/player/player-action-charge)、割り当てと`Reserved`は[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)、発火時の`Palette Bullet`化・発射は[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正本とします。
 
 ## シャオンダマの浮遊仕様
 
@@ -73,7 +79,8 @@ Chargeの入力、`ActionState`、開始・終了条件、成立条件、内部�
 - Playerによる選択対象となる
 - ラジクジラは通常シャオンダマを世界内へ出現させる役割を持つ
 - 世界内へ出現した後は、ラジクジラから独立したオブジェクトとして扱う
-- Playerによる利用では、Charge後に`Palette Bullet`化する
+- Playerによる利用では、Charge成功時にAttackEvent occurrenceへ割り当てられて`Reserved`になる
+- AttackEventの発火時に、対象の`Reserved`のシャオンダマが`Palette Bullet`化して発射される
 
 シャオンダマ生成に使用する`NoteEvent`や生成タイミング・生成個数などの決定は、本ページでは扱いません。
 
@@ -89,7 +96,9 @@ Chargeの入力、`ActionState`、開始・終了条件、成立条件、内部�
 - 世界内へ出現した後
   - シャオンダマ側が生成後の挙動を担当する
 - Playerによる利用時
-  - Playerがシャオンダマを選択し、Chargeを経て`Palette Bullet`化する
+  - Playerがシャオンダマを選択してChargeする
+  - Charge成功時にAttackEvent occurrenceへ割り当て、`Reserved`にする
+  - AttackEventの発火時に、対象の`Reserved`のシャオンダマを`Palette Bullet`化して発射する
 
 ## 他システムとの接続
 
@@ -111,13 +120,17 @@ BGM／MusicChart側は、シャオンダマについて「何を・いつ・何�
 
 世界内に存在するシャオンダマをPlayerが選択した後のCharge処理は、[Playerアクション｜チャージ](/spec/player/player-action-charge)を正本とします。
 
-本ページではChargeの入力、State、成立条件、内部ロジックは定義しません。
+Charge成功時のAttackEvent occurrenceへの割り当てと`Reserved`は、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正本とします。
+
+本ページではChargeの入力、State、成立条件、Allocationの内部ロジックは定義しません。
 
 ### AttackEvent
 
 `AttackEvent`の詳細仕様は[BGM｜AttackEvent](/spec/bgm/bgm-attack-event)を正本とします。
 
-本ページでは`AttackEvent`の成立条件や内部処理は定義しません。
+AttackEvent発火時の使用対象確定と`Palette Bullet`化・発射は[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、発射後の飛行・命中処理は[パレットブレット](/spec/combat/palette-bullet)を正本とします。
+
+本ページでは`AttackEvent`の成立条件や内部処理、`Palette Bullet`の飛行・命中処理は定義しません。
 
 ### 万能シャオンダマ
 
