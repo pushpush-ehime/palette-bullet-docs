@@ -208,6 +208,14 @@ Result操作の受付状態は、このPlayer State構造へ追加しません�
 
 したがって、Battle結果確定後も`RootState`の事実を保持したまま、Gameplay受付だけを停止し、Player Stateとは別にResult操作をlock／解禁できます。特に、同一frameでClearとDeadが成立した場合は`RootState = Dead`を維持したままClear Resultの操作を受け付けられます。
 
+### Mode／Conductとの責務境界
+
+モード変更要求とコンダクト選択はPlayer入力に関係しますが、そのことだけを理由に既存の`ActionState`へ追加したり、新しいPlayer State／State遷移として扱ったりしません。既存のPalette State Graphと競合する第二のPlayer State管理者も作りません。
+
+現在適用中のモード、未適用のモード変更要求、クールタイム、Player側のコンダクト選択状態、およびAttackEvent occurrenceへ付与されたコンダクトについて、具体的なRuntime OwnerとPalette State Graphへの接続形式は未決です。本ページでは、State Graph Contextへ保持するかどうか、Runtime field、Production Event／Command、およびpayloadを定義しません。
+
+Mode／ConductのGameplay上の意味とライフサイクルは[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とし、Palette State Graphの技術的責務は[Player Action／State Graph基盤](/spec/common-technology/action-state-manage)を参照します。
+
 ---
 
 ## Player仕様ページ構成
@@ -1096,6 +1104,7 @@ StateMachine間の組み合わせによって発生する具体的な移動速�
 | Dead成立後の死亡演出・Game Over接続・Retry | Player死亡 |
 | Battle結果の確定・Clear優先・Result操作解禁条件 | ゲーム全体 |
 | Result操作受付gate・入力lock・Continue／Retry入力 | Player入力と操作 / UI |
+| Mode／ConductのGameplay上の意味・ライフサイクル | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 | カメラ設計 | カメラ仕様側 |
 
 ---
