@@ -1727,6 +1727,16 @@ Lifetimeの具体的な管理方法はShaondama側の正本である`docs/spec/s
 * Charge success後にReservedへ移行したShaondamaは、未Charge向けの通常Lifetime / source NoteEvent到達時処理から外れる
 * Palette Bullet化はReserved移行時ではなくAttackEvent発火時に行う
 
+### モード／コンダクトとの接続
+
+Charge処理では、Charge時点のモードをShaondama個体へsnapshotせず、Allocation Slotにも保存しません。Charge側で使用モードを固定せず、どのモードを使用するかはAttackEventの発火・発射処理へ委譲します。
+
+Charge success時にPlayer側でコンダクトが選択されており、成功したAllocation結果が指すAttackEvent occurrenceにコンダクトが未設定である場合は、そのoccurrenceへ一つ付与します。コンダクトはShaondamaまたはSlotごとに個別付与せず、すでにそのoccurrenceへ`Reserved`済みのShaondamaを含むAttackEvent occurrence全体に対する指示として扱います。
+
+すでにコンダクトが付与されているAttackEvent occurrenceへCharge successした場合に、Player側の選択中コンダクトを消費するかは未決とし、本ページでは確定しません。
+
+モード／コンダクトのGameplay上の意味と付与規則は、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正とします。本ページでは具体的なRuntime field、payload、Ownerを固定しません。
+
 ## パラメータ
 
 Charge固有の主な調整項目を以下に示します。
@@ -1795,6 +1805,7 @@ Chargeに関係する仕様は、以下のように管理します。
 | AttackEvent発火時の完全成立・不完全完成 | `docs/spec/bgm/bgm-attack-judgement.md` |
 | AttackEvent発火時の使用Reserved Shaondama実体決定 | `docs/spec/bgm/bgm-attack-judgement.md` |
 | AttackEvent発火時のPalette Bullet化・Chord / Arpeggio発射 | `docs/spec/bgm/bgm-attack-judgement.md` |
+| Charge時点でモードを固定しない境界と、Charge success時のコンダクト接続 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 | Reserved中のShaondama Lifetime詳細 | `docs/spec/shaondama-music/floating-behavior.md` |
 | 未Charge Shaondamaのsource NoteEvent到達時処理 | Shaondama側正本 |
 

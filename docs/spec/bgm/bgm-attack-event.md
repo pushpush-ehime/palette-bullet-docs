@@ -85,6 +85,7 @@ Gameplay側で発火結果を解決
 | Arpeggio snapshot / 解決完了 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | Palette Bullet発射時の音程音 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | BGMとの実音響同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
+| モード／コンダクトのGameplay上の意味・付与／参照境界 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 | system pre-roll時計・音源開始offset | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | Pause / Resume音響同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | MusicChart上の保存構造・Import・loop validation | [MusicChart仕様](/spec/bgm/bgm-music-chart) |
@@ -1052,7 +1053,7 @@ Runtimeでは、loopをまたぐAttackEventに対して次の補正を行いま�
 
 ## AttackEvent Definition
 
-MusicChart上に保存されるAttackEvent定義と、BGM各周回で実際に発生する論理Occurrenceを分離します。
+MusicChart上に保存される静的なAttackEvent Definitionと、Stage挑戦中にBGM各周回で実際に発生する論理的なAttackEvent occurrenceを分離します。
 
 ```text
 AttackEvent Definition A
@@ -1062,6 +1063,14 @@ AttackEvent Definition A
 ```
 
 同じAttackEvent Definitionを再利用しても、各周回のOccurrenceは仕様上区別できる必要があります。
+
+MusicChart上に保存される静的なAttackEvent Definitionには、PlayerがStage挑戦中に選択するモード／コンダクトを保存しません。
+
+コンダクトは、Stage挑戦中の具体的なAttackEvent occurrenceへ最大一つ付与し、そのoccurrence全体の指示として扱います。付与前に`Reserved`済みのShaondamaを含め、Chordの各音、Arpeggio列、複数Shaondamaへ別々のコンダクトを持たせません。
+
+モードはCharge時にAttackEvent occurrenceまたはReserved Shaondamaへ固定しません。発火・発射処理では、Charge時のモードではなく、モード切替規則に従って適用済みのモードを使用します。同じ小節頭でモード適用とPalette Bullet発射が成立する場合は、新しいモードを先に適用します。ただし、ArpeggioでAttackEvent発火時のモードを全体へ固定するか、各Palette Bulletの実発射時点で参照するかは未決です。
+
+モード／コンダクトの具体的なRuntimeデータ構造、field名、保持Owner、Production Event／Command名は本ページでは確定しません。Gameplay上の意味と付与・参照境界は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正とします。
 
 ---
 
@@ -1388,6 +1397,11 @@ Normal AttackEventではAttackEvent自身のMusic Requirement Entryが実発音�
 - 「Weakは必ずShaondama自身のsource NoteEventで発火する」と一般化しない
 - HarmonyはAttackEventの音楽情報として保持する
 - MusicChart上のAttackEvent Definitionと各BGM周回の論理Occurrenceを分離する
+- MusicChart上の静的なAttackEvent Definitionへモード／コンダクトを保存しない
+- コンダクトはStage挑戦中の具体的なAttackEvent occurrenceへ最大一つ付与し、occurrence全体の指示として扱う
+- モードはCharge時のAttackEvent occurrenceまたはReserved Shaondamaへ固定せず、発火・発射処理で適用済みのモードを使用する
+- 同じ小節頭でモード適用とPalette Bullet発射が成立する場合は、新しいモードを先に適用する
+- ArpeggioのモードをAttackEvent発火時に全体へ固定するか、各Palette Bulletの実発射時点で参照するかは未決とする
 - Random Sectionでは各周回で選択されたCandidateだけがNormal AttackEvent occurrenceになる
 - 選択されなかったCandidateはその周回では予告・Charge対象・発火の対象にしない
 - Weak AttackEventはAllocation済みの特定NoteEvent occurrenceに紐づき、別周回へ自動付け替えしない

@@ -11,7 +11,7 @@ relatedTasks: []
 
 ## 目的
 
-本ページでは、Reserved状態のShaondamaがChargeされた状態：Palette Bulletについて、以下を定義します。
+本ページでは、世界内のShaondamaがCharge成功によりAttackEvent occurrenceへ割り当てられて`Reserved`となり、AttackEventで定められた発射タイミングにPalette Bullet化する境界と、その後の処理について、以下を定義します。
 
 - Palette Bullet化とShaondamaからの情報引き継ぎ
 - 発射開始位置
@@ -467,7 +467,7 @@ Gameplay無効化後に、Palette Bulletの軌跡、object、爆発VFX、SEを�
 
 次のすべてを満たした時点を、Palette Bullet Ownerの必須cleanup完了とします。
 
-- 終了したBattleに対する新しいPalette Bullet生成要求を拒否している
+- 終了したBattleに対する新しいPalette Bullet化・発射要求を拒否している
 - 終了したBattleに属する飛行中・衝突処理中・爆発処理中の全Palette BulletをGameplay無効化している
 - 終了したBattleのCollider、Trigger、Hit、Damage、爆発範囲query、Marker消滅処理を停止している
 - Palette Bullet側に残っていた未送信・未受理のDamage候補を破棄している

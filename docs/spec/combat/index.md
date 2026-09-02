@@ -135,7 +135,7 @@ Battle開始gate成立後のsystem pre-roll中も、上記条件を満たす現�
 
 受付対象は、次の2種類に分けます。
 
-- **新規処理:** 新しい戦闘操作、Charge、シャオンダマ生成要求、Enemy Spawn、AttackEvent／Arpeggio開始、Allocation、Target決定、Palette Bullet／Marker／Enemy Projectileの生成、Hit／Damage／Parry判定を含む攻撃開始
+- **新規処理:** 新しい戦闘操作、Charge、シャオンダマ生成要求、Enemy Spawn、AttackEvent／Arpeggio開始、Allocation、Target決定、Reserved ShaondamaのPalette Bullet化・発射、その他のProjectile／Markerの生成、Hit／Damage／Parry判定を含む攻撃開始
 - **遅延結果:** すでに開始済みの処理から遅れて届く生成完了、衝突、Hit、Damage、浄化、Parry、Target、結果候補、予約済みcallback
 
 | 受付種別 | 結果未確定・非Pause・終了前 | Pause中 | 結果確定後／終了処理中 | Battle ID不一致 |
@@ -152,7 +152,7 @@ Battle開始gate成立後のsystem pre-roll中も、上記条件を満たす現�
 - Game Over候補はPlayer側から、ゲーム全体の結果確定処理へ渡します。
 - Clear／Game Overの条件、Unity上の同一フレームを単位とする候補収集、同一フレームでのClear優先、および最終結果の一回確定は、[ゲーム全体](/spec/game/)を参照します。
 - Combat Systemは、独自のClear／Game Over条件や優先順位を追加せず、確定結果を再判定しません。
-- Battle結果確定後は、飛行中または処理途中のobjectが残っていても、新しいHit、Damage、Parry判定、Target決定、Projectile／Marker生成、Enemy Spawnを成立させません。
+- Battle結果確定後は、飛行中または処理途中のobjectが残っていても、新しいHit、Damage、Parry判定、Target決定、Reserved ShaondamaのPalette Bullet化・発射、その他のProjectile／Markerの生成、Enemy Spawnを成立させません。
 - Charge、Allocation、Reserved、AttackEvent、Palette Bullet、Marker、Damage、および浄化の内部成立条件は、各所有ページを正本とします。
 - Chargeは明示的なCombat受付対象です。Charge開始条件は、現在BattleのCombat受付とPlayer戦闘操作受付が有効であること、およびCharge固有条件によって判定し、BGM Audioの再生状態には依存させません。このため、system pre-roll中もChargeを開始できます。
 - system pre-roll中のAttackEvent Previewは有効です。Previewの生成時刻と表示への受け渡しはBGM／MusicChart側を正本とし、Combat SystemはBGM Audioが無音であることを理由に無効化しません。
@@ -339,7 +339,7 @@ StageとEnemy Spawnは機能上それぞれの処理を持つが、Battle終了�
 - Charge開始条件へ、BGM Audioが再生中であることを追加してはいけません。
 - Pause中に、新しいEnemy Spawn、Clear対象登録、Enemy生成・初期化、またはGameplay有効化を進行させてはいけません。
 - 同じBattleに対してBattle ID配布、Combat受付開始、Battle終了通知の受理、またはBattle終了処理を複数回成立させてはいけません。
-- Battle結果確定後に、新しい戦闘操作、Charge、生成要求、Enemy Spawn、AttackEvent、Arpeggio、Allocation、Target決定、Projectile／Marker生成、攻撃、Hit、Damage、Parry判定、または浄化を開始してはいけません。
+- Battle結果確定後に、新しい戦闘操作、Charge、生成要求、Enemy Spawn、AttackEvent、Arpeggio、Allocation、Target決定、Reserved ShaondamaのPalette Bullet化・発射、その他のProjectile／Markerの生成、攻撃、Hit、Damage、Parry判定、または浄化を開始してはいけません。
 - Battle結果確定後に、旧Spawn要求や遅延Spawn完了通知からClear対象登録、`PendingSpawn → Active`、またはEnemy有効化を成立させてはいけません。
 - Combat Systemが、Stage内部のobjective、wave進行、pending Spawn数、Clear対象Enemy記録、またはworld上のEnemy数からClear候補を再判定してはいけません。
 - GameからのBattle終了通知を同じBattleについて複数回受理したり、各Ownerへcleanup要求を重複発行したりしてはいけません。
