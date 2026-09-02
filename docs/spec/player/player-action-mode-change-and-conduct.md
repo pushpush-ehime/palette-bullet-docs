@@ -26,7 +26,7 @@ relatedTasks: []
 
 - Stage前に、聞こえ方と戦い方が異なるモードを構成する
 - HP、スタミナ、Enemy、場の状況、次の小節を見てモードを切り替える
-- Charge直前に、一つのAttackEventをどのように演奏・発射するか選ぶ
+- Charge開始前またはCharge中に、成功確定前まで一つのAttackEventをどのように演奏・発射するか選ぶ
 - 選択結果を音、見た目・挙動、攻撃や回復などの明示的な値へ同じ設定から反映する
 
 本ページは、今回合意した新仕様を一か所へ保存し、後続の既存ページ同期と実装検討で参照するためのページです。
@@ -66,7 +66,7 @@ relatedTasks: []
 | モード | 音への作用と、長所・短所を持つ戦い方の設定をひとまとまりにしたもの | 4種類を使用 |
 | エフェクター | 編集可能なモードのスロットへセットし、音と戦い方の両方を変化させる設定要素 | 種類・効果は未決 |
 | コンダクト | 一つのAttackEvent全体へ付与する演奏・発射指示 | 仮称・付与規則は確定 |
-| 選択中コンダクト | Player側で選択され、次のCharge成功まで保持されているコンダクト | Charge成功前は変更可能 |
+| 選択中コンダクト | Player側で選択され、次のCharge成功まで保持されているコンダクト | Charge開始後を含め、Charge成功確定前は変更可能 |
 | 付与済みコンダクト | Charge成功時にAttackEventへ固定されたコンダクト | 付与後は変更不可 |
 | コンダクト未選択状態（通常状態） | Playerがコンダクトを選択していない状態 | Stage開始・Retry・消費後の初期状態。Normal AttackEventやNormal Shaondamaとは別の意味 |
 
@@ -86,14 +86,14 @@ Stage中
 次の小節頭
 新しい聞こえ方と戦い方へ一括切替
 ↓
-Charge前
-一つのAttackEventに使うコンダクトを選択
+Charge開始前またはCharge中
+Charge成功確定前まで、使うコンダクトを選択・変更
 ↓
 Charge成功
 選択中コンダクトをAttackEvent全体へ固定
 ↓
-AttackEventの発射タイミング
-発射時点のモードと付与済みコンダクトを同時に反映
+AttackEventの発火・発射タイミング
+発火・発射処理で決定されたモードと付与済みコンダクトを同時に反映
 ```
 
 各選択は、音とGameplayの両方から違いを理解できる必要があります。音楽知識がないPlayerにも聞こえ方と効果から役割が伝わり、上級者には接続順、段階、切替タイミングを研究する余地を残します。
@@ -119,12 +119,14 @@ Charge成功時にConductをAttackEventへ付与
 ↓
 既存仕様が定めるAttackEvent発火・各発射タイミング
 ↓
-発射時点のModeを参照
+AttackEventの発火・発射処理で使用するModeを参照
 ↓
 ShaondamaをPalette Bullet化して発射
 ```
 
 Weakの場合は、既存のAllocation規則に従ってCharge成功時にWeak AttackEventを動的に作り、同じ成功処理の中でコンダクトを付与します。
+
+ArpeggioでModeをAttackEvent発火時に全体へ固定するか、各Palette Bulletの実発射時点で参照するかは未決事項です。
 
 次の境界を守ります。
 
@@ -335,15 +337,28 @@ Gameplay上の意図として、古いモードから新しいモードへ徐々
 新モードを参照
 ```
 
-その小節頭で発射されるPalette Bulletには新しいモードを使用します。
+少なくとも、その小節頭で発火するAttackEventのPalette Bulletには新しいモードを使用します。
 
-Charge済みで`Reserved`のShaondamaも、Charge時点のモードを個体へ固定保存しません。対応する発射タイミングで有効なモードの影響を受けます。
+Charge済みで`Reserved`のShaondamaも、Charge時点のモードを個体へ固定保存しません。AttackEventの発火・発射処理で決定されるモードの影響を受けます。
 
-Arpeggioでは、AttackEvent全体へコンダクトを固定したまま、各Palette Bulletの実際の発射時点で有効なモードを参照します。
+Arpeggioが小節頭をまたぐ場合のモード参照時点は、まだ確定していません。次の二案を後続で比較し、決定します。
+
+- AttackEvent発火時のモードをsnapshotし、後続Entryを含むArpeggio全体で使用する
+- 各Palette Bulletの実発射時点で有効なモードを使用する
+
+後者を採用した場合は、同じArpeggio AttackEvent内でも、小節頭より前後のEntryで使用モードが異なる可能性があります。本ページでは、どちらかを確定したものとして扱いません。
 
 ### クールタイム
 
 モードのクールタイムは、変更要求を受け付けた瞬間ではなく、選択されたモードが小節頭で実際に適用された瞬間から開始します。
+
+モード切替操作自体は無料です。
+
+- モード切替の要求・適用によって、スタミナ、HP、アイテムなどを消費しない
+- モード切替の使用回数に上限を設けない
+- 連続した切替を制限するのは、以下の1小節相当秒数のクールタイムだけとする
+
+これは、モードの効果によってスタミナの回復・消費などが変化する可能性とは別の規則です。モード効果のコストや数値を、モード切替操作のコストとして扱いません。
 
 - クールタイムの長さは、適用位置における1小節相当の秒数とする
 - クールタイム中は別のモードへ変更できない
@@ -423,6 +438,14 @@ Cutは現在の候補へ含めません。
 ### 入力
 
 コンダクトは、マウスホイール回転で選択します。
+
+コンダクトはCharge開始前だけでなく、Charge開始後もCharge成功が確定する前であれば選択・変更できます。
+
+- Click Chargeでは、Charge判定Eventによる`success`確定前まで選択・変更できる
+- Drag Chargeでは、ReleaseによるAtomic判定の`success`確定前まで選択・変更できる
+- `success`確定後は、そのChargeに使用したコンダクトを変更できない
+
+ホイール入力とCharge成功確定が同じ時刻・同じFrameに発生した場合の処理順は、本ページでは確定しません。
 
 - マウスホイールをモード選択には使用しない
 - マウスホイール押し込みのMarker入力とは別の入力として扱う
@@ -511,12 +534,12 @@ Weak AttackEventの場合は、Charge成功時に既存のWeak Allocation規則�
 
 | 既存要素 | コンダクトとの関係 | モードとの関係 |
 | --- | --- | --- |
-| Normal AttackEvent | Charge成功時に、未設定なら一つ付与できる | 各発射時点の有効モードを使用する |
+| Normal AttackEvent | Charge成功時に、未設定なら一つ付与できる | AttackEventの発火・発射処理で決定する。Arpeggioの参照単位は未決 |
 | Weak AttackEvent | Charge成功時の動的作成と同じ成功処理で一つ付与できる | 発射時点の有効モードを使用する |
 | Click Charge | 1個のShaondamaのCharge成功を契機に、接続先AttackEventへ付与する | Charge時点では固定しない |
 | Drag Charge | Atomic success時に、Shaondamaごとではなく接続先AttackEvent全体へ一つ付与する | Charge時点では固定しない |
 | Chord | 全Entry・全発射音へ同じコンダクトを作用させる | Chordの発射時点の有効モードを使用する |
-| Arpeggio | 一連のEntry・発射音へ同じコンダクトを作用させる | 各Entryの実際の発射時点の有効モードを使用する |
+| Arpeggio | 一連のEntry・発射音へ同じコンダクトを作用させる | AttackEvent発火時に全体へ固定するか、各Entryの実発射時点で参照するかは未決 |
 
 Normal／Weakの決定、Click／Dragの`success / miss`、Slot Allocation、Chord／Arpeggioの音楽的順序・Timing、AttackEventの発火結果は、既存の各正本ページで決定します。本ページは、それらを再判定しません。
 
@@ -541,17 +564,17 @@ Palette Bulletの発射時には、少なくとも以下を参照します。
 
 - MusicChart／AttackEventが決めた「何を・いつ鳴らすか」
 - Charge成功時にAttackEventへ保存されたコンダクト
-- 各Palette Bulletの発射時点で有効なモード
+- AttackEventの発火・発射処理で適用対象として決定されたモード
 
 | 要素 | 確定・参照時点 | 後から変更されるもの |
 | --- | --- | --- |
 | MusicChart／AttackEventの音楽情報 | 楽曲・Chart制作時および既存Runtime解決時 | Player操作では元データを変更しない |
 | コンダクト | Charge成功時にAttackEventへ固定 | 付与後は変更しない |
-| モード | 小節頭で有効モードを切替、Palette Bullet発射時に参照 | 後続の小節頭で別モードへ切替可能 |
+| モード | 小節頭で有効モードを切替、AttackEventの発火・発射処理で参照 | 後続の小節頭で別モードへ切替可能 |
 
 モード切替と発射が同じ小節頭の場合は、新しいモードを先に適用します。モードを変更してもAttackEventのコンダクトは変化しません。コンダクトを付与してもMusicChartの元データは変化しません。
 
-Arpeggioの途中で小節頭のモード切替が成立した場合、コンダクトは同じAttackEvent全体で固定したまま、切替前後のEntryがそれぞれの実発射時点で有効なモードを参照します。その結果、同じArpeggio AttackEvent内でEntryごとに参照モードが異なる場合があります。
+Arpeggioの途中で小節頭のモード切替が成立した場合も、コンダクトは同じAttackEvent全体で固定します。一方、モードをAttackEvent発火時にArpeggio全体へ固定するか、各Palette Bulletの実発射時点で参照するかは未決です。決定までは、同じAttackEvent内でモードが分かれることを確定仕様として扱いません。
 
 音、見た目・挙動、攻撃や回復などの値は、実際の音声波形から逆算しません。モード設定とコンダクト設定を安定した入力データとして参照し、それぞれの出力を決定します。
 
@@ -649,7 +672,7 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 - 次の小節を予測してモードを選ぶ判断が面白いか
 - モード1へ戻る回復・立て直し判断が成立するか
 - エフェクターの並び順を変えることで、音と戦い方の両方が変わるか
-- コンダクトをCharge直前に選ぶ行為が、演奏へ参加している感覚につながるか
+- コンダクトをCharge成功確定前まで選択・変更する行為が、演奏へ参加している感覚につながるか
 - 「ひろがり」と「やまびこ」の使い分けが成立するか
 - 一つの最適なモードや接続順だけに収束しないか
 - 音楽知識がないPlayerでも、聞こえ方と効果から理解できるか
@@ -674,9 +697,11 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 - 編集可能モードは初期方針として最大3エフェクタースロットを持つ
 - エフェクターは左から右へ順番に処理し、並び順で音と戦い方の両方が変わる
 - モードは`1`～`4`で直接選択し、マウスホイールでは選択しない
+- モード切替操作自体はスタミナ、HP、アイテムなどを消費せず、使用回数制限を持たない
+- モード切替を制限するのは、実適用時から始まる1小節相当秒数のクールタイムだけとする
 - 変更要求は次の小節頭で一括適用する
 - 同じ小節頭では新モードを適用してからPalette Bulletを発射する
-- 発射時点のモードを使用し、Charge時点のモードをShaondamaへ固定しない
+- Charge時点のモードをShaondamaへ固定せず、AttackEventの発火・発射処理で使用するモードを決める
 - 実適用時から、その位置の1小節相当秒数のクールタイムを開始する
 - クールタイム中の入力は破棄し、後から実行しない
 - Stage開始とRetryではモード1から開始する
@@ -688,7 +713,7 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 
 - コンダクトは一つのAttackEvent全体に対する指示とする
 - マウスホイール回転で選択し、ホイール押し込みのMarker入力と分離する
-- Charge成功前は別のコンダクトへ変更できる
+- Charge開始前およびCharge開始後も、Charge成功確定前は別のコンダクトへ変更できる
 - 選択状態はNormal／Weakを問わず次のCharge成功まで維持する
 - Charge成功時にAttackEventへ一つだけ付与し、Player側をコンダクト未選択状態へ戻す
 - 付与後は上書き・切替できない
@@ -736,6 +761,7 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 - モード変更要求と同Frameの各処理順序
 - 同じ小節内に複数のモード変更要求を受けた場合の保持・上書き規則
 - 現在使用中のモードを再選択した場合の扱い
+- ArpeggioでAttackEvent発火時のモードを全体へ固定するか、各Palette Bulletの実発射時点で参照するか
 - 通常のRoom移動中に参照する小節基準と適用タイミング
 - 未適用のモード変更要求とクールタイムをRoom境界で維持するか
 - Pause中の変更要求受付・小節頭適用・クールタイム進行
@@ -753,6 +779,7 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 - コンダクト選択中のHUD表示
 - AttackEventにすでにコンダクトがある場合のFeedback
 - 選択中コンダクトを保持したまま、コンダクト付与済みAttackEventがCurrentになった場合の入力gate
+- ホイール入力とClick／DragのCharge成功確定が同じ時刻・同じFrameに成立した場合の処理順
 - Accent、Staccato、ひろがり、とがり、やまびこの具体的効果
 - 各コンダクトの長所・短所
 - スタミナ、弾速、Damageなどの具体的な代償
@@ -791,7 +818,7 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 - Shaondamaの浮遊へ影響するか
 - Normal Shaondamaの自然破裂Weak攻撃へモードを作用させるか
 - モード内部の計算結果を、既存のRGB、直撃／爆風倍率、Wildcard倍率、Enemy側集約・丸め・Clampへ接続する順序
-- Palette Bullet発射時に参照したモードの値・挙動を、飛行・命中・爆発までどのように保持するか
+- AttackEventの発火・発射処理で適用したモードの値・挙動を、飛行・命中・爆発までどのように保持するか
 
 ### Runtime・UI・保存
 
@@ -844,12 +871,12 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 | Player | [Playerアクション遷移](/spec/player/player-action-transitions) | コンダクト選択がActionState遷移を不必要に増やさないこと |
 | BGM | [BGM概要](/spec/bgm/) | モード／コンダクトとBGMカテゴリの高レベルな責務境界 |
 | BGM | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) | MusicChart由来情報と、Stage挑戦中に付与するコンダクトの分離 |
-| BGM | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) | 発火時のコンダクト取得と、発射時点モード参照の接続 |
+| BGM | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) | 発火時のコンダクト取得と、Arpeggioを含むモード参照時点の接続 |
 | BGM | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) | モード／コンダクトの必須音響範囲、小節境界、Mix責務 |
 | BGM | [BGM→シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama) | Shaondama生成とモード／コンダクトを混同しない境界 |
 | BGM | [MusicChart仕様](/spec/bgm/bgm-music-chart) | モード／コンダクトをChart元データへ埋め込まない契約 |
 | Combat | [戦闘](/spec/combat/) | モード／コンダクトによる明示的なCombat値・挙動の接続先 |
-| Combat | [パレットブレット](/spec/combat/palette-bullet) | 発射時点のモード、AttackEvent単位コンダクト、飛行・Damageへの反映 |
+| Combat | [パレットブレット](/spec/combat/palette-bullet) | 冒頭にある`Reserved`状態とPalette Bulletの同一視を避ける表現、cleanup完了条件に残る旧「生成要求」表現の「Palette Bullet化・発射要求」への同期、発火・発射処理で使用するモード、AttackEvent単位コンダクト、飛行・Damageへの反映 |
 | Draw | [ドローシステム](/spec/draw-system/) | 新仕様との高レベルな接続 |
 | Draw | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) | Weak AttackEvent作成時のコンダクト付与と`Reserved`境界 |
 | Shaondama | [シャオンダマ](/spec/shaondama-music/) | 浮遊個体からPalette Bullet化する既存ライフサイクルとの接続 |
@@ -860,7 +887,7 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 | Game | [ゲーム全体](/spec/game/) | Stage、Room、Battle、Result、Retryのライフサイクル接続 |
 | Game | [プロトタイプ](/spec/game/prototype) | 現行対象外の拠点を使う構成方法と、初期検証段階・試遊範囲への反映 |
 | 共通技術 | [Player Action／State Graph基盤](/spec/common-technology/action-state-manage) | 既存State Graphとの接続、Owner、Event／Commandを実装時に確定 |
-| 共通技術 | [Gameplay Runtime Trace](/spec/common-technology/gameplay-runtime-trace) | モード要求・適用・コンダクト付与・発射時参照の追跡範囲 |
+| 共通技術 | [Gameplay Runtime Trace](/spec/common-technology/gameplay-runtime-trace) | モード要求・適用、コンダクト付与、発火・発射処理でのモード参照の追跡範囲 |
 | 共通技術 | [プランナー向け調整パラメータ管理](/spec/common-technology/planner-tuning-parameter) | エフェクター段階、上限、モード／コンダクト数値の調整・保存方式 |
 | UI | [UI](/spec/ui/) | モード予告、クールタイム、コンダクト選択、入力拒否Feedbackの表示 |
 | RadioWhale | [ラジクジラ](/spec/radiowhale/) | Presentation上のセット表現とPlayerから独立した存在である境界 |
