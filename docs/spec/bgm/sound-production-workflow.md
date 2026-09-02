@@ -460,6 +460,16 @@ UnityへのImportとGameplay接続が完了した後は、実際のゲーム内�
 
 BGMとGameplayの同期挙動については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。
 
+### Mode／Conductの制作・確認境界
+
+Mode／Conductを導入しても、完成済みの戦闘BGMを継続して使用し、Player由来音を別レイヤーとして追加します。戦闘BGM、Palette Bullet音程音、およびGameplay SEの既存レイヤー分離を維持します。
+
+将来の制作・試聴・ゲーム内確認では、Modeが完成済み戦闘BGMへ、ConductがPalette Bulletの発射音へ、それぞれPlayerが聞き分けられる変化を与えているか確認します。Conductを音程音、Gameplay上の発射SE、またはその両方のどこへ適用するかは未決です。具体的なEffect chain、Audio Mixer、DSP、および音量値は本ページで確定しません。
+
+MIDIは静的な楽曲情報の入力元、MusicChartは静的データの正本、[MusicChart制作・確認ツール](/spec/common-technology/music-chart-workbench)は制作・確認ツールとして扱い、PlayerがStage挑戦中に選ぶMode／ConductのRuntime状態や必須入力の正本にはしません。Player操作によってMIDIまたはMusicChartの元データを書き換えず、Workbench固有のRuntime正本も作りません。
+
+この確認境界はWorkbenchへの機能追加やUnity Audio実装方式を要求するものではありません。Mode／ConductのGameplay上の意味は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、最低音響保証は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とします。
+
 ---
 
 ## 修正時の流れ
@@ -674,6 +684,8 @@ SEを10個制作する
 | AttackEventのSlot割り当て・成立判定       | チャージシステム側の仕様                                         |
 | PlayerのCharge入力・Action          | Player仕様                                             |
 | NoteEventからのシャオンダマ生成            | シャオンダマ側の仕様                                           |
+| Mode／ConductのGameplay上の意味      | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
+| MusicChart Workbenchの制作・確認責務 | [MusicChart制作・確認ツール](/spec/common-technology/music-chart-workbench) |
 
 ---
 

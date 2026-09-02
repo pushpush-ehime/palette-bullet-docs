@@ -33,6 +33,7 @@ relatedTasks: []
 - Battle終了時のGameplay同期解除・cleanup / Room Retry
 - Parry HitStop中のBGM Audio・3時計・AttackEvent同期
 - 戦闘BGM / Palette Bullet音程音 / Gameplay SEのレイヤー関係
+- Mode／Conductの最低音響保証とGameplay結果との分離
 
 一方、以下は本ページでは再定義しません。
 
@@ -290,6 +291,30 @@ Palette Bullet発射
 - Spatial設定
 
 などは本ページでは固定しません。
+
+---
+
+# Mode／Conductの音響接続
+
+## 最低音響保証
+
+Modeは、少なくとも完成済みの戦闘BGMへ、Playerが聞き分けられる変化を与えます。Conductは、少なくともPalette Bulletの発射音へ、Playerが聞き分けられる変化を与えます。
+
+ここでいう発射音は、Palette Bulletの発射時にPlayerへ聞こえる音を指します。Conductを音程音、Gameplay上の発射SE、またはその両方のどこへ適用するかは未決です。
+
+完成済みの戦闘BGMを継続して使用し、Player由来音を別レイヤーとして追加する既存構造と、戦闘BGM／Palette Bullet音程音／Gameplay SEのレイヤー分離を維持します。現時点のMode仕様には、BGMの恒常的なTempo変更、拍子変更、楽器編成の変更、別アレンジへの交換、およびRuntimeでのStem／楽器レイヤー切替を含めません。
+
+Conductによる一時的な「だんだん速く／遅く」は将来候補であり、採用するか、および採用する場合のBGM／MusicChart同期方法は未決です。
+
+具体的なAudio Mixer／Mixer Group、DSP、Effect、パラメーター、Wet／Dry、Crossfade、残響Tail、ModeのBGM以外への適用範囲、およびConductの具体的な適用先は未決です。Gameplay上の意味と適用規則は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。
+
+## 音響とGameplay結果の境界
+
+音、Palette Bulletの見た目・挙動、およびGameplay上の値や結果は、同じ安定したMode／Conduct設定データを参照して別々に決定します。実際にスピーカーから出力された音声波形を解析してDamageなどを決めず、Audio出力の遅延、音量、または端末差によってGameplay結果が変化する方式にはしません。
+
+Mode／Conductを音だけが変わる装飾機能にも、音楽性を伴わない単なる数値装備にもせず、音響とGameplayの双方が同じ設定を参照します。
+
+具体的なDamage、回復、弾速、範囲、および計算順は未決です。本ページでは音響とGameplay結果の接続境界だけを定義し、具体的なGameplay効果を確定しません。
 
 ---
 
@@ -1739,6 +1764,8 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 | `Complete / Incomplete / Zero Charge`・使用Reserved・Palette Bullet化・発射対象 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | 発火前AttackEvent・Arpeggio残Entry・AttackEvent snapshot・未消費ReservedのBattle終了cleanup | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | BGM / Palette Bullet音程音 / Gameplay SEの同期・発音 | **本ページ** |
+| Mode／Conductの最低音響保証と、音響／Gameplay結果の分離 | **本ページ** |
+| Mode／ConductのGameplay上の意味・選択・適用規則 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 | Shaondama runtime data | [玉のデータ](/spec/shaondama-music/orb-data) |
 | 万能Shaondama固有仕様 | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
 | Palette Bullet発射後のTarget / 飛翔 / 命中 / Damage / 消滅 | Palette Bullet側の正本 |

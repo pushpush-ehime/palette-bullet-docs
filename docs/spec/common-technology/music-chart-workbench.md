@@ -110,6 +110,14 @@ Workbench専用データとMusicChart内へ、同じGameplay設定を二重保�
 Editorツールが存在しない場合でも、
 MusicChartやRuntimeデータの意味が変化しない構造とします。
 
+### モード／コンダクトとの責務境界
+
+WorkbenchはMusicChartの制作・確認ツールであり、PlayerがStage挑戦中に選択・保持・付与するモード／コンダクトのRuntime状態を保存する正本ではありません。これらをMIDI、MusicChartの必須入力・手動設定、またはWorkbench専用データへ追加せず、Workbench、MIDI、MusicChartのいずれもPlayer Runtime状態の独立した正本にはしません。
+
+Runtime Monitor等で将来これらを表示する場合も、Runtime側が確定した状態を読み取り専用で確認し、Workbench側で再判定・保存しません。モード／コンダクトの聞き分け可能性を将来確認する場合は、制作・試聴の支援として扱います。
+
+この境界はWorkbenchへの機能追加や、具体的なAudio Mixer／DSP、Runtime実装、保持Ownerを確定するものではありません。Gameplay上の意味とRuntime境界は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。
+
 ---
 
 ## 対象データ
@@ -1120,6 +1128,7 @@ MIDI Note単体試聴は、
 | Random Sectionの抽選規則 | [BGM Random Section仕様](/spec/bgm/bgm-random-section) |
 | Charge Allocation・Current AttackEvent | [Charge Allocation仕様](/spec/draw-system/charge-allocation) |
 | 複数System横断のRuntime時系列Evidence | [Gameplay Runtime Trace仕様](/spec/common-technology/gameplay-runtime-trace) |
+| モード／コンダクトのGameplay上の意味とRuntime境界 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 
 ---
 

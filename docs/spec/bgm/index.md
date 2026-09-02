@@ -155,12 +155,20 @@ MusicChart
 ↓
 NoteEvent
 ↓
-シャオンダマ
+世界内に存在するシャオンダマ
 ↓
-Charge
+Playerが選択してCharge
 ↓
-パレットブレット
+Charge成功
+↓
+AttackEvent occurrenceへ割り当ててReserved
+↓
+AttackEvent発火
+↓
+Reserved ShaondamaがPalette Bullet化・発射
 ```
+
+Charge成功時点ではシャオンダマをPalette Bullet化せず、AttackEvent occurrenceへのAllocationを確定して`Reserved`へ移行するまでとします。Charge、Allocation、AttackEvent発火判定、およびPalette Bullet化後の詳細は、[Playerアクション｜チャージ](/spec/player/player-action-charge)、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet)をそれぞれ正本とします。
 
 これとは別に、`MusicChart`へAttackEventを設定します。
 
@@ -179,7 +187,7 @@ AttackEvent発火
 │
 └─ 成立
     ↓
-    パレットブレット発射
+    Reserved ShaondamaをPalette Bullet化・発射
     +
     パレットブレットの音程を発音
     +
@@ -199,6 +207,12 @@ Gameplay SE
 として再生します。
 
 Chord / Arpeggioの発音、AttackEvent不成立時、Pause / Resume、BGM Loop、Battle終了、Retryなどの詳細については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。
+
+### MusicChartとMode／Conductの責務境界
+
+MusicChartは、楽曲側が決める「何の音を、いつ使用するか」を静的な音楽情報として保持します。これに対し、Modeは戦闘中に曲全体の聞こえ方と戦い方の方向を切り替え、Conductは一つのAttackEvent occurrenceの演奏・発射をどう表現するか指示します。
+
+PlayerがStage挑戦中に選択するMode／ConductをMusicChartの元データへ保存せず、Player操作によって実行中または保存済みのMusicChart元データを書き換えません。Gameplay上の意味は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、最低限の音響接続は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とします。
 
 ---
 
@@ -437,10 +451,11 @@ Gameplay自体のルールは、それぞれのカテゴリを正とします。
 | MusicChartの構造・Import / ReImport | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart)           |
 | AttackEventを音楽上どこへ・どのように設定するか   | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)              |
 | Random Sectionの候補・抽選ルール         | [BGM Random Section仕様](/spec/bgm/bgm-random-section)    |
-| サウンド班からUnityまでの制作・受け渡し工程        | **サウンド班制作フロー（新規作成予定）**                                  |
+| サウンド班からUnityまでの制作・受け渡し工程        | [サウンド班制作フロー](/spec/bgm/sound-production-workflow)              |
 | `NoteEvent`からシャオンダマを生成するルール     | [MIDI駆動生成](/spec/shaondama-music/midi-driven-spawning)  |
 | AttackEventのSlot割り当て・成立判定       | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
 | PlayerのCharge入力・Action          | [Playerアクション｜チャージ](/spec/player/player-action-charge)   |
+| Mode／ConductのGameplay上の意味・選択・適用 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 
 同じ仕様を複数ページで独立して定義しません。
 
