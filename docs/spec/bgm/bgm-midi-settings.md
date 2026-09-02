@@ -66,6 +66,12 @@ MIDIから取得した情報は、Unity Editorで`MusicChart`へ変換して使�
 
 ゲーム実行中にMIDIを直接解析・再生することを前提としません。
 
+### モード／コンダクトとの責務境界
+
+MIDIがUnityへ渡すのは、楽曲側が決めた「何の音を、いつ使用するか」のための静的な音楽情報です。PlayerがStage挑戦中に選ぶモード／コンダクトをMIDIへ埋め込まず、MIDIをその選択状態の正本にしません。Player操作によってMIDIまたはMusicChartの元データを書き換えません。
+
+MIDI由来の音楽情報、MusicChartへ手動設定する静的なAttackEvent Definition、Stage挑戦中の具体的なAttackEvent occurrenceへ付与するコンダクト、および発火・発射時に参照する適用済みモードを区別します。この境界は既存のMIDI変換・Export・設定を変更しません。詳細は[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)と[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。
+
 ---
 
 ## BGM制作データ構成
@@ -811,3 +817,4 @@ Import後は、サウンド班もゲーム内で音楽・同期結果を確認�
 | Random Section | [BGM Random Section仕様](/spec/bgm/bgm-random-section) |
 | BGMとGameplay結果の音響接続・Loop挙動 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | Gameplayで使用するTrackの最終決定 | プランナー側のGameplay仕様 |
+| モード／コンダクトのGameplay上の意味とRuntime境界 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |

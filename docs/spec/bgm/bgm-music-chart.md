@@ -1068,6 +1068,17 @@ MusicChartに保存しないRuntime状態には、少なくとも以下を含み
 - 動的Weak AttackEvent
 - Weak Reserved Shaondama
 - PlayerのCharge状態
+- 現在適用中のモード
+- 未適用のモード変更要求
+- モード切替クールタイム
+- Player側で選択中のコンダクト
+- Stage挑戦中の具体的なAttackEvent occurrenceへ付与されたコンダクト
+- Playerのモード／コンダクト入力履歴と、それによる一時的なRuntime状態
+- Charge時または発火・発射時に参照されたモードと、その一時的なRuntime結果
+
+これらをMusicChartの静的schema、AttackEvent Definition、MusicChartのsource assetまたは生成物へ追加しません。Player入力やStage挑戦中の状態変化によって、実行中または保存済みのMusicChart元データを書き換えません。
+
+[MusicChart制作・確認ツール](/spec/common-technology/music-chart-workbench)はMusicChartの制作・確認ツールであり、上記Runtime状態の独立した正本にはしません。具体的なRuntime field、保持schema、およびOwnerは本ページでは確定せず、Mode／ConductのGameplay上の意味は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。
 
 ### BGM LoopとNormal AttackEvent occurrence
 
@@ -1594,6 +1605,7 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 | NoteEventからのシャオンダマ生成 | [BGM シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama) |
 | Random Sectionの候補・抽選ルール | [BGM Random Section仕様](/spec/bgm/bgm-random-section) |
 | PlayerのCharge入力・Action | Player仕様 |
+| Mode／ConductのGameplay上の意味とStage挑戦中のRuntime状態 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 
 ### 本ページで再定義しない内容
 
