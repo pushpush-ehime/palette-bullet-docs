@@ -20,13 +20,14 @@ relatedTasks: []
 
 ## 目的
 
-本ページでは、PlayerがStage前に構成した複数のモードを戦闘中に小節単位で切り替える「モードチェンジ」と、一つのAttackEvent全体へ演奏・発射指示を付ける「コンダクト」の仮仕様を定義します。
+本ページでは、PlayerがStage前に構成した複数のモードを戦闘中に小節単位で切り替える「モードチェンジ」と、一つのAttackEvent occurrence全体へ演奏・発射指示を付ける「コンダクト」のGameplay上の正本契約を定義します。
 
 この二つによって、Playerが単に攻撃を強くするのではなく、以下を同時に考える体験を作ります。
 
 - Stage前に、聞こえ方と戦い方が異なるモードを構成する
 - HP、スタミナ、Enemy、場の状況、次の小節を見てモードを切り替える
-- Charge開始前またはCharge中に、成功確定前まで一つのAttackEventをどのように演奏・発射するか選ぶ
+- Charge前にコンダクトを選び、有効なCharge Pressでその選択をsnapshotする
+- Charge中も次回用のコンダクトを選びながら、進行中Chargeのsnapshotは変えない
 - 選択結果を音、見た目・挙動、攻撃や回復などの明示的な値へ同じ設定から反映する
 
 本ページは、今回合意した新仕様を一か所へ保存し、後続の既存ページ同期と実装検討で参照するためのページです。
@@ -36,11 +37,10 @@ relatedTasks: []
 本ページでは、主に以下を扱います。
 
 - モードの種類と編集可否
-- 拠点で行うモード構成
-- エフェクターのスロット、段階、接続順
+- 拠点で行うモード構成の概要と正本への導線
 - Stage中のモード選択、次の小節頭での適用、クールタイム
 - Stage、Room、Retryをまたぐモードのライフサイクル
-- コンダクトの選択状態、保持、Charge成功時の付与と消費
+- コンダクトの選択状態、Charge Press snapshot、Charge成功時の付与commitとクールタイム
 - AttackEvent単位のコンダクト制約
 - Normal／Weak、Click／Drag、Chord／Arpeggioとの接続
 - モードとコンダクトが同時に作用する場合の参照時点
@@ -49,7 +49,7 @@ relatedTasks: []
 
 本ページでは、Unity上の具体的な実装構造を先に固定しません。
 
-- モード状態を保持する具体的なRuntime Owner
+- Runtime Ownerを実装する具体的なクラス名・field名
 - Production Event／Commandの具体名
 - Event payloadやIdentifierの最終形式
 - Input Action Assetの具体的なAction名
@@ -65,12 +65,14 @@ relatedTasks: []
 | モードチェンジ | Stage中に、曲全体の聞こえ方とPlayerの戦い方を切り替える機能 | 仮称・機能方針は確定 |
 | モード | 音への作用と、長所・短所を持つ戦い方の設定をひとまとまりにしたもの | 4種類を使用 |
 | エフェクター | 編集可能なモードのスロットへセットし、音と戦い方の両方を変化させる設定要素 | 種類・効果は未決 |
-| コンダクト | 一つのAttackEvent全体へ付与する演奏・発射指示 | 仮称・付与規則は確定 |
-| 選択中コンダクト | Player側で選択され、次のCharge成功まで保持されているコンダクト | Charge開始後を含め、Charge成功確定前は変更可能 |
-| 付与済みコンダクト | Charge成功時にAttackEventへ固定されたコンダクト | 付与後は変更不可 |
-| コンダクト未選択状態（通常状態） | Playerがコンダクトを選択していない状態 | Stage開始・Retry・消費後の初期状態。Normal AttackEventやNormal Shaondamaとは別の意味 |
+| コンダクト | 一つのAttackEvent occurrence全体へ付与する演奏・発射指示 | 仮称・付与規則は確定 |
+| Player側の選択コンダクト | Player Runtimeが保持し、次の有効なCharge Pressでsnapshotする選択 | Charge中も次回用として変更可能 |
+| Charge Press snapshot | 有効なCharge Press時に取得し、そのChargeだけが使用する一時的なコンダクト | Action開始時・Charge成功時には取り直さない |
+| 付与済みコンダクト | Conduct付与commit成功時にAttackEvent occurrenceへ固定されたコンダクト | 付与後は変更不可 |
+| コンダクト未選択状態（通常状態） | Playerがコンダクトを選択していない明示的な選択肢 | Stage開始・Retry・付与成功後・cooldown中の状態。Normal AttackEventやNormal Shaondamaとは別の意味 |
+| pending Mode | 受理済みで、次の対象小節頭への適用を待つMode ID | 適用前の有効入力で上書き・取消できる |
 
-本ページで「次の小節頭」と記載した場合、MusicChartが表す楽曲本来の音楽時間上で次に到達する小節境界を指します。Tempo／拍子変更を含む具体的な算出方法は未決事項です。
+本ページで「次の小節頭」と記載した場合、MusicChartが表す楽曲本来の音楽時間上で次に到達する論理小節境界を指します。Tempo／拍子変更があっても、記譜上の1小節を1小節として扱います。
 
 ## コア体験
 
@@ -86,14 +88,20 @@ Stage中
 次の小節頭
 新しい聞こえ方と戦い方へ一括切替
 ↓
-Charge開始前またはCharge中
-Charge成功確定前まで、使うコンダクトを選択・変更
+Charge前
+使うコンダクトを選択
+↓
+有効なCharge Press
+Player側の選択コンダクトをsnapshot
 ↓
 Charge成功
-選択中コンダクトをAttackEvent全体へ固定
+Press snapshotを成功したAllocationと同じAttackEvent occurrenceへcommit
 ↓
-AttackEventの発火・発射タイミング
-発火・発射処理で決定されたモードと付与済みコンダクトを同時に反映
+Fire Music Position
+そのoccurrenceへ有効Modeをsnapshot
+↓
+Palette Bullet化・発射
+Mode snapshotと付与済みコンダクトを反映
 ```
 
 各選択は、音とGameplayの両方から違いを理解できる必要があります。音楽知識がないPlayerにも聞こえ方と効果から役割が伝わり、上級者には接続順、段階、切替タイミングを研究する余地を残します。
@@ -115,18 +123,20 @@ MusicChart
 ↓
 Normal AttackEventを音楽時間上に提示
 ↓
-Charge成功時にConductをAttackEventへ付与
+有効なCharge PressでConductをsnapshot
 ↓
-既存仕様が定めるAttackEvent発火・各発射タイミング
+Charge成功時に、成功したAllocationと同じAttackEvent occurrenceへConductを付与
 ↓
-AttackEventの発火・発射処理で使用するModeを参照
+Fire Music PositionでAttackEvent occurrenceが発火を開始
 ↓
-ShaondamaをPalette Bullet化して発射
+Modeをoccurrence全体へsnapshot
+↓
+既存仕様が定める各発射タイミングでShaondamaをPalette Bullet化して発射
 ```
 
 Weakの場合は、既存のAllocation規則に従ってCharge成功時にWeak AttackEventを動的に作り、同じ成功処理の中でコンダクトを付与します。
 
-ArpeggioでModeをAttackEvent発火時に全体へ固定するか、各Palette Bulletの実発射時点で参照するかは未決事項です。
+一度取得したMode snapshotは、Chord／Arpeggio／Weak AttackEvent全体で共有します。Arpeggioの後続Entryや発射済みPalette BulletがPlayerのcurrent Modeを読み直すことはありません。
 
 次の境界を守ります。
 
@@ -138,7 +148,7 @@ ArpeggioでModeをAttackEvent発火時に全体へ固定するか、各Palette B
 - 実際にスピーカーから出た音声波形を解析して攻撃結果を決めない
 - 同じ安定した設定データから、音、見た目・挙動、攻撃や回復などの数値変化を決める
 - 既存のPalette State Graphと競合する第二のPlayer State管理者を作らない
-- 具体的なRuntime Owner、Production Event、Command名は本ページで確定しない
+- 具体的なクラス名、field名、Production Event、Command名は本ページで確定しない
 
 ### ShaondamaとPalette Bullet化
 
@@ -179,112 +189,61 @@ Charge、Allocation、`Reserved`、AttackEvent発火、Palette Bullet化の詳�
 - 戦い方に関する短所がある
 - 他のモードの単純な上位互換にならない
 
-変化させる候補には、Damage、攻撃力、防御力、HP回復、スタミナ回復、スタミナ消費、のけぞりにくさ、弾速、攻撃範囲などがあります。どの値を採用するかは未決です。
-
-採用時は「Gameplayへの効果」のような総称だけで済ませず、変化する値・挙動、算出順、上限、丸め処理を個別に定義します。
-
 ### モード総数
 
 モードは合計4種類です。
 
 | モード | 編集 | 役割 |
 | --- | --- | --- |
-| モード1 | Playerは編集できない | 固定の通常・回復用モード |
+| モード1 | Playerは編集できない | 固定の立て直し用モード |
 | モード2 | 拠点の専用機能で編集できる | Playerが作る役割別モード |
 | モード3 | 拠点の専用機能で編集できる | Playerが作る役割別モード |
 | モード4 | 拠点の専用機能で編集できる | Playerが作る役割別モード |
 
 ### モード1
 
-モード1は、以下の役割を持つ固定モードです。
+モード1は、Stage開始時とRetry時の初期Modeであり、Playerが編集できない固定の立て直し用Modeです。
 
-- Stage開始時の初期モード
-- Game Over後のRetry時の初期モード
-- 安全性や回復を重視する基準モード
-- 攻撃面などに短所を持つモード
-- Playerが内容を編集できないモード
+初期仕様は次のとおりです。
 
-モード1の具体的な音、回復内容、短所、数値は未決です。安全性や回復を重視することだけを理由として、他のモードより常に有利な上位互換にはしません。
+| 対象 | 初期仕様 |
+| --- | --- |
+| Stamina自然回復速度 | 1.5倍 |
+| Palette BulletのDirect Contact Damage | 0.75倍 |
+| Palette BulletのExplosion Damage | 0.75倍 |
+| 戦闘BGM | 高域を抑えた、穏やかで丸い聞こえ方 |
 
-モード1という名称だけを根拠に、HPの常時自然回復、`Dead`からの復活、既存Player Status契約にない回復処理を追加しません。
+1.5倍と0.75倍は調整可能な初期値です。最終Tuning値と具体的なDSPは未決です。
+
+モード1は、HP自然回復、被Damage軽減、または`Dead`からの復活を追加しません。Stamina自然回復速度の倍率は、既存の回復開始条件、回復待機、Dash／Parry中の回復禁止、および`MaxStamina`制限を解除しません。これらの基礎契約は[Playerステータス](/spec/player/player-status)を正本とします。
 
 ### モード2～4
 
 モード2～4は、Playerが拠点の専用機能で内容を作るモードです。
 
-三つの編集可能モードには、それぞれ異なる役割を持たせられます。ただし、利用できるエフェクター、入手・解放方法、段階上限、容量制限、Save Dataの保存範囲は未決です。
+三つの編集可能Modeは、拠点でEffectorの構成と並び順を準備し、Save Dataへ保存します。
+
+詳細な構成契約は[モード構成・エフェクター仕様](/spec/player/mode-configuration-and-effectors)を正本とし、本ページでは重複して定義しません。
 
 ### 拠点とStageの役割
 
-拠点では、以下を行います。
-
-- モード2～4の内容を作る
-- エフェクターをセットする
-- エフェクターの並び順を変更する
-- エフェクターの段階を調整する
-
-拠点では「現在使用中のモード」を選択しません。使用中モードの選択は、クエスト／Stageへ出陣した後に行います。
-
-以下の場所では、モードの中身を編集できません。
-
-- Stage攻略中
-- 戦闘中
-- 通常のRoom移動中
-- ポーズ画面
-
-ポーズ画面からモード編集画面へ移動する仕様にはしません。
+拠点ではMode 2～4の構成を編集し、Stage中は保存済みMode 1～4のどれを使用するか選択します。拠点では「現在使用中のMode」を選択しません。
 
 ## モード構成とエフェクター接続順
 
-### エフェクタースロット
+Mode 2～4の構成、slot、重複可否、段階、並び順、編集可能な場面、およびSave Dataは、[モード構成・エフェクター仕様](/spec/player/mode-configuration-and-effectors)を正本とします。
 
-Playerが編集できる各モードは、初期方針として最大3個のエフェクタースロットを持ちます。
+本ページでは、AttackEventのMode snapshotに含まれるEffectorを左から右へ適用し、その結果へConductを適用する高レベルな順序だけを定義します。
 
-- 一つのモードに最大3スロットを持つ
-- 同じエフェクターは、一つのモード内で重複使用できない
-- エフェクターは左から右へ順番に処理する
-- Playerは並び順を変更できる
-- 並び順によって、音と戦い方の両方が変わる
-- 自由な連続ノブではなく、段階式で調整する
-- 各調整値には上限を設ける
-- エフェクターの選択、段階、並び順から、音と数値変化を決定する
-- 攻撃力や防御力だけを音と無関係に直接調整する仕組みにはしない
+## Modeの初期適用範囲
 
-```text
-元の音・数値
-↓
-スロット1
-↓
-スロット2
-↓
-スロット3
-↓
-最終結果
-```
+- 攻撃系Mode効果は、AttackEvent由来のPalette Bulletへ適用する
+- 未Charge Normal Shaondamaの自然破裂Weak攻撃には適用しない
+- Enemy AI、移動速度、攻撃頻度をModeから直接変更しない
+- Shaondama浮遊の変化は、採用未定の将来Presentation候補とする
+- Stamina回復などPlayer自身へ作用する効果は、current Modeが有効な間だけ適用する
 
-### 接続順による変化の説明例
-
-以下は、接続順が結果へ影響することを説明するための例です。数値とエフェクター効果そのものは確定仕様ではありません。
-
-| 基礎Damage | 接続順 | 説明用結果 |
-| --- | --- | --- |
-| 100 | `+20 → ×1.5` | 180 |
-| 100 | `×1.5 → +20` | 170 |
-
-実際のエフェクターは、「加算を先、乗算を後」のような一つの接続順だけが常に最適にならないよう設計します。複数の値に対する長所・短所、値の変換、上限などを組み合わせる方針ですが、具体的な規則は未決です。
-
-ここで確定する左から右への順次処理は、一つのモード内部におけるエフェクター接続順です。既存のRGB Damage、直撃／爆風倍率、Wildcard固有倍率、Enemy側の集約・丸め・Clampに対して、モードの計算結果をどこへ接続するかは本ページでは確定しません。
-
-### 音と戦い方の一体性
-
-一つのエフェクター設定から、少なくとも以下の二方向を決定できる構造にします。
-
-| 出力先 | 内容 |
-| --- | --- |
-| 音 | 聞こえ方の変化 |
-| Gameplay | 攻撃、回復、防御、移動・弾の挙動など、明示的に定義された値または挙動の変化 |
-
-音の結果を解析してGameplay値を逆算せず、Gameplay値から後付けで無関係な音を選びません。エフェクターの安定した設定データを共通の入力とし、音とGameplayの各出力を決定します。
+Charge時点ではModeをShaondamaやAllocation Slotへ固定しません。攻撃系Mode効果の対象とsnapshot規則は後述します。
 
 ## モード入力と小節同期切替
 
@@ -305,12 +264,12 @@ Playerが編集できる各モードは、初期方針として最大3個のエ�
 
 ### 変更要求と適用
 
-モード選択入力を受け付けた時点では、音やGameplay値を即座に切り替えません。選択先をモード変更要求として保持し、次の小節頭で適用します。
+Mode選択入力を受け付けた時点では、音やGameplay値を即座に切り替えません。選択先のMode IDを`pending Mode`として保持し、次の対象小節頭で適用します。
 
 ```text
-Stage中に`1`～`4`を入力
+`1`～`4`の有効入力
 ↓
-モード変更要求として受理
+pending Modeとして受理
 ↓
 次の小節頭まで現在モードを維持
 ↓
@@ -319,53 +278,74 @@ Stage中に`1`～`4`を入力
 選択されたモードへ一括切替
 ```
 
-Gameplay上の意図として、古いモードから新しいモードへ徐々に切り替えません。
+適用前に複数のMode入力を受理した場合は、最後に受理したModeだけをpendingとして保持します。
+
+current Modeを入力した場合は次のように処理します。
+
+| pending | 処理 |
+| --- | --- |
+| なし | 無処理 |
+| current Modeとは異なるModeを保持中 | pendingを取り消す |
+
+無処理とpending取消ではMode cooldownを開始しません。
+
+小節頭より前に受理した入力だけを、その小節頭で適用します。小節頭と同時または小節頭より後の入力は、次の小節頭の対象です。小節頭で先行pendingを適用してMode cooldownが開始した場合、同じ小節頭の新規Mode入力は破棄します。
+
+Gameplay上の意図として、古いModeから新しいModeへ徐々に切り替えません。
 
 音声のクリックノイズなどを防ぐために極短時間の技術的補間が必要な場合は、Gameplay上の段階的切替とは区別します。補間方法と長さは実装時の未決事項です。
 
+### 入力gate
+
+Mode入力は、system pre-rollを含むPlayer操作可能なGameplayで、別の操作lockがない場合に受理します。Movement中、Charge中、およびParry中であることだけを理由に拒否せず、Mode入力はそれらを中断しません。
+
+次の状態では拒否します。
+
+- Battle準備中
+- Pause中
+- HitStop中
+- Room移動演出中
+- Battle結果確定後
+- `Dead`中
+- Mode cooldown中
+
+拒否した入力は保存、buffer、予約、または後から再実行しません。Action先行入力、Dashキャンセル入力buffer、およびParry専用のHitStop入力bufferをMode入力へ流用しません。
+
 ### 同じ小節頭での処理順
 
-モード変更の適用とPalette Bulletの発射が同じ小節頭に成立する場合は、新しいモードを先に適用します。
+Mode適用とAttackEvent occurrenceの発火開始が同じ小節頭に成立する場合は、新しいModeを先に適用します。
 
 ```text
 小節頭へ到達
 ↓
 予約されていた新モードを適用
 ↓
-同じ小節頭のPalette Bullet発射処理
+同じ小節頭のAttackEvent occurrenceが発火開始
 ↓
-新モードを参照
+新Modeをsnapshot
 ```
 
-少なくとも、その小節頭で発火するAttackEventのPalette Bulletには新しいモードを使用します。
-
-Charge済みで`Reserved`のShaondamaも、Charge時点のモードを個体へ固定保存しません。AttackEventの発火・発射処理で決定されるモードの影響を受けます。
-
-Arpeggioが小節頭をまたぐ場合のモード参照時点は、まだ確定していません。次の二案を後続で比較し、決定します。
-
-- AttackEvent発火時のモードをsnapshotし、後続Entryを含むArpeggio全体で使用する
-- 各Palette Bulletの実発射時点で有効なモードを使用する
-
-後者を採用した場合は、同じArpeggio AttackEvent内でも、小節頭より前後のEntryで使用モードが異なる可能性があります。本ページでは、どちらかを確定したものとして扱いません。
+この順序により、その小節頭で発火を開始するoccurrenceは新Modeをsnapshotします。小節頭と同時の新規入力は前節の規則どおり次の小節頭向けであり、このsnapshotへは影響しません。
 
 ### クールタイム
 
-モードのクールタイムは、変更要求を受け付けた瞬間ではなく、選択されたモードが小節頭で実際に適用された瞬間から開始します。
+Mode cooldownの初期値は4小節で、Tuning可能です。秒数へ換算せず、MusicChart上の論理小節を数えます。Tempo／拍子変更があっても、記譜上の1小節を1カウントとします。
 
-モード切替操作自体は無料です。
+適用された小節を1小節目として1～4小節目をlockし、5小節目の小節頭で新しいMode入力を解禁します。5小節目で受理した入力は、通常規則どおり6小節目の小節頭で適用します。
 
-- モード切替の要求・適用によって、スタミナ、HP、アイテムなどを消費しない
-- モード切替の使用回数に上限を設けない
-- 連続した切替を制限するのは、以下の1小節相当秒数のクールタイムだけとする
+```text
+Mode適用小節 = lock 1小節目
+↓
+2～4小節目 = lock
+↓
+5小節目の小節頭 = 入力解禁
+↓
+5小節目で受理したpending = 6小節目の小節頭で適用
+```
 
-これは、モードの効果によってスタミナの回復・消費などが変化する可能性とは別の規則です。モード効果のコストや数値を、モード切替操作のコストとして扱いません。
+cooldownは、異なるMode IDが小節頭で実際に適用された場合だけ開始します。構成内容が同じでもMode IDが異なれば開始します。current Modeの再選択による無処理、またはpending取消では開始しません。
 
-- クールタイムの長さは、適用位置における1小節相当の秒数とする
-- クールタイム中は別のモードへ変更できない
-- クールタイム中のモード入力はその場で破棄する
-- 破棄した入力を、クールタイム終了後に実行する予約入力にはしない
-
-Tempo／拍子変更をまたぐ場合を含む「適用位置における1小節相当の秒数」の算出方法は未決です。
+cooldown中のMode入力は破棄し、予約しません。Mode切替操作自体はStamina、HP、Itemなどを消費せず、種類別コストや使用回数上限を追加しません。
 
 ## モードのStage／Room／Retryライフサイクル
 
@@ -373,11 +353,11 @@ Tempo／拍子変更をまたぐ場合を含む「適用位置における1小�
 | --- | --- | --- | --- |
 | Stage開始 | モード1から開始 | 拠点で作った内容を使用 | 初期状態から開始 |
 | 同じStage挑戦中 | 小節同期切替の結果を維持 | 維持 | 通常規則で管理 |
-| 通常のRoom移動 | 現在の使用中モードを維持 | 維持 | 詳細な受付境界は未決 |
+| 通常のRoom移動 | 現在の使用中モードを維持 | 維持 | Mode入力は拒否。pending／cooldownの詳細表は後続同期 |
 | Game Over後のRetry | モード1へ戻す | 失わない | 変更要求とクールタイムを解除 |
 | Stage終了 | 次のStageへ使用中モードを持ち越さない | 保存範囲に従って保持 | 終了時に解除 |
 
-Stage中はモード変更要求を受け付けます。ただし、通常のRoom移動中に小節基準をどの音楽時間から取得するか、Battle外の区間で変更要求をいつ適用するかは未決です。
+Stage中は入力gateを満たす場合にMode変更要求を受け付けます。Room移動演出中は新規入力を拒否し、拒否入力を保存しません。通常Room境界でのpending／Mode cooldownの詳細な維持・進行表は、Game／Status／Death側を同期する後続PR Bへ委譲します。
 
 Retryでは、前回の挑戦で使用していたモード、未適用の変更要求、進行中のクールタイムを持ち越しません。一方、拠点で作ったモード2～4の構成自体は失いません。
 
@@ -385,128 +365,140 @@ Retryでは、前回の挑戦で使用していたモード、未適用の変更
 
 ### 基本的な役割
 
-コンダクトは、一つの音だけではなく、一つのAttackEvent全体に対する演奏・発射指示です。
+コンダクトは、一つの音だけではなく、一つのAttackEvent occurrence全体に対する演奏・発射指示です。
 
 ChordやArpeggioでは一つのAttackEventに複数音が含まれますが、音ごとに別のコンダクトを持たせません。同じAttackEventに属する音、発射対象、発射列全体へ一つのコンダクトを適用します。
 
-### 現在の候補
+初期採用するコンダクトは「ひろがり」と「やまびこ」です。Accent、Staccato、とがり、Legato、速度変化、およびその他の指揮表現は採用済みではなく、残す場合も将来候補として扱います。
 
-以下は、すべてコンダクト側の候補です。名称と具体的効果は未決であり、候補であること自体を採用済み効果とみなしません。
+### ひろがり
 
-- Accent
-- Staccato
-- ひろがり
-- とがり
-- やまびこ
+ひろがりは、対象AttackEvent occurrenceに属する各Palette Bulletへ適用します。
 
-以下は将来候補ですが、採用確定ではありません。
+- Palette Bullet数を増やさない
+- 弾道、Target、直進／非追尾を変更しない
+- Mode適用後のExplosion Radiusだけを1.5倍にする
+- Direct Contact Damageを変更しない
+- Explosion Damageを変更しない
+- 距離減衰を追加しない
+- 音程とTimingを維持し、音の広がりを強める
 
-- Legato
-- だんだん早く
-- だんだん遅く
-- その他の一定時間続く指揮表現
+1.5倍は調整可能な初期値です。「Damageを変更しない」とは、Mode適用後のDamageへひろがりによる追加変更を行わないという意味です。
 
-Cutは現在の候補へ含めません。
+### やまびこ
 
-### 初期導入段階
+やまびこは新しいPalette Bulletを生成・再発射せず、各Palette BulletにGameplay上の第二爆発と音響Repeatを一度だけ予約します。
 
-初期導入は、以下の二段階で行います。
+Gameplay上の第二爆発は次の契約に従います。
 
-1. コンダクトを選択・保持し、Charge成功時にAttackEventへ付与・消費できる枠組みを作る
-2. 次の試遊可能版で「ひろがり」「やまびこ」を追加する
+- 第一爆発から0.5秒後に、同じ位置で一度だけ発生する
+- Explosion Damageだけを発生させ、Direct Contact Damageを再発生させない
+- 半径はMode適用後の通常Explosion Radiusと同じとする
+- DamageはMode適用後の通常Explosion Damageの50%とする
+- 第二爆発から追加のやまびこを発生させない
+- Battle終了時に未発生の第二爆発を破棄する
 
-枠組みだけを導入する段階では、具体的なコンダクト効果がなくても構いません。Gameplayとして面白さを検証する段階では、最低でも「ひろがり」と「やまびこ」を使用できるようにします。
+音響Repeatは次の契約に従います。
 
-### 音以外の変化
+- 各Palette Bulletの元の発射音から0.5秒後に一度だけ発生する
+- 音量は元の発射音の50%とする
+- Battle終了時に未発生のRepeatを破棄する
 
-各コンダクトは将来、同じ設定から以下を決めます。
-
-- Palette Bulletの見た目
-- Palette Bulletの飛び方や広がり方
-- 攻撃範囲
-- 弾速
-- Damage
-- スタミナ消費
-- その他の明示的な値・挙動
-
-具体的な対応表、長所、短所、代償は未決です。見た目の具体的なデザイン制作はデザイン側へ委託しますが、戦闘中にコンダクトを識別するために必要な情報は、後でGameplay仕様として定義します。
-
-「ひろがり」や「やまびこ」を具体化する場合も、既存の1 Occupied Slot＝1 Reserved Shaondama＝1 Palette Bullet、AttackEvent内で共有するTarget座標、Arpeggioの音楽的順序・Timing、直進・非追尾・非retarget、Complete Chordバフの成立条件を暗黙に変更しません。変更が必要な効果を採用する場合は、該当する正本ページで明示的に仕様を更新します。
+音響Repeatは元の発射音、第二爆発は第一爆発をそれぞれ起点とし、互いを起点にしません。0.5秒と50%は調整可能な初期値です。
 
 ## コンダクト選択とCharge成功時の処理
 
 ### 入力
 
-コンダクトは、マウスホイール回転で選択します。
+コンダクトはマウスホイール回転で選択します。正方向の循環順は次のとおりで、逆回転は逆順です。
 
-コンダクトはCharge開始前だけでなく、Charge開始後もCharge成功が確定する前であれば選択・変更できます。
+```text
+未選択 → ひろがり → やまびこ → 未選択
+```
 
-- Click Chargeでは、Charge判定Eventによる`success`確定前まで選択・変更できる
-- Drag Chargeでは、ReleaseによるAtomic判定の`success`確定前まで選択・変更できる
-- `success`確定後は、そのChargeに使用したコンダクトを変更できない
+未選択は明示的な選択肢です。ホイール回転はMode選択およびホイール押し込みのMarker入力とは分離します。
 
-ホイール入力とCharge成功確定が同じ時刻・同じFrameに発生した場合の処理順は、本ページでは確定しません。
+Player側の選択はCharge中も変更でき、Conduct付与済みAttackEventがCurrentであっても次回用の選択・変更を受け付けます。ただし、進行中Chargeが使用するコンダクトは有効なCharge Press時のsnapshotであり、その後のPlayer側選択変更では変わりません。
 
-- マウスホイールをモード選択には使用しない
-- マウスホイール押し込みのMarker入力とは別の入力として扱う
-- Charge成功前であれば、ホイールで別のコンダクトへ変更できる
-- Charge成功時点で選択されているコンダクトを使用する
-- AttackEventへ付与された後は変更できない
-- すでにコンダクトが付いているAttackEventでは、新しいコンダクト入力を受け付けない
+### Charge Press snapshot
 
-「選択後は上書きできない」という規則にはしません。
+Charge入力評価を開始でき、対象Shaondamaを取得できた有効なCharge Pressで、Player側の選択コンダクトを一時snapshotします。
 
-| 状態 | 別コンダクトへの変更 |
-| --- | --- |
-| Player側で選択中・Charge成功前 | 変更できる |
-| AttackEventへ付与済み | 変更・上書きできない |
+- Click／Dragへ分岐する前に取得する
+- Dashing中の有効なCharge先行入力へ同じsnapshotを引き継ぐ
+- 実際のAction開始時やCharge成功時に取り直さない
+- 無効Press、対象なし、開始不可Pressから有効なsnapshotを作らない
+- WheelとCharge Pressが同じ時刻なら、Wheel更新後にsnapshotする
+- 時刻を区別できる場合は時刻順に処理する
+- miss／cancelでは一時snapshotだけを破棄し、Player側の選択を消費しない
 
-### 選択状態の保持
-
-一度コンダクトを選択した場合、次のCharge成功まで選択状態を維持します。
-
-以下では、選択状態を消費・解除しません。
-
-- Chargeしない
-- Chargeに失敗する
-- AttackEventが終了する
-- Current Normal AttackEventが変更される
-- Current Normal AttackEventが存在しない
-- 次のChargeがWeak AttackEventになる
-- 通常のRoom移動を行う
-- モードを変更する
-
-Normal／Weakの区別なく、次に成功したChargeで使用します。
-
-現時点では、Playerが選択中コンダクトを任意にコンダクト未選択状態へ戻すことはできないものとして記録します。ただし、この操作はマウスホイールUIの設計と合わせて再確認する未決事項でもあります。Charge成功前に別のコンダクトへ変更することはできます。
+Charge中にPlayer側の選択を変更しても、そのChargeのsnapshotは変更しません。
 
 ### Charge成功時の処理
 
-Charge成功時は、以下の順で処理します。
+Charge成功時は、成功したAllocationが返した同じAttackEvent occurrenceを対象とします。Current AttackEventを再検索したり、別occurrenceへ付け替えたりしません。
 
-1. 成功したAllocation結果が指す、現在のStage挑戦中のAttackEvent occurrenceを確定する
-2. Player側に選択中コンダクトがあるか確認する
-3. そのAttackEvent occurrenceにコンダクトが未設定であれば、コンダクトを付与する
-4. そのAttackEvent occurrenceへすでにCharge済みのShaondamaを含め、AttackEvent全体へ作用させる
-5. Player側のコンダクト選択状態をコンダクト未選択状態へ戻す
+次の両方を満たす場合だけ、Conduct付与commitを一つの処理として成立させます。
+
+```text
+対象OccurrenceにConduct未付与
+AND
+Press snapshotが未選択ではない
+```
+
+commitでは次を同時に成立させます。
+
+1. occurrenceへPress snapshotのConductを一つ付与する
+2. Player側の現在選択を強制的に未選択へ戻す
+3. 共通3秒Conduct cooldownを開始する
 
 ```text
 ClickのCharge判定EventまたはDragのRelease atomic commitがsuccess
 ↓
-成功したAllocation結果の接続先AttackEvent occurrenceを確定
+成功したAllocationが返した同じAttackEvent occurrenceを使用
 ↓
-選択中Conductを確認
+未付与かつPress snapshotあり？
 ↓
-AttackEvent occurrenceに未設定ならConductを固定
-↓
-Player側の選択状態をコンダクト未選択へ戻す
+Yes: 付与＋現在選択を未選択化＋3秒cooldown開始
 ```
 
-Weak AttackEventの場合は、Charge成功時に既存のWeak Allocation規則でWeak AttackEventを作り、同じ成功処理の中でコンダクトを付与します。
+Charge成功までにPlayerが別Conductを選んでいても、付与成功時にはその新しい選択を含めて未選択へ戻します。
 
-コンダクト付与時にCurrent Normal AttackEventを検索し直したり、別のAttackEventへ付け替えたりしません。対象は、Charge成功判定とAllocation commitで確定した同じAttackEvent occurrenceです。MusicChartに保存された静的なAttackEvent Definitionは変更しません。
+次の場合はConduct付与、Player側選択の消費、およびcooldown開始を行いません。
 
-コンダクトをAttackEventへ付与した後も、Shaondamaは既存仕様に従って`Reserved`として発火を待ちます。コンダクトの付与は即時発射を意味しません。
+- 対象occurrenceへすでにConductが付与済み
+- Press snapshotが未選択
+- Charge miss
+- Charge cancel
+- 無効なPress
+
+既付与の場合はPlayer側の現在選択を保持します。Conductを付与できなくてもCharge成功とAllocation結果は取り消しません。Weak AttackEventでは、既存の動的生成と同じ成功処理内で同じ付与commitを使用します。
+
+コンダクト付与後もShaondamaは`Reserved`として発火を待ちます。付与は即時発射を意味せず、MusicChartに保存された静的AttackEvent Definitionも変更しません。
+
+### Conduct cooldown
+
+Conduct cooldownの初期値は3秒で、ひろがり／やまびこ共通のTuning値です。occurrenceへConductを実際に付与できた瞬間から開始します。
+
+- cooldown中はPlayer側を未選択に固定する
+- cooldown中のWheel入力は破棄し、予約しない
+- Charge自体は行える
+- cooldown中のCharge Pressは未選択をsnapshotする
+- そのChargeの成功前にcooldownが終了しても、取得済みsnapshotは未選択のままとする
+- cooldown終了時に以前の選択を復元しない
+- 追加のStamina、HP、Item消費や種類別cooldownを設けない
+
+時間境界は次のとおりです。
+
+| 境界 | Conduct cooldown |
+| --- | --- |
+| 通常Gameplay | 進行 |
+| HitStop | 進行 |
+| Pause | 停止 |
+| Room移動演出 | 停止し、残量を維持 |
+| 通常Room移動の完了 | 残量を維持 |
+| Stage終了 | 破棄 |
+| Retry | 破棄 |
 
 ### AttackEvent単位の制約
 
@@ -518,15 +510,16 @@ Weak AttackEventの場合は、Charge成功時に既存のWeak Allocation規則�
 - Arpeggioの順番ごとに異なるコンダクトを付けない
 - コンダクトはAttackEventへ付与後、上書き・切替できない
 
-コンダクトはCharge成功時にAttackEventへ固定します。したがって、同じAttackEventへ先にCharge済みのShaondamaがある場合も、後から付与されたコンダクトがAttackEvent全体へ作用します。
+コンダクトは付与commit成功時にAttackEvent occurrenceへ固定します。したがって、同じoccurrenceへ先にCharge済みのShaondamaがある場合も、後から付与されたコンダクトがAttackEvent全体へ作用します。
 
 ### StageとRetry
 
-- 同じStage挑戦中は、Charge成功するまで選択中コンダクトを維持する
+- 同じStage挑戦中は、付与成功またはPlayer自身のWheel操作までPlayer側の選択を維持する
 - Stage終了時にPlayer側の選択状態を解除する
 - Game Over後のRetryではコンダクト未選択状態から開始する
 - 前回のStage挑戦で選択中だったコンダクトをRetryへ持ち越さない
 - AttackEventへ付与済みだったコンダクトを新しいStage挑戦へ持ち越さない
+- Stage終了とRetryではConduct cooldownも破棄する
 
 ## Normal／Weak／Click／Drag／Chord／Arpeggioとの関係
 
@@ -534,18 +527,18 @@ Weak AttackEventの場合は、Charge成功時に既存のWeak Allocation規則�
 
 | 既存要素 | コンダクトとの関係 | モードとの関係 |
 | --- | --- | --- |
-| Normal AttackEvent | Charge成功時に、未設定なら一つ付与できる | AttackEventの発火・発射処理で決定する。Arpeggioの参照単位は未決 |
-| Weak AttackEvent | Charge成功時の動的作成と同じ成功処理で一つ付与できる | 発射時点の有効モードを使用する |
-| Click Charge | 1個のShaondamaのCharge成功を契機に、接続先AttackEventへ付与する | Charge時点では固定しない |
-| Drag Charge | Atomic success時に、Shaondamaごとではなく接続先AttackEvent全体へ一つ付与する | Charge時点では固定しない |
-| Chord | 全Entry・全発射音へ同じコンダクトを作用させる | Chordの発射時点の有効モードを使用する |
-| Arpeggio | 一連のEntry・発射音へ同じコンダクトを作用させる | AttackEvent発火時に全体へ固定するか、各Entryの実発射時点で参照するかは未決 |
+| Normal AttackEvent | 有効Pressのsnapshotを、Charge成功時に同じoccurrenceへ付与できる | `Fire Music Position`でoccurrence全体へsnapshotする |
+| Weak AttackEvent | 動的生成と同じ成功処理で同じ付与commitを使用する | `Fire Music Position`でoccurrence全体へsnapshotする |
+| Click Charge | Press時にsnapshotし、1個のAllocation success先へcommitする | Charge時点では固定しない |
+| Drag Charge | Press時にsnapshotし、Atomic success先へ一つcommitする | Charge時点では固定しない |
+| Chord | 全Entry・全発射音へ同じ付与済みConductを作用させる | occurrenceの同じMode snapshotを共有する |
+| Arpeggio | 一連のEntry・発射音へ同じ付与済みConductを作用させる | 後続Entryを含め、occurrenceの同じMode snapshotを共有する |
 
 Normal／Weakの決定、Click／Dragの`success / miss`、Slot Allocation、Chord／Arpeggioの音楽的順序・Timing、AttackEventの発火結果は、既存の各正本ページで決定します。本ページは、それらを再判定しません。
 
 Weak AttackEventは、Current Normal AttackEventが存在しない場合のClick Charge successで動的に作られる単音AttackEventです。Drag Chargeは既存仕様どおり一つのCurrent Normal AttackEventに対するAtomic判定であり、Weakへfallbackしません。
 
-未ChargeのNormal Shaondamaがsource NoteEvent到達時に行う自然破裂Weak攻撃は、Weak AttackEventでもPalette Bullet発射でもありません。自然破裂を理由としてコンダクトを付与・消費せず、モードを自然破裂へ作用させるかは未決事項とします。
+未ChargeのNormal Shaondamaがsource NoteEvent到達時に行う自然破裂Weak攻撃は、Weak AttackEventでもPalette Bullet発射でもありません。自然破裂を理由としてConductを付与・消費せず、攻撃系Mode効果も作用させません。
 
 特に、以下を守ります。
 
@@ -556,27 +549,34 @@ Weak AttackEventは、Current Normal AttackEventが存在しない場合のClick
 - コンダクトの有無を`Complete / Incomplete / Zero Charge`の再判定根拠にしない
 - モードの有無をMusicChart上の要求音、発火位置、Chord／Arpeggio構造の書き換えに使用しない
 
-## モードとコンダクトの同時作用
+## Mode snapshot
 
-モードとコンダクトは、排他的ではなく常に同時に作用できます。
+AttackEvent occurrenceが`Fire Music Position`へ到達し、発火を開始した瞬間にcurrent Modeをsnapshotします。最初のPalette Bulletが実際に発射された時点ではありません。先頭EntryがEmptyでもsnapshot取得を遅らせません。
 
-Palette Bulletの発射時には、少なくとも以下を参照します。
+- 一度取得したMode snapshotをChord／Arpeggio／Weak AttackEvent全体で共有する
+- 小節をまたぐArpeggioの後続Entryでcurrent Modeを読み直さない
+- 同じ小節頭でMode適用と発火開始が成立する場合、新Modeを先に適用してからsnapshotする
+- Palette Bulletは発射時にoccurrenceのsnapshotを引き継ぎ、飛行、Direct Contact、Explosion、消滅まで維持する
+- Charge時点ではShaondamaやAllocation SlotへModeを固定しない
+- 発射済みPalette Bulletへ後からMode変更を反映しない
 
-- MusicChart／AttackEventが決めた「何を・いつ鳴らすか」
-- Charge成功時にAttackEventへ保存されたコンダクト
-- AttackEventの発火・発射処理で適用対象として決定されたモード
+AttackEvent／Palette Bullet側の具体的なdata受け渡しとProducer契約は後続PR Cへ委譲します。
 
-| 要素 | 確定・参照時点 | 後から変更されるもの |
-| --- | --- | --- |
-| MusicChart／AttackEventの音楽情報 | 楽曲・Chart制作時および既存Runtime解決時 | Player操作では元データを変更しない |
-| コンダクト | Charge成功時にAttackEventへ固定 | 付与後は変更しない |
-| モード | 小節頭で有効モードを切替、AttackEventの発火・発射処理で参照 | 後続の小節頭で別モードへ切替可能 |
+## ModeとConductの計算順
 
-モード切替と発射が同じ小節頭の場合は、新しいモードを先に適用します。モードを変更してもAttackEventのコンダクトは変化しません。コンダクトを付与してもMusicChartの元データは変化しません。
+ModeとConductは排他的ではなく、次の順で同時に作用できます。
 
-Arpeggioの途中で小節頭のモード切替が成立した場合も、コンダクトは同じAttackEvent全体で固定します。一方、モードをAttackEvent発火時にArpeggio全体へ固定するか、各Palette Bulletの実発射時点で参照するかは未決です。決定までは、同じAttackEvent内でモードが分かれることを確定仕様として扱いません。
+1. Palette Bulletの通常値・RGBなどの元データを取得する
+2. AttackEventのMode snapshotに含まれるEffectorを左から右へ適用する
+3. Mode適用後の結果へ付与済みConductを適用する
+4. 既存のDirect／Explosion、Wildcard override、Enemy側集約・丸め・Clampへ接続する
 
-音、見た目・挙動、攻撃や回復などの値は、実際の音声波形から逆算しません。モード設定とコンダクト設定を安定した入力データとして参照し、それぞれの出力を決定します。
+- Enemy受信後にMode／Conduct倍率を再適用しない
+- ひろがりはMode適用後のDamageを変更せず、Explosion Radiusだけを変更する
+- やまびこの50%は、Enemy反映後・丸め後ではなく、Mode適用後の通常Explosion RGB payloadを基準にする
+- 第二爆発ではMode chainや種別倍率を再実行せず、算出済み基準から一度だけ生成する
+
+詳細なPalette Bullet Producer、Damage候補、およびEnemy受信側の同期は後続PR Cへ委譲します。
 
 ## 音響レイヤーとの関係
 
@@ -584,18 +584,16 @@ Arpeggioの途中で小節頭のモード切替が成立した場合も、コン
 
 | 機能 | 最低限、聞こえる変化を加える対象 |
 | --- | --- |
-| モード | 完成済みの戦闘BGM |
-| コンダクト | Palette Bulletの発射音 |
+| モード | 完成済み戦闘BGM、Palette Bullet音程音 |
+| コンダクト | Palette Bullet音程音、Gameplay発射SE |
 
-モードは、少なくとも完成済み戦闘BGMへ聞いて分かる変化を加えます。
+Modeは、完成済み戦闘BGMとPalette Bullet音程音へ聞いて分かる変化を加えます。原則としてGameplay発射SE、着弾SE、UI音へ作用しません。
 
-コンダクトは、少なくともPalette Bulletの発射音へ聞いて分かる変化を加えます。
+ConductはPalette Bullet音程音とGameplay発射SEへ作用し、戦闘BGMを変更しません。
 
-ここでいう発射音は、Palette Bulletの発射時にPlayerへ聞こえる音を指します。既存仕様が分けている音程音、Gameplay上の発射SE、またはその両方のどれへコンダクトを掛けるかは未決です。
+戦闘BGMは小節頭で新Modeへ切り替えます。一方、発火済みArpeggioの後続音程音は、そのoccurrenceが保持する旧Mode snapshotを使用します。
 
-- Chordでは、そのAttackEventに属する発射音全体へ作用する
-- Arpeggioでは、そのAttackEventに属する連続した発射音全体へ作用する
-- Weak AttackEventでも同じ規則を使用する
+音声の不連続を防ぐ短い技術Crossfadeを許可します。既発生のDelay／Reverb Tailは不自然に切断せず、新しいGameplay snapshotへ変更する根拠には使用しません。具体的なDSP、Crossfade時間、およびTail処理はPR #72のAudio側詳細へ委譲します。
 
 ### 音響とGameplayの分離
 
@@ -608,17 +606,33 @@ Arpeggioの途中で小節頭のモード切替が成立した場合も、コン
 └─ Gameplay値・挙動の計算へ入力
 ```
 
-Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波形、Material、VFXの状態をGameplay判定の正本にはしません。
+Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波形、DSP結果、Material、VFXの状態をGameplay判定の正本にはしません。
 
 ### モードに含めないもの
 
 現時点では、以下をモードへ含めません。
 
 - BGMの恒常的なTempo変更
+- BGMの拍子変更
 - BGMの楽器編成変更
 - RuntimeでのBGMステム／楽器レイヤー切替
 
-強弱、Crescendo／Diminuendo、転調などは未決事項です。
+強弱、Crescendo／Diminuendo、転調などは採用済みではありません。
+
+## Runtime責務
+
+概念上のOwnerは次のとおりです。具体的なクラス名、field名、Event／Command名、payload、およびInput Action名は固定しません。
+
+| Owner | 保持・管理する内容 |
+| --- | --- |
+| Player Runtime | current Mode、pending Mode、Mode cooldown、Player側の選択Conduct、Conduct cooldown |
+| Charge入力文脈 | 有効なCharge Pressで取得した一時Conduct snapshot |
+| AttackEvent occurrence | 付与済みConduct、`Fire Music Position`で取得したMode snapshot |
+| Palette Bullet | Mode／Conduct由来の不変派生dataまたは算出済み値 |
+| Battle lifecycle | Pause／HitStop／Room／Stage終了／Retryにおける維持・停止・破棄 |
+| Save Data | Mode 2～4の構成 |
+
+Mode／Conductのために新しい`ActionState`を追加しません。既存Action buffer、Dashキャンセル入力buffer、およびParry専用HitStop入力bufferも流用しません。
 
 ## RadioWhaleとの関係
 
@@ -636,7 +650,7 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 - RadioWhaleがMusicChartを解析・変更しない
 - RadioWhaleがAttackEventへコンダクトを付与しない
 - RadioWhaleがモードの小節同期切替時刻を決定しない
-- 実際にモード状態を保持するRuntime Ownerは未決事項とする
+- current ModeなどのPlayer側状態はPlayer Runtimeが所有し、RadioWhaleへ所有させない
 
 拠点の専用機能でRadioWhaleへセットするという表現は、RadioWhaleが拠点へ常駐すること、戦闘外で常時同行すること、Scene間で同じinstanceを維持することを確定しません。
 
@@ -656,14 +670,14 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 
 ## 初期検証段階
 
-現行のプロトタイプ仕様は拠点を対象外としているため、本ページの追加だけではプロトタイプの完成条件を変更しません。拠点で行うモード2～4の構成を初期検証でどのように用意するかは、後続でプロトタイプ仕様と整合させます。
+現行のプロトタイプ仕様は拠点を対象外としているため、Mode 2～4は企画側が用意した固定プリセットで供給します。プリセットの具体的内容は後続のPrototype／Tuning仕様へ委譲し、Stage攻略中の編集は許可しません。
 
 ### 導入段階
 
 | 段階 | 導入内容 | 確認目的 |
 | --- | --- | --- |
-| 1 | モード構成・切替と、コンダクト選択・保持・AttackEvent付与・消費の枠組み | 責務境界、入力、ライフサイクル、発火時参照を検証する |
-| 2 | 試遊可能なモード差と、最低でも「ひろがり」「やまびこ」を導入 | 音と戦い方が結び付いた判断の面白さを検証する |
+| 1 | 固定プリセットのMode構成・切替と、ConductのPress snapshot・付与commit・cooldown | 責務境界、入力、ライフサイクル、発火時参照を検証する |
+| 2 | Mode 1、ひろがり、やまびこの初期値をTuningしながら試遊する | 音と戦い方が結び付いた判断の面白さを検証する |
 
 ### 初期検証で確認する面白さ
 
@@ -672,7 +686,7 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 - 次の小節を予測してモードを選ぶ判断が面白いか
 - モード1へ戻る回復・立て直し判断が成立するか
 - エフェクターの並び順を変えることで、音と戦い方の両方が変わるか
-- コンダクトをCharge成功確定前まで選択・変更する行為が、演奏へ参加している感覚につながるか
+- Charge Press前にコンダクトを選び、Charge中に次回用選択を変えられることが演奏へ参加している感覚につながるか
 - 「ひろがり」と「やまびこ」の使い分けが成立するか
 - 一つの最適なモードや接続順だけに収束しないか
 - 音楽知識がないPlayerでも、聞こえ方と効果から理解できるか
@@ -680,170 +694,47 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 
 ## 確定事項
 
-### 責務境界
+本ページで確定した中核契約は次のとおりです。
 
-- MusicChartは楽曲側の「何を・いつ鳴らすか」を所有する
-- モードは現在の曲全体をどのような音と戦い方にするかを扱う
-- コンダクトは一つのAttackEventをどのように演奏・発射するかを扱う
-- モード／コンダクトでMusicChartの元データを書き換えない
-- 音声波形、Material、VFXからGameplay結果を逆算しない
-- Palette State Graphと競合する第二のPlayer State管理者を作らない
-
-### モード
-
-- モードは合計4種類とする
-- モード1は固定の通常・回復用モードで、Playerは内容を編集できない
-- モード2～4は拠点の専用機能で編集する
-- 編集可能モードは初期方針として最大3エフェクタースロットを持つ
-- エフェクターは左から右へ順番に処理し、並び順で音と戦い方の両方が変わる
-- モードは`1`～`4`で直接選択し、マウスホイールでは選択しない
-- モード切替操作自体はスタミナ、HP、アイテムなどを消費せず、使用回数制限を持たない
-- モード切替を制限するのは、実適用時から始まる1小節相当秒数のクールタイムだけとする
-- 変更要求は次の小節頭で一括適用する
-- 同じ小節頭では新モードを適用してからPalette Bulletを発射する
-- Charge時点のモードをShaondamaへ固定せず、AttackEventの発火・発射処理で使用するモードを決める
-- 実適用時から、その位置の1小節相当秒数のクールタイムを開始する
-- クールタイム中の入力は破棄し、後から実行しない
-- Stage開始とRetryではモード1から開始する
-- 通常のRoom移動では使用中モードとモード2～4の設定内容を維持する
-- Retryでは変更要求とクールタイムを解除し、モード2～4の設定内容は失わない
-- モードは最低限、完成済み戦闘BGMへ聞こえる変化を加える
-
-### コンダクト
-
-- コンダクトは一つのAttackEvent全体に対する指示とする
-- マウスホイール回転で選択し、ホイール押し込みのMarker入力と分離する
-- Charge開始前およびCharge開始後も、Charge成功確定前は別のコンダクトへ変更できる
-- 選択状態はNormal／Weakを問わず次のCharge成功まで維持する
-- Charge成功時にAttackEventへ一つだけ付与し、Player側をコンダクト未選択状態へ戻す
-- 付与後は上書き・切替できない
-- すでにCharge済みのShaondamaを含め、AttackEvent全体へ作用する
-- Click／Drag、Chord／ArpeggioでShaondamaや音ごとに分割しない
-- Stage終了とRetryでPlayer側の選択状態を解除し、付与済みコンダクトを次の挑戦へ持ち越さない
-- コンダクトは最低限、Palette Bulletの発射音へ聞こえる変化を加える
-- 初期導入は「付与・消費できる枠組み」と「ひろがり／やまびこを使える試遊版」の二段階とする
+- Modeは4種類で、Mode 1は編集不可、Mode 2～4は拠点で構成する
+- Mode 1はStamina自然回復速度1.5倍、Direct／Explosion Damage 0.75倍を初期値とし、HP自然回復・被Damage軽減・復活は追加しない
+- Modeは`1`～`4`で直接選択し、次の対象小節頭で適用する
+- Mode cooldownは論理4小節で、実際に別Mode IDへ適用した場合だけ開始する
+- Modeは`Fire Music Position`でAttackEvent occurrence全体へsnapshotする
+- Conductは`未選択 → ひろがり → やまびこ → 未選択`をWheelで循環選択する
+- Conductは有効なCharge Pressでsnapshotし、Charge成功時は成功したAllocationと同じoccurrenceへ付与commitする
+- 付与成功時だけPlayer側を未選択へ戻し、共通3秒cooldownを開始する
+- ひろがりとやまびこは初期採用仕様であり、Mode適用後の結果へ適用する
+- MusicChartの静的元データをPlayerのMode／Conduct操作で変更しない
+- 新しい`ActionState`や第二のPlayer State管理者を追加せず、既存bufferも流用しない
 
 ## 未決事項
-
-### 名称
 
 - モードチェンジの正式名称
 - コンダクトの正式名称
 - 各エフェクターの正式名称
 - 各コンダクトの正式名称
 - モード1の正式名称
-
-### モード1
-
-- 正確な回復内容
-- 正確な短所
-- BGMの具体的な聞こえ方
+- Mode 1の最終Tuning値
 - 固定エフェクターを内部的に持つか
-- Tuning値
-
-### モード2～4
-
-- 採用するエフェクター一覧
-- エフェクターの入手方法
-- Storyによる解放順序
-- 各段階の最大Level
-- エフェクターごとの加算、乗算、変換、上限
-- 丸め処理
-- モード全体の総コストや容量制限
-- 並び順による具体的な音と数値の変化
-- 同じ接続順が常に最適にならないための規則
-- 保存範囲とSave Data
-- 異なるモード同士で同じエフェクターを同時に使用できるか
-
-### モード切替
-
-- Tempo／拍子変更がある位置での「1小節相当秒数」の算出
-- モード変更要求と同Frameの各処理順序
-- 同じ小節内に複数のモード変更要求を受けた場合の保持・上書き規則
-- 現在使用中のモードを再選択した場合の扱い
-- ArpeggioでAttackEvent発火時のモードを全体へ固定するか、各Palette Bulletの実発射時点で参照するか
-- 通常のRoom移動中に参照する小節基準と適用タイミング
+- 具体的なEffectorカタログ、Level、上限、入手、解放、容量制限
+- Effectorごとの計算式、上限、丸め、および具体的な音響処理
 - 未適用のモード変更要求とクールタイムをRoom境界で維持するか
-- Pause中の変更要求受付・小節頭適用・クールタイム進行
-- Parry HitStop中の変更要求受付・小節頭適用・クールタイム進行
-- Audio上の極短い補間
-- Delay／Reverbなどの残響Tail
+- Mode cooldownのPause／HitStop／Room境界における詳細な進行表
+- Audio上の技術Crossfadeの長さと具体DSP
 - モード切替UIと予告表示
 - 使用できない状態でのFeedback
-
-### コンダクト
-
-- マウスホイール上の並び順
-- コンダクト未選択状態をホイール選択肢へ含めるか
-- Charge成功前に任意でコンダクト未選択状態へ戻せるか
 - コンダクト選択中のHUD表示
 - AttackEventにすでにコンダクトがある場合のFeedback
-- 選択中コンダクトを保持したまま、コンダクト付与済みAttackEventがCurrentになった場合の入力gate
-- ホイール入力とClick／DragのCharge成功確定が同じ時刻・同じFrameに成立した場合の処理順
-- Accent、Staccato、ひろがり、とがり、やまびこの具体的効果
-- 各コンダクトの長所・短所
-- スタミナ、弾速、Damageなどの具体的な代償
-- 音、見た目、挙動、数値の対応表
-- 将来のLegato
-- だんだん早く／遅くを本当に採用するか
-- 一時的なTempo変更を行う場合のBGM／MusicChart同期方法
-
-### 音響範囲
-
-- モードをPalette Bulletの音程音へも掛けるか
-- モードをGameplay SEへ掛けるか
-- BGM、Palette Bullet音、Gameplay SEでモードの掛かり方を分けるか
-- コンダクトをPalette Bullet発射音以外へ掛けるか
-- コンダクトを音程音、Gameplay上の発射SE、または両方のどれへ掛けるか
-- BGM、Palette Bullet音、Gameplay SEのMix方法
-- 実際に使用するAudio Mixer／DSP構成
-- EQ、Compressor、Reverb、Ducking等の具体的構成
-- Delay／Reverbの残響をモード切替後に残すか
-- 強弱、Crescendo／Diminuendo、転調をモードへ含めるか
-
-### Gameplayとの対応
-
-以下は曖昧な総称のまま確定せず、採用する値・挙動を個別に決めます。
-
-- Damage
-- 攻撃力
-- 防御力
-- HP回復
-- スタミナ回復
-- スタミナ消費
-- のけぞりにくさ
-- 弾速
-- 攻撃範囲
-- Enemyの動き・攻撃へ影響するか
-- Shaondamaの浮遊へ影響するか
-- Normal Shaondamaの自然破裂Weak攻撃へモードを作用させるか
-- モード内部の計算結果を、既存のRGB、直撃／爆風倍率、Wildcard倍率、Enemy側集約・丸め・Clampへ接続する順序
-- AttackEventの発火・発射処理で適用したモードの値・挙動を、飛行・命中・爆発までどのように保持するか
-
-### Runtime・UI・保存
-
-- モード状態を保持するRuntime Owner
-- コンダクト選択状態と付与済みデータを保持するRuntime Owner
-- 既存Palette State Graphとの具体的な接続形式
-- Production Event／Command名とpayload
-- Input Action名とInput Action Asset上の構成
-- モード／コンダクトのUI詳細
-- Gameplay上必要な識別Presentation
-- 拠点の専用機能の画面・操作・解放条件
-- 拠点を通らない現行プロトタイプでモード2～4を構成・試用する方法
-- RadioWhaleへモード構成をセットするPresentation
-- RadioWhaleの雰囲気、VFX、音をモードで変えるか
-- 拠点・戦闘外でのRadioWhaleの存在とScene間ライフサイクル
-
-### Shaondamaの浮遊
-
-- エフェクターの性質によってShaondamaの浮遊挙動を変えるか
-- MusicChartが持つ楽曲本来のTempoに合わせて浮遊リズムを変えるか
-- `Reserved`中の停止・接続規則と浮遊変化をどう両立するか
+- ひろがり／やまびこの最終Tuning値、VFX、具体DSP
+- Accent、Staccato、とがり、Legato、速度変化など将来候補の採否
+- Shaondama浮遊をMode Presentationへ含めるか
+- 具体的なクラス名、field名、Event／Command名、payload、Input Action名
+- Save Dataの具体schema、migration、Identifier
 
 ## 対象外
 
-本ページおよび本ページを追加する最初のDraft PRでは、以下を行いません。
+本ページのGameplay契約では、以下を確定しません。
 
 - Unity実装
 - Input Action Asset変更
@@ -856,59 +747,24 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 - VFXデザイン確定
 - BGM素材やMIDIの変更
 
-## 後続で整合修正が必要な既存ページ
+## 後続ページとの責務境界
 
-本ページの追加時点では、以下の既存ページを変更しません。後続作業では、本ページを参照しながら責務の重複や旧表現を確認します。
+この表は進捗表ではなく、今回変更しないページが所有する詳細責務と参照先を示します。
 
-| 分類 | ページ | 後続で確認・同期する内容 |
+| 担当 | 所有する詳細責務 | 主な参照先 |
 | --- | --- | --- |
-| 全体 | [ゲーム概要](/game-overview) | コア体験とStage前準備へのモード構成追加 |
-| Player | [Player概要](/spec/player/) | Playerの主要行動とStage前／Stage中の役割 |
-| Player | [Player入力と操作](/spec/player/input-and-controls) | `1`～`4`、マウスホイール回転、使用可能な場面、既存Charge説明 |
-| Player | [Playerアクション｜チャージ](/spec/player/player-action-charge) | Charge成功時のコンダクト付与、Normal／Weak、Click／Dragとの接続 |
-| Player | [Playerステータス](/spec/player/player-status) | HP・スタミナへ作用する効果を採用する場合のOwner境界 |
-| Player | [Player状態](/spec/player/states) | 第二のState管理者を作らない境界とStage／Retry cleanup |
-| Player | [Playerアクション遷移](/spec/player/player-action-transitions) | コンダクト選択がActionState遷移を不必要に増やさないこと |
-| BGM | [BGM概要](/spec/bgm/) | モード／コンダクトとBGMカテゴリの高レベルな責務境界 |
-| BGM | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) | MusicChart由来情報と、Stage挑戦中に付与するコンダクトの分離 |
-| BGM | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) | 発火時のコンダクト取得と、Arpeggioを含むモード参照時点の接続 |
-| BGM | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) | モード／コンダクトの必須音響範囲、小節境界、Mix責務 |
-| BGM | [BGM→シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama) | Shaondama生成とモード／コンダクトを混同しない境界 |
-| BGM | [MusicChart仕様](/spec/bgm/bgm-music-chart) | モード／コンダクトをChart元データへ埋め込まない契約 |
-| Combat | [戦闘](/spec/combat/) | モード／コンダクトによる明示的なCombat値・挙動の接続先 |
-| Combat | [パレットブレット](/spec/combat/palette-bullet) | 冒頭にある`Reserved`状態とPalette Bulletの同一視を避ける表現、cleanup完了条件に残る旧「生成要求」表現の「Palette Bullet化・発射要求」への同期、発火・発射処理で使用するモード、AttackEvent単位コンダクト、飛行・Damageへの反映 |
-| Draw | [ドローシステム](/spec/draw-system/) | 新仕様との高レベルな接続 |
-| Draw | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) | Weak AttackEvent作成時のコンダクト付与と`Reserved`境界 |
-| Shaondama | [シャオンダマ](/spec/shaondama-music/) | 浮遊個体からPalette Bullet化する既存ライフサイクルとの接続 |
-| Shaondama | [MIDI連動のシャオンダマ生成](/spec/shaondama-music/midi-driven-spawning) | MusicChart由来の生成とPlayer設定の分離 |
-| Shaondama | [玉のデータ](/spec/shaondama-music/orb-data) | モードをCharge時点の個体dataへ固定しない境界 |
-| Shaondama | [浮遊・挙動](/spec/shaondama-music/floating-behavior) | 浮遊変化案と`Reserved`停止規則の整合 |
-| Shaondama | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb) | Weak AttackEventとWildcard固有解決の維持 |
-| Game | [ゲーム全体](/spec/game/) | Stage、Room、Battle、Result、Retryのライフサイクル接続 |
-| Game | [プロトタイプ](/spec/game/prototype) | 現行対象外の拠点を使う構成方法と、初期検証段階・試遊範囲への反映 |
-| 共通技術 | [Player Action／State Graph基盤](/spec/common-technology/action-state-manage) | 既存State Graphとの接続、Owner、Event／Commandを実装時に確定 |
-| 共通技術 | [Gameplay Runtime Trace](/spec/common-technology/gameplay-runtime-trace) | モード要求・適用、コンダクト付与、発火・発射処理でのモード参照の追跡範囲 |
-| 共通技術 | [プランナー向け調整パラメータ管理](/spec/common-technology/planner-tuning-parameter) | エフェクター段階、上限、モード／コンダクト数値の調整・保存方式 |
-| UI | [UI](/spec/ui/) | モード予告、クールタイム、コンダクト選択、入力拒否Feedbackの表示 |
-| RadioWhale | [ラジクジラ](/spec/radiowhale/) | Presentation上のセット表現とPlayerから独立した存在である境界 |
-| RadioWhale | [キャラクター・世界観](/spec/radiowhale/character-worldbuilding) | モード構成をセットする世界観上の説明 |
-| RadioWhale | [追従・浮遊](/spec/radiowhale/follow-and-floating) | モード状態をPlayer追従Stateへ混ぜないこと |
-| RadioWhale | [シャオンダマ生成](/spec/radiowhale/shaondama-spawning) | モード構成とShaondama出現責務を混同しないこと |
-| RadioWhale | [Gameplayライフサイクル](/spec/radiowhale/gameplay-lifecycle) | 拠点・Stage・RetryとRadioWhaleの未決ライフサイクル |
-| RadioWhale | [Animation・VFX・Sound](/spec/radiowhale/animation-effects-sound) | 将来モードで雰囲気・VFX・音を変える場合のPresentation |
-
-### 既存タスクとの境界
-
-| タスク | 今回の仕様との関係 |
-| --- | --- |
-| [PB-TASK-0019｜プロトタイプ戦闘BGMの要件整理・ラフ制作](/tasks/music-chart-scriptableobject/pb-task-0019) | BGMラフ、MIDI、AttackEvent候補を扱う。Playerのモード／コンダクトをMIDI TrackやMusicChartへ埋め込まない |
-| [PB-TASK-0020｜ラジクジラのキャラクターコンセプトデザイン](/tasks/radiowhale/pb-task-0020) | RadioWhaleをPlayer装備やPlayer Stateの一部にしない。RuntimeのモードOwnerや最終VFX／Soundは扱わない |
-| [PB-TASK-0021｜コア戦闘オブジェクトの視認性・ビジュアル言語設計](/tasks/effects/pb-task-0021) | PresentationをGameplay状態の正本にしない。モード／コンダクト固有の最終VFXや全AttackEvent演出は別途検討する |
+| PR B | Game／Player Status／DeathにおけるPause、HitStop、Room、Stage終了、Retryの詳細表 | [ゲーム全体](/spec/game/)、[Playerステータス](/spec/player/player-status)、[Player死亡](/spec/player/player-death) |
+| PR C | AttackEvent発火、Mode snapshotの受け渡し、Palette Bullet／Damage候補／Enemy接続 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet) |
+| PR #72 | BGM／MusicChart／音響実装境界、Crossfade、Tail、具体DSP | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)、[MusicChart仕様](/spec/bgm/bgm-music-chart) |
+| PR D | Prototype固定プリセット、Tuning、Runtime Trace | [プロトタイプ](/spec/game/prototype)、[プランナー向け調整パラメータ管理](/spec/common-technology/planner-tuning-parameter)、[Gameplay Runtime Trace](/spec/common-technology/gameplay-runtime-trace) |
+| PR E | Mode／ConductのBattle HUD、cooldown、pending、入力拒否Feedback | [Battle HUD](/spec/ui/battle-hud) |
+| PR F | ゲーム概要、用語、ガイド等の入口・横断参照 | [ゲーム概要](/game-overview) |
 
 ## 関連ページ
 
 - [Player概要](/spec/player/)
 - [Player入力と操作](/spec/player/input-and-controls)
+- [モード構成・エフェクター仕様](/spec/player/mode-configuration-and-effectors)
 - [Playerアクション｜チャージ](/spec/player/player-action-charge)
 - [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)
 - [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)

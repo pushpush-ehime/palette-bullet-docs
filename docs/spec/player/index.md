@@ -23,6 +23,8 @@ collapsed: false
 
 Playerは、世界内のシャオンダマを選択してChargeし、Charge成功時にAttackEvent occurrenceへ割り当てて`Reserved`にできます。対応するAttackEventの発火時に、その`Reserved`のシャオンダマがPalette Bullet化して敵へ発射されます。
 
+Playerは拠点でMode 2～4のEffector構成を準備し、Stage中はMode 1～4を選択して次の小節頭で切り替えます。また、マウスホイールでConductを選択し、有効なCharge Pressでその選択をsnapshotします。Charge成功時は、成功したAllocationと同じAttackEvent occurrenceへsnapshotしたConductを付与できます。
+
 ## Player体験の基本方針
 
 ### 雑魚戦
@@ -72,6 +74,9 @@ Playerは、世界内のシャオンダマを選択してChargeし、Charge成�
 - ラジクジラのGameplay上の存在・表示：[ラジクジラ｜Gameplayライフサイクル](../radiowhale/gameplay-lifecycle.md)
 - Markerの有効条件・置換・消滅：[マーカー](../combat/marker.md)
 - Palette BulletのTarget座標決定：[パレットブレット](../combat/palette-bullet.md)
+- Mode 2～4の構成：[モード構成・エフェクター仕様](./mode-configuration-and-effectors.md)
+- Stage中のMode切替、Mode snapshot、Conductの付与commit：[Playerアクション｜モードチェンジとコンダクト](./player-action-mode-change-and-conduct.md)
+- 有効なCharge PressでのConduct snapshot：[Playerアクション｜チャージ](./player-action-charge.md)
 
 ## Playerが行える主要行動
 
@@ -84,6 +89,7 @@ Playerが行える操作は、拠点と戦闘ステージで異なります。
 - キャラクターとの会話
 - ステージの選択
 - 戦闘前の準備
+- Mode 2～4のEffector構成
 
 ### 戦闘ステージ
 
@@ -95,4 +101,6 @@ Playerが行える操作は、拠点と戦闘ステージで異なります。
 - AttackEvent発火時のPalette Bullet化・発射
 - マーカー発射
 - パリィ
+- Mode 1～4の選択と小節同期切替
+- Conductの選択とCharge Press snapshot
 - スキル（未確定）
