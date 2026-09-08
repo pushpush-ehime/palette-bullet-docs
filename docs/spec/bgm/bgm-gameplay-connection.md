@@ -30,10 +30,10 @@ relatedTasks: []
 - Battle開始時の準備gateとsystem pre-roll
 - Pause / Resume
 - BGM Loop
-- Battle終了時のGameplay同期解除・cleanup / Room Retry
+- Battle終了時のGameplay同期解除・cleanup / Room移動 / Room Retry
 - Parry HitStop中のBGM Audio・3時計・AttackEvent同期
 - 戦闘BGM / Palette Bullet音程音 / Gameplay SEのレイヤー関係
-- Mode／Conductの最低音響保証とGameplay結果との分離
+- Mode／Conductの確定Audio対象・snapshot・RepeatとGameplay結果との分離
 
 一方、以下は本ページでは再定義しません。
 
@@ -296,17 +296,67 @@ Palette Bullet発射
 
 # Mode／Conductの音響接続
 
-## 最低音響保証
+## Audio対象
 
-Modeは、少なくとも完成済みの戦闘BGMへ、Playerが聞き分けられる変化を与えます。Conductは、少なくともPalette Bulletの発射音へ、Playerが聞き分けられる変化を与えます。
+Mode／ConductのGameplay上の意味と適用規則は、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。本ページは、その確定設定をAudioへ接続する責務だけを持ちます。
 
-ここでいう発射音は、Palette Bulletの発射時にPlayerへ聞こえる音を指します。Conductを音程音、Gameplay上の発射SE、またはその両方のどこへ適用するかは未決です。
+| 設定 | 作用するAudio | 原則として作用しないAudio |
+| --- | --- | --- |
+| Mode | 完成済み戦闘BGM、Palette Bulletの音程音 | Gameplay上の発射SE、着弾SE、UI音 |
+| Conduct | Palette Bulletの音程音、Gameplay上の発射SE | 戦闘BGMそのもの |
+
+Mode構成を共通入力としてBGM処理とPalette Bullet音程音処理へ渡し、音とGameplayの双方が[モード構成とエフェクター](/spec/player/mode-configuration-and-effectors)に定義された同じ安定設定を参照します。Mode1の音響は、高域を抑えた穏やかで丸い聞こえ方を初期方針とします。
 
 完成済みの戦闘BGMを継続して使用し、Player由来音を別レイヤーとして追加する既存構造と、戦闘BGM／Palette Bullet音程音／Gameplay SEのレイヤー分離を維持します。現時点のMode仕様には、BGMの恒常的なTempo変更、拍子変更、楽器編成の変更、別アレンジへの交換、およびRuntimeでのStem／楽器レイヤー切替を含めません。
 
-Conductによる一時的な「だんだん速く／遅く」は将来候補であり、採用するか、および採用する場合のBGM／MusicChart同期方法は未決です。
+具体的なEQ、Filter、Audio Mixer／Mixer Group、DSP、Effect、Wet／Dry、およびMode1の最終Tuning値は技術調整として固定しません。
 
-具体的なAudio Mixer／Mixer Group、DSP、Effect、パラメーター、Wet／Dry、Crossfade、残響Tail、ModeのBGM以外への適用範囲、およびConductの具体的な適用先は未決です。Gameplay上の意味と適用規則は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。
+## occurrence単位の適用
+
+AttackEvent occurrenceが`Fire Music Position`へ到達して発火を開始した瞬間にModeをsnapshotします。最初のPalette Bulletが実際に発射される時点まで遅らせず、先頭EntryがEmptyの場合も同じです。
+
+このMode snapshotはChord／Arpeggio／Weak AttackEvent全体で共有します。小節をまたぐArpeggioの後続Entryや、発射済みPalette Bulletの音程音も同じsnapshotを使用し、後からPlayerのcurrent Modeが変わっても読み直しません。Audio処理がglobalなcurrent Modeだけを参照して、発火済みoccurrenceの後続音まで変更してはいけません。
+
+Conductも同じAttackEvent occurrenceに付与済みの一つの設定を、そのoccurrenceに属する音程音と発射SE全体へ適用します。Chord／Arpeggioの音ごと・Entryごとに選び直さず、Weak AttackEventにも同じAudio対象規則を使用します。
+
+同じ小節頭でMode切替とAttackEvent発火が成立する場合は、次の順序にします。
+
+1. 保持済みpending Modeを適用する
+2. 戦闘BGMへ新Modeを適用する
+3. 同じ小節頭で発火するAttackEvent occurrenceが新Modeをsnapshotする
+4. そのoccurrenceの音程音へ新Modeを使用する
+
+すでに発火済みのArpeggioが小節境界をまたぐ場合は、戦闘BGMだけを小節頭から新Modeへ切り替え、残りの音程音には旧occurrenceのMode snapshotを使用します。
+
+## Mode cooldownと音楽時間
+
+Mode cooldownは初期値4小節です。適用された小節を1小節目として4小節分をlockし、5小節目の小節頭で新しいMode入力を解禁します。
+
+MusicChart上で順に到達する論理小節を数え、Tempoや拍子が変化しても記譜上の1小節を1カウントとします。BGM Loopで表示小節番号やloop occurrenceが戻っても残り小節数をresetせず、Loop前後の論理小節を順に数えて残量から継続します。Audio再生秒、適用時Tempoを固定した秒換算、またはFrame数で代用しません。
+
+MusicChart／TempoMapは小節境界を提供しますが、PlayerのMode cooldown残量を所有・保存しません。5小節目入力解禁後の適用を含む詳細規則とRuntime Ownerは、Player正本の[Modeクールタイム](/spec/player/player-action-mode-change-and-conduct#クールタイム)を参照します。
+
+Conduct cooldownは初期値3秒で、実際にAttackEvent occurrenceへConductを付与できた瞬間から開始します。BGM／MusicChartはPlayer側の選択や残り時間を所有せず、本ページではPause／HitStop／RoomへのAudio時間接続だけを定義します。付与・消費・入力の詳細はPlayer正本の[Conduct cooldown](/spec/player/player-action-mode-change-and-conduct#conduct-cooldown)を参照します。
+
+## 技術的CrossfadeとTail
+
+Gameplay上のMode切替は小節頭で一括して成立します。クリックノイズを防ぐための極短いCrossfadeは許可しますが、Gameplay上の切替時点を遅らせず、Crossfade中の音量比からDamageやAttackEvent結果を補間しません。
+
+Mode切替前に発生済みのDelay／Reverb Tailは不自然に切断せず減衰させて構いません。新しく入力される戦闘BGM音には新Mode、発火済みArpeggioの音程音には旧occurrenceのMode snapshotを使用します。CrossfadeやTailの具体的な方式・秒数・DSP値は技術調整とします。
+
+## ひろがりの音響
+
+ひろがりは初期採用済みのConductです。元の音程と発音Timingを維持したまま音の広がりを強め、Chord／ArpeggioではAttackEvent occurrence全体へ同じ効果を適用します。戦闘BGMそのものは変更しません。
+
+Gameplay上のExplosion Radius 1.5倍はPlayer／Combat側の正本が所有します。Audio処理結果からExplosion Radiusを算出しません。Stereo width、Reverb、Mixer、DSPの具体値は技術調整とします。
+
+## やまびこの音響Repeat
+
+やまびこは初期採用済みのConductです。各Palette Bulletについて、元の発射音から0.5秒後に、そのBulletの音程音とGameplay上の発射SEを一度だけRepeatします。Repeat音量は元の発射音の50%とし、元の音程と発射内容、元AttackEvent occurrenceのMode snapshotとConduct設定を使用します。Repeat時にcurrent Modeを読み直さず、Repeatから追加Repeatを発生させません。0.5秒と50%は調整可能な初期値です。
+
+Chord／Arpeggioでは各元発射音を個別の起点として、それぞれ一度だけRepeatします。Gameplay上の第二爆発は第一爆発から0.5秒後であり、発射音を起点とするAudio Repeatとは別の予約です。飛翔時間によって両者の時刻は一致しない場合があります。Audio処理から第二爆発を発生させず、第二爆発からRepeat時刻を決めません。
+
+Repeatの0.5秒delayはPause中に停止し、HitStop中に進行します。Battle結果確定時には未発生Repeatを取消し、Retryや次Battleへ持ち越しません。旧`battleId`のcallbackは新Battleで実行しません。一般的な発音済みTailの継続許可を、未発生Repeatの継続許可へ広げてはいけません。
 
 ## 音響とGameplay結果の境界
 
@@ -314,7 +364,7 @@ Conductによる一時的な「だんだん速く／遅く」は将来候補で�
 
 Mode／Conductを音だけが変わる装飾機能にも、音楽性を伴わない単なる数値装備にもせず、音響とGameplayの双方が同じ設定を参照します。
 
-具体的なDamage、回復、弾速、範囲、および計算順は未決です。本ページでは音響とGameplay結果の接続境界だけを定義し、具体的なGameplay効果を確定しません。
+Mode1のGameplay倍率、ひろがりのExplosion Radius、およびやまびこの第二爆発Damageを含むGameplay計算はPlayer／Combat側の正本が所有します。本ページでは再定義せず、確定済みのGameplay設定を音響波形やDSP結果から逆算・上書きしません。
 
 ---
 
@@ -1109,6 +1159,10 @@ system pre-roll中は、BGM Audioがまだ再生されていなくても、対�
 
 Chargeの具体的な受付条件は[Playerアクション｜チャージ](/spec/player/player-action-charge)を正本とします。本ページでは、Charge開始条件としてBGM Audioの再生状態を要求しません。
 
+Playerが操作可能でMode入力gateを満たす場合、system pre-roll中もMode入力を受け付けられます。BGM Audioが音源位置0で停止していることだけを拒否理由にしません。受理済みのpending Modeは、Battle音楽runtime上で次に到達する有効な小節頭へ適用します。同じ小節頭でMode適用とAttackEvent発火が成立する場合は、新ModeをBGMへ適用してからAttackEvent occurrenceがsnapshotします。
+
+Mode cooldownなどの入力拒否条件はsystem pre-roll中も維持します。Mode入力gateとpendingの詳細は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とし、BGM Audioの再生状態から独自に再判定しません。
+
 ---
 
 ## system pre-roll
@@ -1227,6 +1281,8 @@ E / Gの音楽時間だけ進む
 
 system pre-roll中にPauseした場合は、戦闘BGMを開始せず、system pre-rollの残り時間を保持します。Pause中にsystem pre-rollだけを完了させたり、戦闘BGMを音源位置0から開始したりしません。
 
+Player Runtimeが保持する未適用のMode pending、Mode cooldownの残り小節数、およびPlayer側のConduct選択を破棄しません。Pause中は小節頭でのpending適用を行わず、Mode cooldownとConduct cooldownの進行を停止します。未発生のやまびこAudio Repeatを含む予約Audioの残り時間も停止・保持します。
+
 ## Resume
 
 Resume時は、Pauseしたsystem pre-rollまたはBGM位置と音楽時間関係から再開します。
@@ -1247,6 +1303,8 @@ AttackEvent / Arpeggio / Gameplay音
 ```
 
 BGMだけが先に進んだり、system pre-rollだけが消費されたり、Arpeggioの発射・発音順序がずれたりしないようにします。
+
+停止していた音楽位置と小節関係からMode pendingの適用判定とMode cooldownを再開し、Conduct cooldownと未発生のやまびこAudio Repeatもそれぞれの残り時間から再開します。Pause中に進行したものとして補正しません。
 
 Pauseは同じ`battleId`の同期状態・予約event・再開位置を保持する一時停止です。Battle結果確定時の終了停止は、発行待ち通知と予約callbackを無効化して同じBattleを再開不能にする処理であり、Pause / Resumeと共通化して意味を曖昧にしません。
 
@@ -1336,6 +1394,10 @@ HitStop中に到達したAttackEventを終了後までqueueへ保留してまと
 
 HitStopによってAttackEventの`Complete / Incomplete / Zero Charge`を再判定せず、発火対象、Arpeggio順序、音程音の発音時刻も変更しません。
 
+Mode cooldownはMusicChart上の論理小節単位で、Conduct cooldownとやまびこのAudio Repeat delayは通常Gameplayと同じ時間関係で、いずれもHitStop中に進行します。有効な小節頭へ到達した場合は、Player Runtimeが保持済みのpending Modeを適用してBGMを新Modeへ切り替えます。実際にMode IDが変わった場合は通常どおり4小節cooldownを開始し、同じ小節頭で発火するAttackEvent occurrenceは新Modeをsnapshotします。
+
+HitStop中の新しいMode入力はPlayer側で拒否し、buffer・予約しません。Parry専用HitStop入力bufferをMode入力へ流用しません。ただし、この入力拒否を理由としてBGM Audio、MusicChart、保持済みpendingの小節頭適用、Mode／Conduct cooldown、またはやまびこのAudio Repeat delayを停止しません。
+
 ## Pauseとの分離
 
 Parry HitStopをPauseとして扱いません。
@@ -1386,6 +1448,8 @@ Loop
 
 system pre-rollはBattle音楽runtimeの開始時に置く区間であり、通常のBGM Loopごとに音源やMIDIへ無音区間を挿入しません。Loop時は、再度Battle準備gateやsystem pre-rollへ戻らず、BGMとMusicChartを同じ新しい周回へ進めます。
 
+Mode cooldownがLoopをまたいでも残り小節数をresetしません。表示上の小節番号やloop occurrenceが切り替わっても、Loop前後で到達したMusicChart上の論理小節を順に数え、残量から継続します。Audio再生秒、固定Tempoによる秒換算、またはFrame数で代用しません。MusicChartは小節境界を提供しますが、Player RuntimeのMode cooldown残量を所有しません。
+
 現在位置より後のMusicChart eventを検索する規則がloop境界を越える場合、音楽上の検索は次loopへ連続します。Wildcard Weakの「次のNoteEvent」検索などの具体条件とoccurrence識別は、AllocationおよびMusicChart側の正本へ委譲します。
 
 以下のGameplay lifecycleは、本ページでは再定義しません。
@@ -1402,7 +1466,7 @@ system pre-rollはBattle音楽runtimeの開始時に置く区間であり、通�
 
 ---
 
-# Battle終了 / Room Retry
+# Battle終了 / Room移動 / Room Retry
 
 ## Battle終了
 
@@ -1486,6 +1550,8 @@ MusicChart → Gameplay Event出力gateを閉じる
 
 終了したBattleに紐づくAttackEventから、新しいPalette Bullet音程音を後から発音しません。Battle結果確定より前にすでに発音開始済みの音を巻き戻すことはしません。
 
+やまびこの未発生Audio Repeatも新規発音せず、予約を取消します。Gameplay側の第二爆発予約はPalette Bullet／Combat側の正本へ委譲し、本ページのAudio callbackから発生させません。
+
 ---
 
 ### 発行待ち通知・予約callbackの無効化
@@ -1497,6 +1563,7 @@ MusicChart → Gameplay Event出力gateを閉じる
 - AttackEvent Preview / Charge / Fire用の予約callback
 - Arpeggio Entry timing用の予約callback
 - BGM同期Gameplay音の予約発音callback
+- やまびこの未発生Audio Repeat callback
 - MusicChart Loop境界に予約されたGameplay callback
 - Gameplay Ownerへまだhand-offされていない同期event
 
@@ -1540,6 +1607,7 @@ MusicChart → Gameplay Event出力gateがOpen
 - MusicChart EventをGameplayへ送る
 - AttackEventやArpeggioを進行させる
 - Palette Bullet音程音やGameplay SEを新規発音する
+- やまびこの未発生Audio Repeatを新規発音する
 - 新Battleの同期状態やcleanup状態を変更する
 
 Retryでは新しい`battleId`を使用します。前Battleのeventが新Battleと同じMusicChart位置・NoteEvent・AttackEventを指していても、別Battleのeventとして拒否します。
@@ -1588,6 +1656,8 @@ Gameplay同期解除済み
 
 BGM AudioのFade、終了SE、すでに発音済みの音の余韻は、BGM / Gameplay同期Ownerの必須cleanup完了条件に含めません。これらの演出が継続していても、Gameplay同期解除が完了していれば本Ownerはcleanup完了を通知できます。
 
+ここで許可する余韻は、Battle結果確定前にすでに発音済みの通常のDelay／Reverb Tailを減衰させることだけです。まだ発音していないやまびこAudio RepeatをBattle終了後に新規発音することは、Tailの継続には含めず禁止します。
+
 ---
 
 ### 同期解除cleanupの処理順と冪等性
@@ -1601,7 +1671,7 @@ BGM / Gameplay同期Ownerは、現在の`battleId`に対するBattle結果確定
 ↓
 3. Battle / Gameplay / MusicChart Clockを同じ終了境界で停止する
 ↓
-4. 発行待ちGameplay通知・予約callbackを無効化する
+4. 発行待ちGameplay通知・やまびこAudio Repeatを含む予約callbackを無効化する
 ↓
 5. system pre-roll / BGM Audio開始予約を無効化する
 ↓
@@ -1636,6 +1706,7 @@ BGM / Gameplay同期Ownerの必須cleanupは、現在の`battleId`について�
 - MusicChartからGameplayへのEvent出力gateが閉じている
 - 発行待ちGameplay通知が無効化されている
 - 予約済みGameplay callbackが無効化されている
+- やまびこの未発生Audio Repeat callbackが無効化されている
 - system pre-roll進行とBGM Audio開始予約が終了している
 - 旧Battleの同期購読・Gameplay向け参照が解除されている
 - 旧`battleId`の同期eventがGameplayへ到達できない
@@ -1677,6 +1748,18 @@ Result操作の解禁は本Owner単独では判断しません。全必須Owner�
 
 ---
 
+## 通常のRoom移動
+
+通常のRoom移動では、Player Runtimeが所有するcurrent Mode、Mode cooldownの残り小節数、Player側のConduct選択、およびConduct cooldownの残り時間をRoom間で維持します。[モード構成とエフェクター](/spec/player/mode-configuration-and-effectors)に保存されたMode2～4の構成も維持します。一方、未適用のMode pendingだけはRoom移動開始時に破棄します。
+
+Room移動演出中はBGM／MusicChart側から小節頭適用を発生させず、Mode cooldownとConduct cooldownを進めません。新しいMode／Conduct入力はPlayer側の通常の操作lockに従って受け付けず、Audio／MusicChart側でも予約しません。BGM／MusicChartはPlayer Runtimeの選択やcooldown残量を所有・保存しません。
+
+新しいRoomのMusicChartが有効になりGameplayが操作可能になった後、Mode cooldownは残り小節数、Conduct cooldownは残り時間から再開します。破棄したMode pendingは復元せず、current ModeとConduct選択は維持された状態から再開します。
+
+やまびこの未発生Gameplay／Audio予約は、Room間で維持するConduct cooldown残量とは別の状態です。Room移動に先立つBattle終了契約で取消し、次Battleへ持ち越しません。Gameplay側の第二爆発cleanupはPalette Bullet／Combat側、Room lifecycleの詳細表はGame側の正本へ委譲します。
+
+通常のRoom移動と異なり、Stage終了／RetryではRuntime上のcurrent Mode、Conduct選択、Mode pending、および両cooldownを破棄します。Mode2～4のSave構成は維持します。これらのPlayer状態の破棄処理そのものはPlayer／Game側が所有し、BGM／MusicChartへ保存しません。
+
 ## Room Retry
 
 Room Retry時は、旧Battleに属する音楽runtimeを破棄します。少なくとも以下を新しいBattleへ持ち越しません。
@@ -1685,6 +1768,7 @@ Room Retry時は、旧Battleに属する音楽runtimeを破棄します。少な
 - 旧Battleのsystem pre-roll進行状態とBGM再生開始予約
 - 旧BattleのBGM再生位置とLoop周回
 - 旧Battleの未発音AttackEvent / Arpeggio音
+- 旧Battleのやまびこ未発生Audio Repeat
 - 旧Battleの発行待ちGameplay通知・予約callback
 - 旧BattleのMusicChart Event出力gate・同期購読・Gameplay向け参照
 
@@ -1746,13 +1830,18 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 | Battle結果の確定・Result操作解禁・Result後のroute | [ゲーム全体](/spec/game/) / `ui/index.md` |
 | Battle ID・Combat状態・Combat受付 | [戦闘](/spec/combat/) |
 | Ready gateと3時計・BGM Audio・system pre-rollのruntime接続 | **本ページ** |
+| Mode／Conduct設定のAudio対象・occurrence単位のMode snapshot接続 | **本ページ**。Gameplay契約は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
+| Mode2～4の構成・保存 | [モード構成とエフェクター](/spec/player/mode-configuration-and-effectors) |
 | Parry HitStop中のBGM Audio・3時計・AttackEvent同期 | **本ページ** |
+| Pause／HitStop／Room／LoopでのMode／Conduct基本契約 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)。本ページはAudio／MusicChart接続を同期 |
 | Parry判定batch・Normal / Just評価・HitStopの強さと長さ・HitStop中のParry入力保持 | [Playerアクション｜パリィ](/spec/player/player-action-parry) |
 | Battle結果確定時の`Battle / Gameplay / MusicChart Clock`停止 | **本ページ** |
 | MusicChartからGameplayへのEvent出力停止 | **本ページ** |
 | 発行待ちGameplay通知・予約callback・BGM Audio開始予約の無効化 | **本ページ** |
 | 旧`battleId`のBGM同期event拒否 | **本ページ** |
 | BGM / Gameplay同期Ownerの必須cleanup完了条件・通知 | **本ページ** |
+| やまびこの未発生Audio Repeat取消・旧`battleId` callback拒否 | **本ページ** |
+| やまびこのGameplay第二爆発・Damage・cleanup | Palette Bullet／Combat側の正本 |
 | MIDI / FLAC書き出し条件 | [BGM MIDIファイルの設定](/spec/bgm/bgm-midi-settings) |
 | MusicChart構造・TempoMap・Sync Settings・system pre-rollの保存・validation | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart) |
 | 初期Shaondama生成・最低保証数・Shaondama Supply Ready | [BGM｜シャオンダマ生成](/spec/bgm/bgm-make-syaonndama) |
@@ -1764,7 +1853,7 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 | `Complete / Incomplete / Zero Charge`・使用Reserved・Palette Bullet化・発射対象 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | 発火前AttackEvent・Arpeggio残Entry・AttackEvent snapshot・未消費ReservedのBattle終了cleanup | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement) |
 | BGM / Palette Bullet音程音 / Gameplay SEの同期・発音 | **本ページ** |
-| Mode／Conductの最低音響保証と、音響／Gameplay結果の分離 | **本ページ** |
+| Mode／Conductの確定Audio対象、Crossfade／Tail、ひろがり／やまびこ音響、音響／Gameplay結果の分離 | **本ページ** |
 | Mode／ConductのGameplay上の意味・選択・適用規則 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 | Shaondama runtime data | [玉のデータ](/spec/shaondama-music/orb-data) |
 | 万能Shaondama固有仕様 | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
@@ -1823,6 +1912,16 @@ Shaondama / Reserved / Player等のGameplay状態リセットについては、�
 - Reverb
 - Ducking
 - Gameplay SEとのバランス
+
+## Mode／ConductのAudio実装値
+
+- Mode1を含む具体的なEQ／Filter／Mixer／DSP値
+- 技術的Crossfadeの方式と時間
+- 発音済みDelay／Reverb Tailの減衰方式と時間
+- ひろがりのStereo width／Reverb等の具体値
+- やまびこRepeatのAudio Mixer／DSP実装
+
+これらの具体方式と値は技術調整として未決です。Mode／ConductのAudio対象、Crossfadeと発音済みTailを許可すること、やまびこのRepeat起点・回数・初期delay・初期音量、およびBattle終了時に未発生Repeatを取消すことは確定済みです。
 
 ## Zero Charge演出
 
