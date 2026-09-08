@@ -110,6 +110,26 @@ Workbench専用データとMusicChart内へ、同じGameplay設定を二重保�
 Editorツールが存在しない場合でも、
 MusicChartやRuntimeデータの意味が変化しない構造とします。
 
+### モード／コンダクトとの責務境界
+
+WorkbenchはMusicChartの制作・確認ツールです。Mode editorやConduct editorへ拡張せず、次のRuntime／Save状態を編集・保存する機能や独立した正本を追加しません。
+
+- Playerのcurrent Mode
+- pending Mode
+- Mode cooldown残量
+- Player側のConduct選択
+- Conduct cooldown残量
+- 有効なCharge Pressの一時Conduct snapshot
+- AttackEvent occurrenceへ付与されたConduct
+- `Fire Music Position`で取得するMode snapshot
+- Palette Bulletへ引き継いだMode／Conduct派生値
+- やまびこのGameplay／Audio Runtime予約とcallback状態
+- Mode2～4のSave構成
+
+これらをMIDI、MusicChartの必須入力・手動設定、またはWorkbench専用データへ追加しません。Runtime Monitor等で将来表示する場合も、Runtime側が確定した状態を読み取り専用で確認し、Workbench側で再判定・保存しません。静的MusicChartとRuntimeの非保存境界を検証する表示は許可します。
+
+この境界はWorkbenchへの機能追加や、具体的なAudio Mixer／DSP、Runtime実装名を確定するものではありません。Gameplay上の意味とRuntime Ownerは[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、Mode2～4のSave契約は[モード構成とエフェクター](/spec/player/mode-configuration-and-effectors)を正本とします。
+
 ---
 
 ## 対象データ
@@ -1120,6 +1140,8 @@ MIDI Note単体試聴は、
 | Random Sectionの抽選規則 | [BGM Random Section仕様](/spec/bgm/bgm-random-section) |
 | Charge Allocation・Current AttackEvent | [Charge Allocation仕様](/spec/draw-system/charge-allocation) |
 | 複数System横断のRuntime時系列Evidence | [Gameplay Runtime Trace仕様](/spec/common-technology/gameplay-runtime-trace) |
+| モード／コンダクトのGameplay上の意味とRuntime境界 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
+| Mode2～4の構成とSave契約 | [モード構成とエフェクター](/spec/player/mode-configuration-and-effectors) |
 
 ---
 

@@ -241,6 +241,8 @@ system pre-rollは、音源、完成BGM、またはMIDIへ追加した無音区�
 
 Battle音楽runtime開始からBGM Audio再生開始までの実行制御、`Battle／Gameplay／MusicChart`の3時計、およびsystem pre-roll中のPreview／Charge受付は、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。本ページは、そのRuntime処理に必要な静的な時間対応とvalidationを所有します。
 
+system pre-roll中もMusicChart側の時間関係は進行します。Playerが操作可能で入力gateを満たす場合に受理されたpending Modeは、次に到達する有効な小節頭へ適用されます。BGM Audioが音源位置0で停止していることだけを入力拒否理由にはしません。同じ小節頭でMode適用とAttackEvent発火が成立する場合は、Modeを先に適用してからoccurrenceがsnapshotします。入力gateとpendingのRuntime処理はPlayer正本、Audio接続順は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection#occurrence単位の適用)へ委譲します。
+
 system pre-rollの具体的な長さはTuning項目とします。秒、Tick、Beat、専用時間型のどれで保存するか、またMusicChart直下または専用Settings内のどこへ保持するかはImplementation Decisionとします。
 
 ---
@@ -289,6 +291,12 @@ BGM開始からの再生位置
 AttackEvent、Arpeggio Timing、Random Sectionなど、BGMと同期するデータの位置変換にも同じ`TempoMap`を使用します。
 
 TempoMapの元情報はMIDIを正とします。
+
+### Mode cooldownへ提供する小節境界
+
+TempoMapは、Mode cooldownがMusicChart上で順に到達した論理小節を数えるための小節境界を提供します。初期値4小節のcooldownは適用小節を1小節目として4小節分をlockし、5小節目の小節頭で入力を解禁します。Tempo／拍子が変化しても記譜上の1小節を1カウントとします。
+
+BGM Loopで表示小節番号やloop occurrenceが戻っても、Loop前後の論理小節を順に数え、残り小節数をresetしません。Audio再生秒、固定Tempoによる秒換算、またはFrame数で代用しません。TempoMapとMusicChartは小節境界を提供するだけで、Player RuntimeのMode cooldown残量を所有・保存しません。詳細規則は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct#クールタイム)を正本とします。
 
 ---
 
@@ -1068,6 +1076,24 @@ MusicChartに保存しないRuntime状態には、少なくとも以下を含み
 - 動的Weak AttackEvent
 - Weak Reserved Shaondama
 - PlayerのCharge状態
+- Playerのcurrent Mode
+- pending Mode
+- Mode cooldown残量
+- Player側のConduct選択
+- Conduct cooldown残量
+- 有効なCharge Pressで取得した一時Conduct snapshot
+- AttackEvent occurrenceへ付与されたConduct
+- AttackEvent occurrenceが`Fire Music Position`で取得したMode snapshot
+- Palette Bulletへ引き継いだMode／Conduct由来の不変派生dataまたは算出済み値
+- やまびこのGameplay上の第二爆発予約
+- やまびこのAudio Repeat予約とRuntime callback状態
+- Mode2～4のSave構成
+
+これらをMusicChartの静的schema、AttackEvent Definition、MusicChartのsource assetまたは生成物へ追加しません。Player入力やStage挑戦中の状態変化によって、実行中または保存済みのMusicChart元データを書き換えません。
+
+[MusicChart制作・確認ツール](/spec/common-technology/music-chart-workbench)はMusicChartの制作・確認ツールであり、上記Runtime／Save状態の独立した正本にはしません。Mode2～4の構成は[モード構成とエフェクター](/spec/player/mode-configuration-and-effectors)に従ってSave Dataへ保存します。具体的なRuntime field、保持schema、およびOwnerは本ページでは確定せず、Mode／ConductのGameplay上の意味は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。
+
+AttackEvent occurrenceのMode snapshotは、`Fire Music Position`で発火を開始した瞬間にRuntime側で取得します。先頭EntryがEmptyでも遅延せず、Chord／Arpeggio／Weak全体で共有し、後続Entryごとにcurrent Modeを読み直しません。このsnapshotや付与済みConductはAttackEvent Definitionへ書き戻さず、発射済みPalette Bulletの音程音を含むAudio接続は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection#occurrence単位の適用)を正本とします。
 
 ### BGM LoopとNormal AttackEvent occurrence
 
@@ -1580,6 +1606,7 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 | MIDI Import / 再Import | 本ページ |
 | system pre-roll時間と、pre-roll終了点・BGM Audio／曲本編位置0の対応を保存する静的データ契約 | 本ページ |
 | MusicChart保存・Import・再Import後のpre-roll／AttackEvent Timing validation | 本ページ |
+| Mode cooldownへ渡すTempo／拍子を反映した論理小節境界 | 本ページ。残量の所有と入力規則は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 | 最初のPreview／Charge開始に必要なleadを確保できているかのvalidation | 本ページ |
 | AttackEvent Timing Settings保存構造 | 本ページ |
 | AttackEvent Entry / exact MIDI Note保存契約 | 本ページ |
@@ -1594,6 +1621,8 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 | NoteEventからのシャオンダマ生成 | [BGM シャオンダマ生成仕様](/spec/bgm/bgm-make-syaonndama) |
 | Random Sectionの候補・抽選ルール | [BGM Random Section仕様](/spec/bgm/bgm-random-section) |
 | PlayerのCharge入力・Action | Player仕様 |
+| Mode／ConductのGameplay上の意味とStage挑戦中のRuntime状態 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
+| Mode2～4の構成とSave契約 | [モード構成とエフェクター](/spec/player/mode-configuration-and-effectors) |
 
 ### 本ページで再定義しない内容
 

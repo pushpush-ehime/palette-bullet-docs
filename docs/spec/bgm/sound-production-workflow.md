@@ -460,6 +460,32 @@ UnityへのImportとGameplay接続が完了した後は、実際のゲーム内�
 
 BGMとGameplayの同期挙動については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。
 
+### Mode／Conductの制作・確認境界
+
+Mode／Conductを導入しても、完成済みの戦闘BGMを継続して使用し、Player由来音を別レイヤーとして追加します。戦闘BGM、Palette Bullet音程音、およびGameplay SEの既存レイヤー分離を維持します。
+
+制作・試聴・ゲーム内確認では、少なくとも次を確認します。
+
+- Modeによって完成済み戦闘BGMとPalette Bullet音程音の双方が意図どおり変化する
+- Modeは原則としてGameplay上の発射SE、着弾SE、およびUI音へ作用しない
+- ConductによってPalette Bullet音程音とGameplay上の発射SEが変化し、戦闘BGMそのものは変化しない
+- ひろがりは元の音程と発音Timingを維持しながら音の広がりを強め、Chord／Arpeggioの同じAttackEvent occurrence全体へ同じ効果を適用する
+- やまびこは各Palette Bulletの元の発射音を起点に0.5秒後、一度だけ音程音と発射SEをRepeatし、元の発射音の50%音量になる
+- やまびこのRepeatから追加Repeatが生じず、元AttackEventのMode snapshotとConduct設定を使用する
+- 同じ小節頭で新Modeを適用してから発火するAttackEventは新Modeをsnapshotする
+- 小節境界より前に発火済みのArpeggioでは、戦闘BGMが新Modeへ切り替わっても後続音程音が旧occurrenceのMode snapshotを維持する
+- クリックノイズ防止用の極短いCrossfadeがGameplay上の切替時点を遅らせず、発音済みDelay／Reverb Tailを不自然に切断しない
+- Pause中は未発生Arpeggio timing、Mode／Conduct cooldown、およびやまびこRepeat delayが停止・保持され、Resume後に残量から再開する
+- HitStop中はBGM／MusicChart、AttackEvent、Mode／Conduct cooldown、およびやまびこRepeat delayが進行する
+- Battle結果確定時に未発生のやまびこRepeatを取消し、旧`battleId`のcallbackをRetry／次Battleへ持ち越さない
+- 音響波形、DSP結果、Crossfade中の音量比がGameplay上のDamage、Explosion Radius、またはAttackEvent結果を決定しない
+
+0.5秒と50%は調整可能な初期値です。具体的なEffect chain、EQ／Filter、Audio Mixer、DSP、Stereo width、Crossfade時間、およびTailの減衰時間は技術調整として本ページで固定しません。
+
+MIDIは静的な楽曲情報の入力元、MusicChartは静的データの正本、[MusicChart制作・確認ツール](/spec/common-technology/music-chart-workbench)は制作・確認ツールとして扱い、PlayerがStage挑戦中に選ぶMode／ConductのRuntime状態や必須入力の正本にはしません。Player操作によってMIDIまたはMusicChartの元データを書き換えず、Workbench固有のRuntime正本も作りません。
+
+この確認境界はWorkbenchへの機能追加やUnity Audio実装方式を要求するものではありません。Mode／ConductのGameplay上の意味は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、Mode構成は[モード構成とエフェクター](/spec/player/mode-configuration-and-effectors)、Audio対象・snapshot・Repeat・cleanupは[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とします。
+
 ---
 
 ## 修正時の流れ
@@ -674,6 +700,9 @@ SEを10個制作する
 | AttackEventのSlot割り当て・成立判定       | チャージシステム側の仕様                                         |
 | PlayerのCharge入力・Action          | Player仕様                                             |
 | NoteEventからのシャオンダマ生成            | シャオンダマ側の仕様                                           |
+| Mode／ConductのGameplay上の意味      | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
+| Mode2～4の構成とSave契約 | [モード構成とエフェクター](/spec/player/mode-configuration-and-effectors) |
+| MusicChart Workbenchの制作・確認責務 | [MusicChart制作・確認ツール](/spec/common-technology/music-chart-workbench) |
 
 ---
 

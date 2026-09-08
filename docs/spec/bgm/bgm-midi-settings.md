@@ -66,6 +66,28 @@ MIDIから取得した情報は、Unity Editorで`MusicChart`へ変換して使�
 
 ゲーム実行中にMIDIを直接解析・再生することを前提としません。
 
+### モード／コンダクトとの責務境界
+
+MIDIがUnityへ渡すのは、楽曲本来のTempo／拍子、Note、Track、およびMusicChartが小節境界へ変換できる情報など、「何の音を、いつ使用するか」のための静的な音楽情報です。Player操作によってMIDIまたはMusicChartの元データを書き換えません。
+
+次のRuntime／Save状態をMIDIへ埋め込まず、MIDI Import結果や再Export対象にも加えません。
+
+- Playerのcurrent Mode
+- pending Mode
+- Mode cooldown残量
+- Player側のConduct選択
+- Conduct cooldown残量
+- 有効なCharge Pressの一時Conduct snapshot
+- AttackEvent occurrenceへ付与されたConduct
+- `Fire Music Position`で取得するMode snapshot
+- Palette Bulletへ引き継いだMode／Conduct派生値
+- やまびこのGameplay／Audio Runtime予約とcallback状態
+- Mode2～4のSave構成
+
+Tempo／拍子はMode cooldownに必要な論理小節境界の入力になりますが、MIDIはcooldown残量を所有・保存しません。AttackEvent occurrenceが`Fire Music Position`で取得するMode snapshotや付与済みConductも、静的なAttackEvent Definitionへ書き戻しません。
+
+Mode2～4の構成は[モード構成とエフェクター](/spec/player/mode-configuration-and-effectors)、その他のRuntime OwnerとGameplay契約は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、静的MusicChartとの境界は[BGM MusicChart仕様](/spec/bgm/bgm-music-chart)を正本とします。この境界は既存のMIDI変換・Export・設定を変更しません。
+
 ---
 
 ## BGM制作データ構成
@@ -811,3 +833,5 @@ Import後は、サウンド班もゲーム内で音楽・同期結果を確認�
 | Random Section | [BGM Random Section仕様](/spec/bgm/bgm-random-section) |
 | BGMとGameplay結果の音響接続・Loop挙動 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | Gameplayで使用するTrackの最終決定 | プランナー側のGameplay仕様 |
+| モード／コンダクトのGameplay上の意味とRuntime境界 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
+| Mode2～4の構成とSave契約 | [モード構成とエフェクター](/spec/player/mode-configuration-and-effectors) |

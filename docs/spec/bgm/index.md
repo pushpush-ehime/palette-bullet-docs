@@ -155,12 +155,20 @@ MusicChart
 ↓
 NoteEvent
 ↓
-シャオンダマ
+世界内に存在するシャオンダマ
 ↓
-Charge
+Playerが選択してCharge
 ↓
-パレットブレット
+Charge成功
+↓
+AttackEvent occurrenceへ割り当ててReserved
+↓
+AttackEvent発火
+↓
+Reserved ShaondamaがPalette Bullet化・発射
 ```
+
+Charge成功時点ではシャオンダマをPalette Bullet化せず、AttackEvent occurrenceへのAllocationを確定して`Reserved`へ移行するまでとします。Charge、Allocation、AttackEvent発火判定、およびPalette Bullet化後の詳細は、[Playerアクション｜チャージ](/spec/player/player-action-charge)、[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet)をそれぞれ正本とします。
 
 これとは別に、`MusicChart`へAttackEventを設定します。
 
@@ -179,7 +187,7 @@ AttackEvent発火
 │
 └─ 成立
     ↓
-    パレットブレット発射
+    Reserved ShaondamaをPalette Bullet化・発射
     +
     パレットブレットの音程を発音
     +
@@ -199,6 +207,16 @@ Gameplay SE
 として再生します。
 
 Chord / Arpeggioの発音、AttackEvent不成立時、Pause / Resume、BGM Loop、Battle終了、Retryなどの詳細については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。
+
+### MusicChartとMode／Conductの責務境界
+
+MusicChartは、楽曲側が決める「何の音を、いつ使用するか」を静的な音楽情報として保持します。これに対し、Modeは戦闘中に曲全体の聞こえ方と戦い方の方向を切り替え、Conductは一つのAttackEvent occurrenceの演奏・発射をどう表現するか指示します。
+
+Modeは完成済み戦闘BGMとPalette Bullet音程音へ作用し、原則としてGameplay上の発射SE、着弾SE、UI音へ作用しません。ConductはPalette Bullet音程音とGameplay上の発射SEへ作用し、戦闘BGMそのものは変更しません。
+
+AttackEvent occurrenceは`Fire Music Position`でModeをsnapshotし、Chord／Arpeggio／Weak全体で共有します。やまびこのAudio Repeatは各Palette Bulletの元の発射音から0.5秒後に一度だけ発生します。小節境界、Pause／HitStop／Room、Crossfade／Tail、Battle終了cleanupを含むAudio接続の詳細は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とします。
+
+PlayerがStage挑戦中に選択するMode／Conduct、cooldown、occurrence snapshot、やまびこのRuntime予約、およびMode2～4のSave構成をMusicChartの元データへ保存しません。Player操作によって実行中または保存済みのMusicChart元データを書き換えません。Gameplay上の意味は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、Mode構成は[モード構成とエフェクター](/spec/player/mode-configuration-and-effectors)を正本とします。
 
 ---
 
@@ -222,7 +240,7 @@ Chord / Arpeggioの発音、AttackEvent不成立時、Pause / Resume、BGM Loop�
 
 ### Unityへの受け渡し
 
-サウンド班が制作した素材や音楽情報をUnityへどのような工程で受け渡すかについては、今後追加する`サウンド班制作フロー`を正とします。
+サウンド班が制作した素材や音楽情報をUnityへどのような工程で受け渡すかについては、[サウンド班制作フロー](/spec/bgm/sound-production-workflow)を正とします。
 
 個別のBGMについて、
 
@@ -252,10 +270,14 @@ BGMカテゴリ内の各ページは、以下の責務に分けます。
 * パレットブレット音程音
 * Gameplay SEとのレイヤー関係
 * Chord / Arpeggioの発音
+* Mode／ConductのAudio対象とoccurrence snapshot接続
+* ひろがり／やまびこの音響
 * BGM同期
+* system pre-roll
 * Pause / Resume
+* Parry HitStop
 * Loop
-* Battle終了 / Retry
+* Battle終了 / Room移動 / Retry
 
 を扱います。
 
@@ -323,13 +345,11 @@ Slot割り当てやAttackEventの成立条件そのものは扱いません。
 
 AttackEvent自体の音楽情報は「BGM 攻撃イベント仕様」を参照します。
 
-### サウンド班制作フロー
+### [サウンド班制作フロー](/spec/bgm/sound-production-workflow)
 
 > **サウンド素材の制作開始からUnity上での確認までの恒久的な制作工程**
 
-を正とするページです。
-
-このページは今後新規作成します。
+を正とします。
 
 ---
 
@@ -437,10 +457,12 @@ Gameplay自体のルールは、それぞれのカテゴリを正とします。
 | MusicChartの構造・Import / ReImport | [BGM MusicChart仕様](/spec/bgm/bgm-music-chart)           |
 | AttackEventを音楽上どこへ・どのように設定するか   | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)              |
 | Random Sectionの候補・抽選ルール         | [BGM Random Section仕様](/spec/bgm/bgm-random-section)    |
-| サウンド班からUnityまでの制作・受け渡し工程        | **サウンド班制作フロー（新規作成予定）**                                  |
+| サウンド班からUnityまでの制作・受け渡し工程        | [サウンド班制作フロー](/spec/bgm/sound-production-workflow)              |
 | `NoteEvent`からシャオンダマを生成するルール     | [MIDI駆動生成](/spec/shaondama-music/midi-driven-spawning)  |
 | AttackEventのSlot割り当て・成立判定       | [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation) |
 | PlayerのCharge入力・Action          | [Playerアクション｜チャージ](/spec/player/player-action-charge)   |
+| Mode／ConductのGameplay上の意味・選択・適用 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
+| Mode2～4の構成・Save契約 | [モード構成とエフェクター](/spec/player/mode-configuration-and-effectors) |
 
 同じ仕様を複数ページで独立して定義しません。
 
