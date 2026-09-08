@@ -24,13 +24,14 @@ relatedTasks: []
 * Weak Attackを使用できる状態へいつ移行するか
 * 通常Shaondama / 万能ShaondamaをWeak AttackEventへどう割り当てるか
 * Charge成功後のShaondama実体をどの状態でAttackEvent発火まで保持するか
+* successしたAllocationが、Conduct付与対象となる同じAttackEvent occurrenceをどう返すか
 * Charge成功と自然破裂が同一フレームで競合した場合に、どちらを先に確定するか
 * Battle結果確定時に未確定Charge、Allocation、Slot、`Reserved`をどのようにcleanupするか
 * 消費済み／未消費の`Reserved`をどのOwnerが判別・解放するか
 
 を定義します。
 
-本ページを、**Current AttackEventの決定、通常AttackEventのSlot割り当て、Weak AttackEventへの割り当て、Allocation結果、Charge成功後の`Reserved`確定、Charge commitと自然破裂の競合順、およびBattle結果確定時のAllocation関係解消の正本**とします。
+本ページを、**Current AttackEventの決定、通常AttackEventのSlot割り当て、Weak AttackEventへの割り当て、Allocation結果、Conduct付与先occurrenceの受け渡し、Charge成功後の`Reserved`確定、Charge commitと自然破裂の競合順、およびBattle結果確定時のAllocation関係解消の正本**とします。
 
 Click / Dragそのものの入力、ActionState、対象選択、Release検出、キャンセル、Actionとしてのsuccess / miss通知等は、`player/player-action-charge.md` を正とします。
 
@@ -1167,6 +1168,32 @@ Weak AttackEventが待機中であっても、通常AttackEventの表示・蓄�
 
 ---
 
+# Conduct付与先Occurrenceの受け渡し
+
+Allocationがsuccessした場合は、Slot／Weak Allocationのcommit先となった同じAttackEvent occurrenceを、Charge側のConduct付与処理へ返します。
+
+```text
+Allocation success
+↓
+Slot／Weak Allocationをcommit
+↓
+commit先の同じAttackEvent occurrenceを返す
+↓
+Charge側がPress snapshotによるConduct付与可否を評価
+```
+
+通常AttackEventでは、その判定でcommitしたCurrent Normal AttackEvent occurrenceを返します。Weakでは、同じ成功処理内で動的生成・Slot割り当てしたWeak AttackEvent occurrenceを返し、そのoccurrenceをConduct付与処理へ渡します。
+
+- Conduct付与時にCurrent AttackEventを再検索しない
+- 別のAttackEvent occurrenceへ付け替えない
+- ConductをAllocation SlotまたはShaondamaへ保存しない
+- Conductを付与できなくてもAllocation successとcommit結果を取り消さない
+- 既存のCurrent決定、Slot優先順位、Weak解決、Drag atomic判定を変更しない
+
+有効なCharge Pressで取得するConduct snapshot、付与commit、Player側選択の消費、およびcooldownは、[Playerアクション｜チャージ](/spec/player/player-action-charge)と[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正本とします。本ページは付与可否を再判定せず、成功したAllocation先occurrenceを一意に返します。
+
+---
+
 # Charge成功後のShaondama実体
 
 ## Reservedへ移行する
@@ -1888,8 +1915,11 @@ Chargeがmissとなりcommitされなかった場合の自然破裂可否は、F
 * キャンセル
 * Actionとしてのsuccess / miss通知
 * Charge中断処理
+* 有効なCharge PressでのConduct snapshotと、success後の付与commit
 
 本ページでは、Charge判定Eventを受け取った後の**Allocation対象の再検証・Current決定・Slot割り当て・Weak割り当て・atomic commit**を定義します。
+
+Allocation success時は、本ページがcommit先となった同じAttackEvent occurrenceを返します。Player Action側はその結果とPress snapshotを使用し、Conduct付与可否を評価します。
 
 Weak時にClick / Drag入力をどのように許可・制限するかはPlayer Action側の責務であり、本ページでは新しいActionStateや入力遷移を追加しません。
 
@@ -2030,6 +2060,10 @@ Battle結果確定、各Ownerへのcleanup開始通知、cleanup完了の集約�
 * Charge成功した瞬間にPalette Bullet化する
 * Charge時点のモードをAllocation SlotまたはReserved Shaondamaへsnapshotする
 * コンダクトをShaondamaまたはSlot単位へ分割して保持する
+* Conduct付与のためにCurrent AttackEventを再検索する
+* Allocationをcommitしたoccurrenceとは別のoccurrenceをConduct付与処理へ渡す
+* Weak AttackEventの動的生成・Allocation commitと切り離して、別のWeak occurrenceをConduct付与先として作る
+* Conduct付与不可を理由に、成立済みのAllocation successや`Reserved`移行を取り消す
 * Charge successと自然破裂が同一フレームで競合したとき、commit前に自然破裂させる
 * Charge commit済みで`Reserved`となったShaondamaへ自然破裂を発生させる
 * Reserved中も通常Lifetimeを進行させ、AttackEvent解決前にShaondamaを通常Lifetimeで消滅させる

@@ -73,13 +73,14 @@ ReactionState = None
 
 モード変更要求とコンダクト選択はPlayer入力ですが、入力であることだけを理由に`ActionState`の開始・遷移として扱いません。本ページの遷移表、Action先行入力、およびDashキャンセル入力バッファは、現在記載している既存Actionだけを対象とします。
 
-* モード変更要求を`ActionState`遷移またはbuffered Actionとして追加しない
-* コンダクト選択を`ActionState`遷移として追加せず、その選択状態をAction先行入力やDashキャンセル入力バッファとして保持しない
-* クールタイム中に破棄されたモード入力を、クールタイム終了後に実行する予約入力として保持しない
-* モード変更要求またはコンダクト選択だけを理由に、Charge、Aim、Movementへ既存仕様にない中断を追加しない
-* Mode／Conduct入力と既存Actionが同Frameに成立した場合の処理順・優先順位を、本ページで推測して確定しない
+* Mode変更要求を`ActionState`遷移またはbuffered Actionとして追加しない
+* Conduct選択を`ActionState`遷移として追加せず、Player側の選択状態変更として扱う
+* Mode入力はMovement、Charge、およびParryを中断しない
+* Conduct選択だけを理由に進行中Chargeを中断せず、有効なCharge Pressで取得済みのConduct snapshotも変更しない
+* 拒否・破棄されたMode／Conduct入力を、受付再開後に実行する予約入力として保持しない
+* Mode／Conduct専用ではないAction先行入力、Dashキャンセル入力buffer、およびParry専用HitStop入力bufferを流用しない
 
-Mode／ConductのRuntime Owner、Palette State Graphとの接続形式、Production Event／Command／payload、およびInput Action実装は未決です。本ページでは、新しいState、遷移、buffer、Event、またはCommandを定義しません。Gameplay上の意味と未決事項は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、入力割り当ては[Player入力と操作](/spec/player/input-and-controls)を正本とします。
+本ページでは、新しいState、遷移、buffer、Event、またはCommandを定義しません。Mode／ConductのGameplay上の意味、入力gate、WheelとCharge Pressの同時順序は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、Charge入力文脈が保持する一時snapshotは[Playerアクション｜チャージ](/spec/player/player-action-charge)、入力割り当ては[Player入力と操作](/spec/player/input-and-controls)を正本とします。
 
 ## 遷移記号
 
