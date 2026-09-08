@@ -299,6 +299,8 @@ Gameplay上の意図として、古いModeから新しいModeへ徐々に切り�
 
 Mode入力は、system pre-rollを含むPlayer操作可能なGameplayで、別の操作lockがない場合に受理します。Movement中、Charge中、およびParry中であることだけを理由に拒否せず、Mode入力はそれらを中断しません。
 
+system pre-roll中も、Playerが操作可能で既存の入力gateを満たす場合はMode入力を受け付けます。BGM Audioがまだ音源位置0で停止していることを拒否理由にはしません。受理したpending Modeは、次に到達する有効な小節頭で通常規則どおり適用します。system pre-roll中であっても、Mode cooldown中など以下の拒否条件は変わりません。
+
 次の状態では拒否します。
 
 - Battle準備中
@@ -347,19 +349,57 @@ cooldownは、異なるMode IDが小節頭で実際に適用された場合だ�
 
 cooldown中のMode入力は破棄し、予約しません。Mode切替操作自体はStamina、HP、Itemなどを消費せず、種類別コストや使用回数上限を追加しません。
 
+BGM LoopによってMusicChart上の表示小節番号やloop occurrenceが切り替わっても、Mode cooldownの残り小節数を初期化しません。Loop前後で到達した論理小節を順に数え、Loopをまたいだ場合も残り小節数から継続します。Audio再生秒、固定Tempoから換算した秒数、またはFrame数で代用しません。具体的なfield名やcounter実装は本ページでは固定しません。
+
 ## モードのStage／Room／Retryライフサイクル
 
-| 境界 | 使用中モード | モード2～4の設定内容 | 変更要求・クールタイム |
+以下はMode／ConductのGameplay上の確定契約です。後続PR Bはこの契約をGame／Player Status／States／Deathの詳細表へ同期しますが、新しい挙動を決定しません。
+
+### 状態別のMode入力・pending・cooldown
+
+| 状態 | 新規Mode入力 | pending Mode | Mode cooldown |
 | --- | --- | --- | --- |
-| Stage開始 | モード1から開始 | 拠点で作った内容を使用 | 初期状態から開始 |
-| 同じStage挑戦中 | 小節同期切替の結果を維持 | 維持 | 通常規則で管理 |
-| 通常のRoom移動 | 現在の使用中モードを維持 | 維持 | Mode入力は拒否。pending／cooldownの詳細表は後続同期 |
-| Game Over後のRetry | モード1へ戻す | 失わない | 変更要求とクールタイムを解除 |
-| Stage終了 | 次のStageへ使用中モードを持ち越さない | 保存範囲に従って保持 | 終了時に解除 |
+| 操作可能なGameplay | 入力gateを満たせば受理 | 次の有効な小節頭で適用 | 論理小節単位で進行 |
+| system pre-roll | 入力gateを満たせば受理 | 次の有効な小節頭で適用 | 通常規則どおり論理小節単位で進行 |
+| Pause | 拒否し、予約しない | 停止・保持し、小節頭適用を行わない | 残り小節数を停止・保持 |
+| HitStop | 拒否し、buffer・予約しない | 有効な小節頭へ到達した場合は適用 | 論理小節単位で進行 |
+| Room移動開始／演出中 | 拒否し、予約しない | 移動開始時に未適用pendingだけを破棄し、演出中は適用しない | 残り小節数を保持して停止 |
+| 新しいRoomの開始後 | Gameplayが操作可能になった後は入力gateに従う | 破棄済みpendingを復元しない | 新しいMusicChartが有効かつGameplayが操作可能になった後から再開 |
+| Stage終了／Retry | 拒否 | 破棄 | 破棄 |
 
-Stage中は入力gateを満たす場合にMode変更要求を受け付けます。Room移動演出中は新規入力を拒否し、拒否入力を保存しません。通常Room境界でのpending／Mode cooldownの詳細な維持・進行表は、Game／Status／Death側を同期する後続PR Bへ委譲します。
+### Pause／Resume
 
-Retryでは、前回の挑戦で使用していたモード、未適用の変更要求、進行中のクールタイムを持ち越しません。一方、拠点で作ったモード2～4の構成自体は失いません。
+Pause開始時は、未適用のpending Modeを破棄せず、停止・保持します。Mode cooldownの残り小節数も停止・保持し、Pause中はcooldownを進めず、小節頭でのpending適用も発生させません。新しいMode入力は拒否し、予約しません。
+
+Resume後は、Pause時に停止していた音楽位置と小節の関係を維持したまま、pending Modeの適用判定とMode cooldownの進行を再開します。
+
+Conduct cooldownもPause中は停止し、Player側の現在Conduct選択と残り時間を保持します。Resume後は保持していた残り時間から再開します。
+
+### HitStop
+
+HitStop中も、既存のBGM／MusicChartが管理する音楽時間は進行します。したがって、Mode cooldownも論理小節単位で進行し、有効な小節頭へ到達した場合は保持済みpending Modeを適用します。適用によって実際にMode IDが変わった場合は、通常どおり4小節のMode cooldownを開始します。
+
+HitStop中の新しいMode入力は拒否し、buffer・予約しません。Parry専用のHitStop入力bufferをMode入力へ流用しません。Conduct cooldownはHitStop中も進行し、停止させません。
+
+### 通常のRoom移動
+
+Room移動開始時は、未適用のpending Modeだけを破棄します。次の状態はRoom間で維持します。
+
+- current Mode
+- Mode 2～4の保存済み構成
+- Mode cooldownの残り小節数
+- Player側の現在Conduct選択
+- Conduct cooldownの残り時間
+
+Room移動演出中は、Mode cooldownとConduct cooldownを進めず、残量を保持します。pending Modeの適用と新しいMode入力を行わず、Conductの新しい選択入力も通常の操作lockに従って受け付けません。拒否した入力を予約しません。
+
+新しいRoomでは、そのRoomのMusicChartが有効になり、Gameplayが操作可能になった後からMode cooldownを残り小節数で、Conduct cooldownを残り時間で再開します。Room移動開始時に破棄したpending Modeは復元せず、current ModeとPlayer側の現在Conduct選択は維持した状態から再開します。
+
+### Stage終了／Retry
+
+通常のRoom移動とは異なり、Stage終了とRetryでは、Runtime上のcurrent Mode、Player側の現在Conduct選択、pending Mode、および両cooldownを破棄します。Stage開始時とRetry後の新しい挑戦はMode 1から開始し、Conductは未選択状態から開始します。
+
+Mode 2～4のSave Data上の構成は、通常のRoom移動、Stage終了、およびRetryで失いません。
 
 ## コンダクト
 
@@ -493,12 +533,15 @@ Conduct cooldownの初期値は3秒で、ひろがり／やまびこ共通のTun
 | 境界 | Conduct cooldown |
 | --- | --- |
 | 通常Gameplay | 進行 |
+| system pre-roll | 通常規則どおり進行 |
 | HitStop | 進行 |
-| Pause | 停止 |
+| Pause | 停止し、残量を維持 |
 | Room移動演出 | 停止し、残量を維持 |
-| 通常Room移動の完了 | 残量を維持 |
+| 新しいRoomのMusicChart有効化・操作可能後 | 残り時間から再開 |
 | Stage終了 | 破棄 |
 | Retry | 破棄 |
+
+Pause中はPlayer側の現在Conduct選択を保持し、Resume後に残りcooldown時間から再開します。通常のRoom移動でもPlayer側の現在Conduct選択と残り時間を維持しますが、Room移動演出中の新しい選択入力は通常の操作lockに従って拒否し、予約しません。新しいRoomのMusicChartが有効になり、Gameplayが操作可能になった後に残り時間から再開します。
 
 ### AttackEvent単位の制約
 
@@ -700,6 +743,10 @@ Mode／Conductのために新しい`ActionState`を追加しません。既存Ac
 - Mode 1はStamina自然回復速度1.5倍、Direct／Explosion Damage 0.75倍を初期値とし、HP自然回復・被Damage軽減・復活は追加しない
 - Modeは`1`～`4`で直接選択し、次の対象小節頭で適用する
 - Mode cooldownは論理4小節で、実際に別Mode IDへ適用した場合だけ開始する
+- system pre-roll中も入力gateを満たすMode入力を受け付け、次の有効な小節頭でpendingを適用する
+- Pauseではpendingと両cooldownを停止・保持し、HitStopでは音楽時間に従ってModeの小節頭適用と両cooldownを進行する
+- 通常のRoom移動ではpendingだけを破棄し、current Mode、保存済み構成、Conduct選択、および両cooldown残量を維持する。Stage終了／RetryではRuntime状態を破棄する
+- BGM LoopをまたいでもMode cooldownを初期化せず、残り小節数から継続する
 - Modeは`Fire Music Position`でAttackEvent occurrence全体へsnapshotする
 - Conductは`未選択 → ひろがり → やまびこ → 未選択`をWheelで循環選択する
 - Conductは有効なCharge Pressでsnapshotし、Charge成功時は成功したAllocationと同じoccurrenceへ付与commitする
@@ -719,8 +766,6 @@ Mode／Conductのために新しい`ActionState`を追加しません。既存Ac
 - 固定エフェクターを内部的に持つか
 - 具体的なEffectorカタログ、Level、上限、入手、解放、容量制限
 - Effectorごとの計算式、上限、丸め、および具体的な音響処理
-- 未適用のモード変更要求とクールタイムをRoom境界で維持するか
-- Mode cooldownのPause／HitStop／Room境界における詳細な進行表
 - Audio上の技術Crossfadeの長さと具体DSP
 - モード切替UIと予告表示
 - 使用できない状態でのFeedback
@@ -753,7 +798,7 @@ Mode／Conductのために新しい`ActionState`を追加しません。既存Ac
 
 | 担当 | 所有する詳細責務 | 主な参照先 |
 | --- | --- | --- |
-| PR B | Game／Player Status／DeathにおけるPause、HitStop、Room、Stage終了、Retryの詳細表 | [ゲーム全体](/spec/game/)、[Playerステータス](/spec/player/player-status)、[Player死亡](/spec/player/player-death) |
+| PR B | 本ページで確定したPause、HitStop、Room、Stage終了、RetryのGameplay契約をGame／Player Status／States／Deathの詳細表へ同期する。新しい挙動は決定しない | [ゲーム全体](/spec/game/)、[Player状態](/spec/player/states)、[Playerステータス](/spec/player/player-status)、[Player死亡](/spec/player/player-death) |
 | PR C | AttackEvent発火、Mode snapshotの受け渡し、Palette Bullet／Damage候補／Enemy接続 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet) |
 | PR #72 | BGM／MusicChart／音響実装境界、Crossfade、Tail、具体DSP | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)、[MusicChart仕様](/spec/bgm/bgm-music-chart) |
 | PR D | Prototype固定プリセット、Tuning、Runtime Trace | [プロトタイプ](/spec/game/prototype)、[プランナー向け調整パラメータ管理](/spec/common-technology/planner-tuning-parameter)、[Gameplay Runtime Trace](/spec/common-technology/gameplay-runtime-trace) |
