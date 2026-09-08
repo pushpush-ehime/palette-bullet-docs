@@ -25,6 +25,7 @@ ActionState
 本ページでは主に以下を扱います。
 
 * Charge入力Press時の対象取得
+* 有効なCharge Pressで取得する一時Conduct snapshot
 * Click / Dragの入力判定
 * `ClickCharging / DragCharging`の開始条件
 * 入力判定中にStateが変化した場合の処理
@@ -251,6 +252,32 @@ Press時に保持した最初のShaondama Aは、Clickの場合もDragの場合�
 
 DragChargingへ移行した場合、AもDrag選択リストへ含めます。
 
+## Charge Press時のConduct snapshot
+
+共通使用可能条件を満たし、Charge入力評価を開始でき、Press時に対象Shaondamaを取得できた場合、そのPressを有効なCharge Pressとします。有効Pressでは、Click／Dragへ分岐する前にPlayer側の選択Conductを一時snapshotします。
+
+```text
+Charge Press
+↓
+開始gateと対象取得に成功
+↓
+Player側の選択Conductをsnapshot
+↓
+Click／Drag入力判定
+```
+
+- `ActionState = None`と`Dashing`のどちらでも同じ時点で取得する
+- Dashing中に後からAction先行入力へ登録する場合も、同じsnapshotを引き継ぐ
+- 実際に`ClickCharging / DragCharging`を開始した時点では取り直さない
+- ClickのCharge判定EventまたはDragのRelease success時にも取り直さない
+- 無効Press、対象なし、または開始不可のPressから有効なsnapshotを作らない
+- WheelとCharge Pressが同じ時刻なら、WheelによるPlayer側選択更新後にsnapshotする
+- 時刻を区別できる場合は時刻順に処理する
+
+snapshot取得後にPlayer側のConduct選択が変化しても、このChargeのsnapshotは変更しません。Charge miss、判定前中断、cancel、または先行入力破棄では一時snapshotだけを破棄し、Player側の現在選択を消費しません。
+
+付与commitとcooldownを含むGameplay上の正本は、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を参照します。
+
 ## Click / Drag入力判定
 
 ClickChargingとDragChargingは同じCharge入力を使用します。
@@ -392,6 +419,8 @@ Click / Drag入力判定を開始した後、判定結果が確定する前にPl
 
 入力判定は、現在のStateでもCharge入力を有効に扱える場合のみ継続します。
 
+以下の規則で入力判定を破棄する場合は、有効Pressで取得した一時Conduct snapshotも同時に破棄します。Player側の現在選択は変更しません。
+
 ### ActionStateがNoneからDashingへ変化した場合
 
 入力判定中にDashingが開始された場合は、入力判定を破棄しません。
@@ -518,7 +547,7 @@ Charge Release
 Pending Action = ClickCharging
 ```
 
-Pending Actionには、Press時に保持したAをClick判定対象として引き継ぎます。
+Pending Actionには、Press時に保持したAと、同じ有効Pressで取得したConduct snapshotを引き継ぎます。
 
 Dashingが正常終了した時点でClickChargingの開始条件を再確認し、条件を満たしている場合に開始します。
 
@@ -540,7 +569,7 @@ Current Normal AttackEventあり
 Pending Action = DragCharging
 ```
 
-Pending Actionには、Drag成立に使用した`A / B`を初期選択内容として引き継ぎます。
+Pending Actionには、Drag成立に使用した`A / B`と、同じ有効Pressで取得したConduct snapshotを引き継ぎます。
 
 Dashingが正常終了した時点でDragChargingの開始条件を再確認します。
 
@@ -548,7 +577,7 @@ Dashingが正常終了した時点でDragChargingの開始条件を再確認し�
 
 DragChargingはCharge入力をHoldして継続するActionです。
 
-そのため、DragChargingを先行入力として保持した後、Dashing終了前にCharge入力をReleaseした場合は、保持しているDragCharging開始要求と未確定の選択内容を破棄します。
+そのため、DragChargingを先行入力として保持した後、Dashing終了前にCharge入力をReleaseした場合は、保持しているDragCharging開始要求、未確定の選択内容、および一時Conduct snapshotを破棄します。
 
 この処理は`miss`として扱いません。
 
@@ -572,6 +601,7 @@ Dashingが正常終了以外の形で終了した場合は、Chargeに関する�
 * Press時に保持した開始対象
 * すでに確定しているClickCharging / DragChargingのAction先行入力
 * Drag先行入力が保持している未確定の選択内容
+* 有効Pressで取得した一時Conduct snapshot
 
 その後、自動的にChargeを開始しません。
 
@@ -1731,11 +1761,23 @@ Lifetimeの具体的な管理方法はShaondama側の正本である`docs/spec/s
 
 Charge処理では、Charge時点のモードをShaondama個体へsnapshotせず、Allocation Slotにも保存しません。Charge側で使用モードを固定せず、どのモードを使用するかはAttackEventの発火・発射処理へ委譲します。
 
-Charge success時にPlayer側でコンダクトが選択されており、成功したAllocation結果が指すAttackEvent occurrenceにコンダクトが未設定である場合は、そのoccurrenceへ一つ付与します。コンダクトはShaondamaまたはSlotごとに個別付与せず、すでにそのoccurrenceへ`Reserved`済みのShaondamaを含むAttackEvent occurrence全体に対する指示として扱います。
+Charge success時は、成功したAllocationが返した同じAttackEvent occurrenceと、有効Pressで取得済みのConduct snapshotを付与処理へ渡します。Current AttackEventを再検索したり、別occurrenceへ付け替えたりしません。
 
-すでにコンダクトが付与されているAttackEvent occurrenceへCharge successした場合に、Player側の選択中コンダクトを消費するかは未決とし、本ページでは確定しません。
+次の両方を満たす場合だけ、occurrenceへのConduct付与、Player側の現在選択を未選択へ戻す処理、および共通3秒cooldown開始を一つのcommitとして成立させます。
 
-モード／コンダクトのGameplay上の意味と付与規則は、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正とします。本ページでは具体的なRuntime field、payload、Ownerを固定しません。
+```text
+対象OccurrenceにConduct未付与
+AND
+Press snapshotが未選択ではない
+```
+
+すでにConductが付与済みの場合、またはPress snapshotが未選択の場合は、付与・選択消費・cooldown開始を行いません。付与済みの場合はPlayer側の現在選択を保持します。Charge successまでにPlayerが別Conductを選んでいても、付与成功時はその新しい選択を含めて未選択へ戻します。
+
+Conductを付与できなかったことを理由に、Charge success、Allocation結果、または`Reserved`移行を取り消しません。Weak AttackEventでは、動的生成と同じ成功処理内で同じ付与commitを使用します。
+
+Charge miss、判定前中断、cancel、無効Press、および先行入力破棄ではConductを付与・消費せず、cooldownを開始しません。一時snapshotが存在する場合は、そのsnapshotだけをcleanupします。
+
+モード／コンダクトのGameplay上の意味、付与commit、cooldown、およびMode snapshotは、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)を正とします。本ページでは具体的なRuntime fieldやpayloadを固定しません。
 
 ## パラメータ
 
@@ -1766,6 +1808,7 @@ Chargeに関係する仕様は、以下のように管理します。
 | Battle ID、Combat受付gate、Battle結果・Pause・終了処理による受付可否 | [戦闘](/spec/combat/) |
 | Battle開始gate、3時計、system pre-roll、BGM Audioの再生開始 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
 | Charge Press時の開始対象取得 | 本ページ |
+| 有効なCharge PressでのConduct snapshot取得・保持・cleanup | 本ページ |
 | `ClickCharging`の開始・対象保持・判定・終了 | 本ページ |
 | `DragCharging`の開始・選択・Atomic判定・終了 | 本ページ |
 | Click / Drag入力判定 | 本ページ |
@@ -1805,7 +1848,7 @@ Chargeに関係する仕様は、以下のように管理します。
 | AttackEvent発火時の完全成立・不完全完成 | `docs/spec/bgm/bgm-attack-judgement.md` |
 | AttackEvent発火時の使用Reserved Shaondama実体決定 | `docs/spec/bgm/bgm-attack-judgement.md` |
 | AttackEvent発火時のPalette Bullet化・Chord / Arpeggio発射 | `docs/spec/bgm/bgm-attack-judgement.md` |
-| Charge時点でモードを固定しない境界と、Charge success時のコンダクト接続 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
+| Conduct snapshotのGameplay意味、付与commit、3秒cooldown、およびMode snapshot | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
 | Reserved中のShaondama Lifetime詳細 | `docs/spec/shaondama-music/floating-behavior.md` |
 | 未Charge Shaondamaのsource NoteEvent到達時処理 | Shaondama側正本 |
 
