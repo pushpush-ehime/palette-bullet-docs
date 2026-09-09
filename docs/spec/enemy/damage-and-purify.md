@@ -1,6 +1,6 @@
 ---
 title: 敵の被弾と浄化
-description: RGB Damage候補の集約・丸め・Clamp・浄化値反映・浄化成立の一回確定・Stage通知
+description: 適用済みMode／Conductを含むRGB Damage候補の集約・丸め・Clamp・浄化値反映・浄化成立の一回確定・Stage通知
 pageType: spec
 category: 敵
 order: 50
@@ -19,7 +19,7 @@ status: 仮仕様
 本ページでは、Enemyが受け取る共通RGB Damage候補について、以下を定義します。
 
 - Palette Bullet Direct Contact RGB Damage候補の受け取り
-- Palette Bullet Explosion RGB Damage候補の受け取り
+- Palette Bulletの第一爆発・やまびこの第二爆発によるExplosion RGB Damage候補の受け取り
 - Normal Shaondama Natural Burst RGB Damage候補の受け取り
 - Damage候補の共通schema
 - Damage候補の有効性確認と最終的な重複除外
@@ -31,7 +31,7 @@ status: 仮仕様
 - `battleId`とEnemy／Clear対象識別情報を含むStageへの浄化成立通知
 - 浄化済みEnemyに対する新しいRGB Damageの禁止
 
-Palette Bulletの飛行・衝突・爆発と、Direct Contact／Explosion RGB Damage候補の生成条件・算出式は、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
+Palette Bulletの飛行・衝突・第一爆発・やまびこの第二爆発と、Direct Contact／Explosion RGB Damage候補の生成条件・算出式は、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
 
 Normal Shaondamaの自然破裂、範囲内Enemyの候補抽出、Natural Burst固有規則を反映した最終RGB Damage payloadの生成、および候補出力は、[浮遊・自然破裂](/spec/shaondama-music/floating-behavior)を正本とします。
 
@@ -43,8 +43,8 @@ Enemy RGB Damageの同一frame処理は、本ページの「同一frame内のDam
 
 | 項目 | 正本 |
 |---|---|
-| Palette Bulletの飛行・衝突・爆発・爆発範囲・壁遮蔽 | [パレットブレット](/spec/combat/palette-bullet) |
-| `DirectHitMultiplier`と`ExplosionMultiplier`を適用した最終RGB Damage payloadの生成 | [パレットブレット](/spec/combat/palette-bullet) |
+| Palette Bulletの飛行・衝突・第一爆発・第二爆発・各爆発時点の範囲／壁遮蔽判定 | [パレットブレット](/spec/combat/palette-bullet) |
+| 通常MultiplierまたはWildcard override、Mode、Conductを必要に応じて適用した最終RGB Damage payloadの生成 | [パレットブレット](/spec/combat/palette-bullet) |
 | Normal Shaondamaの自然破裂・範囲内Enemy抽出・Natural Burst最終RGB Damage payload生成・候補出力 | [浮遊・自然破裂](/spec/shaondama-music/floating-behavior) |
 | Shaondamaから引き継ぐ個体情報・source RGB値・`effective RGB基礎値` | [シャオンダマのデータ](/spec/shaondama-music/orb-data) |
 | Producer側での不要なDamage候補生成の抑制 | 各Damage Producer |
@@ -61,6 +61,7 @@ Enemy RGB Damageの同一frame処理は、本ページの「同一frame内のDam
 
 - Palette BulletをEnemyへ直接命中させると、直接接触分と爆発分の両方が反映される
 - Palette Bulletの爆発範囲内にいるEnemyへ、壁・地形に遮られていない場合のみ爆発分が反映される
+- やまびこが付与されたPalette Bulletは、第一爆発の予約から発生する第二爆発についても、その発生時点の範囲・遮蔽条件を満たすEnemyへ爆発分が反映される
 - Normal Shaondamaの自然破裂範囲内にいるEnemyには、Natural Burstの規則を満たした場合にRGB Damageが反映される
 - RGB Damageが加算されると、Enemyの体が黒から白へ近づいていく
 - 3チャンネルすべてが最大値へ達したEnemyは浄化され、行動を停止する
@@ -102,7 +103,7 @@ Enemy Damage処理は、次の3種類のRGB Damage候補を共通契約で受け
 | Damage発生源種別 | Producer | 候補の概要 |
 |---|---|---|
 | Palette Bullet Direct Contact | Palette Bullet | Palette BulletがEnemyへ直接接触したことによる候補 |
-| Palette Bullet Explosion | Palette Bullet | Palette Bulletの爆発範囲・遮蔽条件を満たしたEnemyへの候補 |
+| Palette Bullet Explosion | Palette Bullet | Palette Bulletの第一爆発またはやまびこの第二爆発について、その発生時点の爆発範囲・遮蔽条件を満たしたEnemyへの候補 |
 | Normal Shaondama Natural Burst | Normal Shaondamaの自然破裂 | Normal Shaondamaの自然破裂範囲とNatural Burst条件を満たしたEnemyへの候補 |
 
 各Damage候補から、最低限、次の情報を識別できるようにします。
@@ -116,10 +117,10 @@ Enemy Damage処理は、次の3種類のRGB Damage候補を共通契約で受け
 発生源となるDamage作用またはEventの識別子は、同一作用から同じEnemyへ重複して生成された候補を判別できる安定した識別情報とします。具体例は次のとおりです。
 
 - Direct Contactを発生させた接触作用の識別情報
-- Explosionを発生させた爆発Eventの識別情報
+- Explosionを発生させた爆発Eventの識別情報。第一爆発と第二爆発には異なる識別情報を与え、共通する発生元Palette Bulletも判別できるようにする
 - Natural Burstを発生させた自然破裂Eventの識別情報
 
-Damage発生源種別も重複判定の一部とします。同じPalette Bulletに由来するDirect ContactとExplosionは、発生源種別が異なるため、互いを重複候補として扱いません。
+Damage発生源種別も重複判定の一部とします。同じPalette Bulletに由来するDirect ContactとExplosionは、発生源種別が異なるため、互いを重複候補として扱いません。第一爆発と第二爆発には同じPalette Bullet ExplosionのDamage発生源種別を使用できますが、異なる爆発Event識別情報によって別のDamage作用として扱います。第二爆発のために新しいDamage発生源種別を設ける必要はありません。
 
 ### RGB用語の区別
 
@@ -128,11 +129,11 @@ Damage発生源種別も重複判定の一部とします。同じPalette Bullet
 - `effective RGB基礎値`
   - AllocationやWildcard置換などを反映した、Damage発生源固有の倍率を適用する前のRGB値
 - `最終RGB Damage payload`
-  - Damage発生源固有の倍率や規則を反映し、Enemy Damageへ渡されるR・G・B値
+  - Damage発生源固有の通常MultiplierまたはWildcard overrideと、必要なMode、Conductを適用し、Enemy Damageへ渡されるR・G・B値
 
 Enemy Damageが受け取って集約するのは、各Producerが確定した`最終RGB Damage payload`です。
 
-Enemy Damageは、受け取った最終RGB Damage payloadへDirect Contact、Explosion、Natural Burstなどの発生源固有倍率を再適用しません。また、倍率適用前の`effective RGB基礎値`を最終payloadとして扱いません。
+Enemy Damageは、受け取った最終RGB Damage payloadへDirect Contact、Explosion、Natural Burstなどの発生源固有倍率、Wildcard override、Mode、Conductを再適用しません。また、それらの適用前の`effective RGB基礎値`を最終payloadとして扱いません。
 
 ### Damage候補の基本的な有効性
 
@@ -163,16 +164,21 @@ Producer側の抑制があることを理由にEnemy Damage側の最終重複除
 
 ## Palette Bulletから受け取るDamage候補
 
-Enemy Damage処理は、Palette Bulletから次の2種類のDamage候補を受け取ります。
+Enemy Damage処理は、Palette Bulletから`Palette Bullet Direct Contact`と`Palette Bullet Explosion`の2種類のDamage発生源種別を受け取ります。第一爆発とやまびこの第二爆発は同じExplosion種別の別作用として扱えるため、受信する作用と最終payloadは次の3つに分かれます。
 
-| Damage種別 | Producer側の発生条件 | Enemy Damageが受け取るpayload |
+| 作用 | Producer側の発生条件 | Enemy Damageが受け取る最終payload |
 |---|---|---|
-| Direct Contact RGB Damage | Palette BulletがDirect Contact候補の生成条件を満たすEnemyへ直接接触した | `effective RGB基礎値`へ`DirectHitMultiplier`を適用した最終RGB Damage payload |
-| Explosion RGB Damage | Enemyが爆発範囲内におり、壁・地形によって遮蔽されていない | `effective RGB基礎値`へ`ExplosionMultiplier`を適用した最終RGB Damage payload |
+| Direct Contact | Palette BulletがDirect Contact候補の生成条件を満たすEnemyへ直接接触した | `effective RGB基礎値`へ対応する通常倍率またはWildcard overrideを適用し、Mode、Conductの順で処理した値 |
+| 第一爆発 | 第一爆発時点でEnemyが爆発範囲内におり、壁・地形によって遮蔽されていない | `effective RGB基礎値`へ対応する爆発倍率またはWildcard overrideを適用し、Mode、Conductの順で処理した値 |
+| やまびこの第二爆発 | 第一爆発時の予約に基づき、第二爆発時点で再評価した範囲・遮蔽条件をEnemyが満たす | 予約時に保持したMode適用後の通常Explosion RGB payload × 0.5。Mode、種別Multiplier、Wildcard overrideを再適用しない |
 
 `DirectHitMultiplier`と`ExplosionMultiplier`は独立した調整値です。
 
-Palette Bullet側で対応する倍率を適用して最終RGB Damage payloadを生成するため、Enemy Damage処理で同じ倍率を再適用しません。
+通常Multiplierと対応するWildcard overrideは加算または重複適用せず、発生元に応じていずれか一方を使用します。
+
+Palette Bullet側で必要な通常MultiplierまたはWildcard override、Mode、Conductを適用して最終RGB Damage payloadを生成するため、Enemy Damage処理ではいずれも再適用しません。第二爆発についても、予約時に保持した値へModeや種別Multiplierを再適用しません。
+
+例えば、通常MultiplierまたはWildcard overrideを反映したMode適用前の通常Explosion RGB payloadの1チャンネルが100の場合、Mode 1適用後の第一爆発は75、やまびこの第二爆発は37.5です。いずれもEnemy Damage側の同一frame集約・丸め前の値です。
 
 ## Direct Contact RGB Damage
 
@@ -182,9 +188,9 @@ Player、Shaondama、Marker、他の弾、地面、壁、浄化済みEnemyなど
 
 対象Enemyが実際にその候補を受け付けるかは、対象frameのEnemy RGB Damage受付開始時点Snapshotと、本ページの共通有効性確認によって最終確定します。
 
-## Explosion RGB Damage
+## Explosion RGB Damage（第一爆発・第二爆発）
 
-Palette Bulletがいずれかの飛行終了条件へ到達して爆発した場合、爆発範囲内かつ遮蔽されていないEnemyに対するExplosion RGB Damage候補を受け取ります。
+Palette Bulletがいずれかの飛行終了条件へ到達して第一爆発を発生させた場合、その時点で爆発範囲内かつ遮蔽されていないEnemyに対するExplosion RGB Damage候補を受け取ります。
 
 Palette Bulletの飛行終了理由が次のいずれであっても、同じExplosion RGB Damage処理を使用します。
 
@@ -193,7 +199,11 @@ Palette Bulletの飛行終了理由が次のいずれであっても、同じExp
 - 最大飛行距離への到達
 - 最大飛行時間への到達
 
-爆心からの距離によるDamage減衰は行いません。爆発範囲と遮蔽の条件を満たすEnemyには、爆心からの距離にかかわらず同じ最終RGB Damage payloadを使用します。
+やまびこが付与されている場合は、第一爆発の成立時にPalette Bullet側が予約し、初期値0.5秒後に発生させる第二爆発についてもExplosion RGB Damage候補を受け取ります。Palette Bullet側は、予約時に保持した第一爆発の固定World座標を爆心として、第二爆発の発生時点にEnemyの範囲・壁／地形の遮蔽を再判定します。Enemy Damage側では、その範囲・遮蔽を再判定せず、条件を満たしたEnemyについて生成された候補を受け取ります。
+
+第一爆発と第二爆発は、同じPalette Bullet ExplosionのDamage発生源種別を使用しても構いませんが、異なる爆発Event識別情報を持つ別作用です。第二爆発のためだけに新しいDamage発生源種別を設けません。
+
+爆心からの距離によるDamage減衰は、第一爆発と第二爆発のいずれでも行いません。各爆発時点の爆発範囲と遮蔽の条件を満たすEnemyには、爆心からの距離にかかわらず同じ最終RGB Damage payloadを使用します。
 
 対象Enemyが実際にその候補を受け付けるかは、対象frameのEnemy RGB Damage受付開始時点Snapshotと、本ページの共通有効性確認によって最終確定します。
 
@@ -224,19 +234,19 @@ Enemy Damageは、受け取ったNatural Burst候補について次を担当し�
 
 Natural Burstの攻撃範囲、Damage倍率、および最終RGB Damage payloadの生成規則は、[浮遊・自然破裂](/spec/shaondama-music/floating-behavior)を正本とします。
 
-## 直接命中Enemyへの2種類のDamage
+## 直接命中EnemyへのDirect Contactと第一爆発
 
-Palette BulletがDirect Contact候補の生成条件を満たすEnemyへ直接命中した場合、そのEnemyには以下の両方の候補を生成できます。
+Palette BulletがDirect Contact候補の生成条件を満たすEnemyへ直接命中した場合、そのEnemyには以下の両方の候補を同一frameに生成できます。
 
 1. Direct Contact RGB Damage候補
-2. 同じ着弾で発生したExplosion RGB Damage候補
+2. 同じ着弾で発生した第一爆発のExplosion RGB Damage候補
 
 ```text
 Enemyへ直接命中
 ↓
 Direct Contact RGB Damage候補
 +
-Explosion RGB Damage候補
+第一爆発のExplosion RGB Damage候補
 ↓
 同一frameのEnemy Damage処理へ集約
 ```
@@ -244,6 +254,8 @@ Explosion RGB Damage候補
 2つは異なるDamage発生源種別として扱います。Explosion RGB Damageの重複除外を理由に、Direct Contact RGB Damageを削除しません。
 
 対象Enemyがframe受付開始時点で未浄化かつDamage受付可能であり、各候補が共通有効性確認を通過した場合、両方の最終RGB Damage payloadを同一frame集約へ含めます。
+
+やまびこの第二爆発は、この直接命中frameへの集約対象ではありません。第二爆発が後から成立した場合は、その発生frameにおけるExplosion RGB Damage候補として別途受け付け、同じframeの他候補と集約します。
 
 ## Damage候補の最終重複除外
 
@@ -267,8 +279,11 @@ Damage作用またはEventの識別情報
 - 異なるExplosionから同じEnemyへ届いた候補は、それぞれ別のDamageとして受け付ける
 - 異なるNatural Burstから同じEnemyへ届いた候補は、それぞれ別のDamageとして受け付ける
 - 同じPalette BulletのDirect ContactとExplosionは、発生源種別が異なるため両方を適用できる
+- 同じPalette Bulletの第一爆発と第二爆発は異なる爆発Event識別情報を持つため、同じEnemyが両方の条件を満たした場合もそれぞれ1件ずつ受け付ける
 
 複数Colliderを持つEnemyが同じExplosionまたはNatural Burstの範囲判定で複数回検出された場合も、Enemy実体単位で最大1件へまとめます。
+
+例えば第一爆発と第二爆発に共通の`Palette Bullet Explosion`種別を使用しても、爆発Event識別情報が異なるため互いを重複候補として削除しません。この区別のためにDamage発生源種別を追加せず、既存の重複除外keyをそのまま使用します。
 
 重複候補のうち、どの配列要素または到着候補を残したかによって最終結果が変化してはいけません。同じ重複キーに異なる内容の最終RGB Damage payloadが含まれる状態は、Producer側の不正な候補生成として検出可能にします。
 
@@ -590,14 +605,16 @@ Battle結果確定後は、新しいDamage候補の受付、RGB Damage反映、E
 - 途中の候補だけで浄化を確定し、残りの同一frame候補を除外しない
 - 同一Damage作用から同じEnemyへ同種のRGB Damageを複数回適用しない
 - 同じ爆発から同じEnemyへExplosion RGB Damageを複数回適用しない
+- 異なる爆発Event識別情報を持つ第一爆発と第二爆発を、同じPalette Bullet由来であることだけを理由に重複除外しない
 - 同じNatural Burstから同じEnemyへNatural Burst RGB Damageを複数回適用しない
 - Direct Contact、Explosion、Natural Burstの発生源種別を無視して重複除外しない
 - 同じPalette BulletのDirect Contact RGB DamageとExplosion RGB Damageを同一候補として重複除外しない
 - 爆心からの距離によってExplosion RGB Damageを減衰させない
 - 壁・地形に遮られているEnemyへExplosion RGB Damage候補を生成しない
 - Enemy同士を爆風遮蔽物として扱わない
-- `effective RGB基礎値`を倍率適用済みの最終RGB Damage payloadとして扱わない
-- Enemy Damage側で発生源固有倍率を再適用しない
+- 第二爆発時の範囲・壁／地形の遮蔽をEnemy Damage側で再判定しない
+- `effective RGB基礎値`を通常MultiplierまたはWildcard override、Mode、Conduct適用済みの最終RGB Damage payloadとして扱わない
+- Enemy Damage側で発生源固有Multiplier、Wildcard override、Mode、Conductを再適用しない
 - RGB Damageを単一HP Damageへ暗黙に変換しない
 - Damage候補ごとに個別に丸めてから合算しない
 - 最大浄化値を超えた分を他チャンネル・次回被弾・別Damageへ転用しない
@@ -623,16 +640,20 @@ Battle結果確定後は、新しいDamage候補の受付、RGB Damage反映、E
 | `MaxPurifyG` | Gチャンネルの最大浄化値 | 調整値 |
 | `MaxPurifyB` | Bチャンネルの最大浄化値 | 調整値 |
 | 各Normal Shaondamaのsource RGB値 | Normal Shaondamaの`effective RGB基礎値`の元となるRGB定義 | [シャオンダマのデータ](/spec/shaondama-music/orb-data)側の調整値を参照 |
-| `DirectHitMultiplier` | Direct Contact最終RGB Damage payloadの生成時に適用する倍率 | [パレットブレット](/spec/combat/palette-bullet)側の調整値を参照 |
-| `ExplosionMultiplier` | Explosion最終RGB Damage payloadの生成時に適用する倍率 | [パレットブレット](/spec/combat/palette-bullet)側の調整値を参照 |
-| Wildcard用倍率override | Palette Bulletの発生元がWildcardである場合に使用する倍率override | [パレットブレット](/spec/combat/palette-bullet)側の調整値を参照 |
+| `DirectHitMultiplier` | 通常由来のDirect Contactについて、Mode、Conductより前に最終RGB Damage payloadの起点へ適用する倍率 | [パレットブレット](/spec/combat/palette-bullet)側の調整値を参照 |
+| `ExplosionMultiplier` | 通常由来の第一爆発について、Mode、Conductより前に最終RGB Damage payloadの起点へ適用する倍率 | [パレットブレット](/spec/combat/palette-bullet)側の調整値を参照 |
+| Wildcard用倍率override | Palette Bulletの発生元がWildcardである場合に、対応する通常Multiplierの代わりに使用する倍率override | [パレットブレット](/spec/combat/palette-bullet)側の調整値を参照 |
+| Mode snapshot／Effector | `Fire Music Position`で確定したModeを、対応する通常MultiplierまたはWildcard overrideの後、Conductの前に適用する | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)と[パレットブレット](/spec/combat/palette-bullet)を参照 |
+| 付与済みConduct | Mode適用後に処理し、やまびこでは第一爆発から第二爆発を予約する | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)と[パレットブレット](/spec/combat/palette-bullet)を参照 |
+| `EchoSecondExplosionDelay` | 第一爆発から第二爆発までの待機時間。初期値0.5秒 | [パレットブレット](/spec/combat/palette-bullet)側の調整値を参照 |
+| `EchoSecondExplosionDamageMultiplier` | 予約時に保持したMode適用後の通常Explosion RGB payloadへ適用する倍率。初期値0.5 | [パレットブレット](/spec/combat/palette-bullet)側の調整値を参照 |
 | Natural Burst攻撃範囲 | Normal Shaondama自然破裂のEnemy抽出範囲 | [浮遊・自然破裂](/spec/shaondama-music/floating-behavior)側の調整値を参照 |
 | Natural Burst Damage倍率 | Natural Burst最終RGB Damage payloadの生成時に適用する倍率 | [浮遊・自然破裂](/spec/shaondama-music/floating-behavior)側の調整値を参照 |
 | `RGBDamageRoundingMode` | 同一frame集約後のRGB Damageに使用する丸め方式 | 調整値 |
 
 各値はハードコードせず、Inspectorまたはデータアセットから調整できる構造とします。
 
-固定の「7色RGB Damage表」は本ページで保持しません。各Damage Producerは、発生元Shaondamaから引き継いだ`effective RGB基礎値`へ発生源固有の倍率または規則を適用し、最終RGB Damage payloadを生成します。
+固定の「7色RGB Damage表」は本ページで保持しません。各Damage Producerは、発生元Shaondamaから引き継いだ`effective RGB基礎値`へ発生源固有の倍率または規則を適用し、Palette BulletではさらにMode、Conductを必要に応じて適用した最終RGB Damage payloadを生成します。
 
 ## 未決事項
 
