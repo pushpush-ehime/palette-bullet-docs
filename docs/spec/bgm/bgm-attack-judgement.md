@@ -1,6 +1,6 @@
 ---
 title: "AttackEvent成立判定"
-description: Palette BulletにおけるAttackEvent発火時のGameplay結果判定・使用実体・発射開始位置・Target共有・Battle終了時取消仕様
+description: Palette BulletにおけるAttackEvent発火時のGameplay結果判定・使用実体・発射開始位置・Target／Mode／Conduct共有・Battle終了時取消仕様
 pageType: spec
 category: "BGM"
 status: 仮仕様
@@ -30,6 +30,8 @@ relatedTasks:
 - Weak AttackEvent発火時の使用実体・終了処理
 - Complete Chord時のバフ発生条件
 - AttackEvent発火時のTarget座標snapshotと同一AttackEvent内での共有
+- `Fire Music Position`でのMode snapshotと同一AttackEvent occurrence内での共有
+- occurrenceへcommit済みのConductまたは明示的な未選択状態の発射時引き渡し
 - Battle結果確定後のAttackEvent発火gate停止
 - 未発火AttackEventとArpeggio残Entryの取消
 - AttackEventが保持するsnapshotの無効化
@@ -83,6 +85,8 @@ Complete / Incomplete / Zero Charge
 使用Reserved Shaondama
 Chord / Arpeggio発射対象
 Target座標snapshot
+Mode snapshot
+付与済みConductまたは明示的な未選択状態
 各発射時点のShaondama現在World座標
 Palette Bullet化
 個体単位の1回消費
@@ -306,10 +310,15 @@ AttackEvent Typeごとの取得タイミングは次のとおりです。
 | 情報 | 内容 |
 | --- | --- |
 | 発生元個体識別情報 | 弾丸化するReserved Shaondamaの個体 |
+| AttackEvent occurrence識別情報 | 発火元となるStage挑戦中の具体的なoccurrence |
 | 有効RGB情報 | 発生元Shaondamaから引き継ぐRGB payloadの基準値 |
 | 発射開始位置 | 弾丸化する瞬間の対象Shaondamaの現在World座標 |
 | Target座標 | AttackEvent発火時に確定した共有Target座標snapshot |
+| Mode snapshot | occurrenceが`Fire Music Position`へ到達して発火を開始した瞬間に取得したMode |
+| Conduct | Charge成功時に同じoccurrenceへcommit済みのConduct、または明示的な未選択状態 |
 | Battle識別情報 | Palette Bulletが属する現在のBattle |
+
+これらを同じ発射要求として一体で渡します。処理に必要なoccurrence識別情報、個体識別情報、有効RGB情報、発射開始位置、Target座標、Mode snapshot、Conduct状態、またはBattle識別情報が不足・不正である場合は、Palette Bullet化・発射要求を拒否します。拒否時にcurrent Mode、Player側の現在Conduct選択、過去のTarget座標、または別occurrenceの情報で暗黙補完しません。
 
 Palette Bulletの直線飛行、衝突、Direct Contact RGB Damage、Explosion RGB Damage、爆風遮蔽、Markerとの相互作用は、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
 
@@ -317,11 +326,13 @@ Palette Bulletの直線飛行、衝突、Direct Contact RGB Damage、Explosion R
 
 ## モード／コンダクトの参照境界
 
-Charge成功時点のモードをAllocation SlotまたはReserved Shaondamaへ固定しません。AttackEventの発火・発射処理では、Charge時点のモードではなく、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)の規則に従い、その時点で適用済みのモードを参照します。モード変更の適用とPalette Bulletの発射が同じ小節頭に成立する場合は、新しいモードを先に適用します。
+Charge成功時点のModeをAllocation SlotまたはReserved Shaondamaへ固定しません。AttackEvent occurrenceが`Fire Music Position`へ到達して発火を開始した瞬間に、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)の規則に従い、その時点のcurrent Modeをoccurrenceへ一度だけsnapshotします。
 
-ただし、ArpeggioでAttackEvent発火時のモードを全Entryへ固定するか、各Palette Bulletの実発射時点で参照するかは未決です。本ページでは、どちらかを確定せず、既存のArpeggio snapshotへモードを追加しません。
+同じ小節頭でMode切替と発火開始が成立する場合は、新Modeを先に適用してからsnapshotします。一度取得したMode snapshotは、同一occurrenceのChord／Arpeggio／Weak AttackEvent全体で共有します。Arpeggioの先頭EntryがEmptyの場合も取得を最初の実発射まで遅らせず、後続Entryの実発射時にcurrent Modeを読み直しません。
 
 コンダクトはMusicChart上の静的なAttackEvent Definitionではなく、Stage挑戦中の具体的なAttackEvent occurrenceへ最大一つ付与される、occurrence全体の演奏・発射指示です。発火・発射処理では、付与前に同じoccurrenceへ`Reserved`済みだったShaondamaを含め、付与済みコンダクトをAttackEvent全体の指示として参照します。Slot、Shaondama、Chordの各音、Arpeggioの各Entryごとに別のコンダクトを持たせません。
+
+Conductは発火時または各Entryの発射時にPlayer側の現在選択から取り直しません。Charge成功時にoccurrenceへcommit済みのConduct、または明示的な未選択状態を、同じMode snapshotとともに各Palette Bulletへ渡します。
 
 具体的な保持field、payload、Runtime Owner、Production Event／Command名は本ページでは確定しません。
 
@@ -690,6 +701,11 @@ Arpeggio AttackEventは、発火した瞬間に、以下を確定してsnapshot�
 - 各Slotの`Occupied / Empty`
 - 使用するReserved Shaondama
 - AttackEvent全体で共有するTarget座標
+- occurrence全体で共有するMode
+
+Charge成功時にoccurrenceへcommit済みのConduct、または明示的な未選択状態も、発火時に取り直さず、同じoccurrenceの全Entryが参照する不変情報として保持します。
+
+Mode snapshotはoccurrenceが`Fire Music Position`へ到達して発火を開始した瞬間に取得します。先頭EntryがEmptyであっても、最初に`Occupied`なEntryの実発射まで取得を遅らせません。
 
 各Palette Bulletの発射開始位置は、AttackEvent発火時のsnapshot対象に含めません。発射開始位置は、各Entryの発射タイミングに対応するShaondamaの現在World座標から取得します。
 
@@ -709,11 +725,13 @@ G Reserved Shaondama
 
 発火後に、Slot状態やAllocation結果を再評価しません。
 
-通常解決では、snapshotした結果とTarget座標を、最後のArpeggio timingの処理が完了するまで維持します。
+通常解決では、snapshotした結果、Target座標、Mode、および付与済みConductまたは明示的な未選択状態を、最後のArpeggio timingの処理が完了するまで維持します。
 
-ただし、その前にBattle結果が確定した場合は例外です。Battle終了cleanupで残Entryを取り消し、未消費Reserved Shaondamaの解放対象を確定した後、結果・Slot・使用対象・Target座標のsnapshotを無効化します。
+ただし、その前にBattle結果が確定した場合は例外です。Battle終了cleanupで残Entryを取り消し、未消費Reserved Shaondamaの解放対象を確定した後、結果・Slot・使用対象・Target座標・Modeのsnapshotと、occurrenceが保持するConduct状態を無効化します。
 
 各Arpeggio timingでTargetを再取得しません。
+
+各Arpeggio timingでcurrent ModeまたはPlayer側の現在Conduct選択を再取得しません。
 
 先行EntryのPalette Bullet化によって、その個体に対応するReserved参照は消費済みになります。後続Entry用にsnapshotした別のReserved Shaondamaは、自身の発射タイミングまで維持します。
 ---
@@ -797,7 +815,7 @@ snapshot済みの対応Reserved Shaondamaを確認
 ↓
 対象Shaondamaの現在World座標を取得
 ↓
-共有Target座標snapshotとともにPalette Bulletへ渡す
+AttackEvent occurrence識別情報・共有Target座標snapshot・Mode snapshot・付与済みConductまたは明示的な未選択状態とともにPalette Bulletへ渡す
 ↓
 Palette Bullet化・発射
 ↓
@@ -807,6 +825,8 @@ Palette Bullet化・発射
 ```
 
 1発目や先行Entryの発射時点で、後続Entryに対応するShaondamaの発射開始位置を先に確定しません。
+
+発射開始位置だけは各Entryの発射時点に取得しますが、Mode snapshotとConduct状態は同じoccurrenceの保存済み情報を使用します。後続Entryでcurrent ModeまたはPlayer側の現在Conduct選択を読み直しません。
 
 Palette Bullet化した個体を、後続Entryまたは別AttackEventでReserved Shaondamaとして再利用しません。
 
@@ -992,19 +1012,23 @@ Weak AttackEvent発火時には、
 Weak AttackEvent発火
 ↓
 Target座標snapshot
+＋
+Mode snapshot
+＋
+付与済みConductまたは明示的な未選択状態
 ↓
 対応Reserved Shaondama 1つ
 ↓
 対象Shaondamaの現在World座標を取得
 ↓
-共有Target座標と発射開始位置をPalette Bulletへ渡す
+AttackEvent occurrence識別情報・共有Target座標・Mode snapshot・Conduct状態・発射開始位置をPalette Bulletへ渡す
 ↓
 Palette Bullet化・個体消費
 ↓
 単音Weak Attack
 ```
 
-Weak AttackEventでも、対応Shaondamaの現在World座標を発射開始位置として使用し、その個体を1回だけPalette Bullet化します。弾丸化後に同じ個体をReserved Shaondamaとして残しません。
+Weak AttackEventでも、`Fire Music Position`でModeを一度だけsnapshotし、Charge成功時に同じoccurrenceへcommit済みのConductまたは明示的な未選択状態を使用します。対応Shaondamaの現在World座標を発射開始位置として使用し、その個体を1回だけPalette Bullet化します。弾丸化後に同じ個体をReserved Shaondamaとして残しません。
 
 発火時に、
 
@@ -1338,7 +1362,10 @@ Reserved Shaondamaの消費状態・解放対象を確定した後、AttackEvent
 
 対象には、少なくとも次を含みます。
 
+- AttackEvent occurrence識別情報と、そのoccurrenceへのGameplay参照
 - AttackEvent Target Position Snapshot
+- AttackEvent Mode Snapshot
+- occurrenceへcommit済みのConductまたは明示的な未選択状態
 - Arpeggioの`Complete / Incomplete / Zero Charge`結果snapshot
 - Arpeggioの`Occupied / Empty` Slot snapshot
 - Arpeggioの使用Reserved Shaondama snapshot
@@ -1347,6 +1374,7 @@ Reserved Shaondamaの消費状態・解放対象を確定した後、AttackEvent
 無効化後は、snapshotを使用して以下を行えません。
 
 - Target座標をPalette Bulletへ渡す
+- Mode snapshotまたはConduct状態をPalette Bulletへ渡す
 - Arpeggioの残Entryを発射する
 - Reserved Shaondamaを消費する
 - Damageやバフへ接続する
@@ -1361,9 +1389,9 @@ Reserved Shaondamaの消費状態・解放対象を確定した後、AttackEvent
 | Battle結果確定時の状態 | 取消・無効化 | Reserved Shaondama |
 | --- | --- | --- |
 | 発火前のNormal / Weak AttackEvent | AttackEventと発火予約を取消。snapshot処理を開始しない | commit済みの全Reservedを未消費として一度だけ解放 |
-| 発火・解決済みChord | Target snapshotとOwner側参照を無効化 | Palette Bullet化済みのため再解放しない |
-| 発火・解決済みWeak | Target snapshotとOwner側参照を無効化 | Palette Bullet化済みのため再解放しない |
-| 発火途中のArpeggio | 残Entryとcallbackを取消。Target・結果・Slot・使用対象snapshotを無効化 | 発射済みEntryは再解放せず、未発射Entry分だけ一度だけ解放 |
+| 発火・解決済みChord | Target・Mode snapshot、Conduct状態、Owner側参照を無効化 | Palette Bullet化済みのため再解放しない |
+| 発火・解決済みWeak | Target・Mode snapshot、Conduct状態、Owner側参照を無効化 | Palette Bullet化済みのため再解放しない |
+| 発火途中のArpeggio | 残Entryとcallbackを取消。Target・Mode・結果・Slot・使用対象snapshotとConduct状態を無効化 | 発射済みEntryは再解放せず、未発射Entry分だけ一度だけ解放 |
 | 解決済みArpeggio | 残存するsnapshotとOwner側参照を無効化 | 全使用対象が処理済みのため再解放しない |
 | 発火済み`Zero Charge` | 残るEntry / callbackとsnapshotを取消・無効化 | Reserved Shaondamaが存在しないため解放なし |
 
@@ -1379,7 +1407,7 @@ AttackEvent判定Ownerの必須cleanupは、現在の`battleId`について次�
 - 発火済みArpeggioの未処理Entryがすべて取り消されている
 - 未消費Reserved Shaondamaが一度だけ解放されている
 - 消費済みReserved Shaondamaへ再解放を行っていない
-- Target snapshotを含むGameplay用snapshotがすべて無効化されている
+- Target・Mode snapshotとConduct状態を含むGameplay用の保持情報がすべて無効化されている
 - AttackEvent判定Ownerが保持する旧BattleのSlot / Reserved参照が終了している
 - 旧`battleId`からの通知でGameplay状態を変更できない
 
@@ -1413,7 +1441,7 @@ Reserved Shaondama
 ↓
 対応する発射タイミングに現在World座標を取得
 ↓
-発射開始位置・共有Target座標・個体情報・有効RGB情報を引き渡す
+AttackEvent occurrence識別情報・発射開始位置・共有Target座標・Mode snapshot・Conduct状態・個体情報・有効RGB情報を引き渡す
 ↓
 Palette Bullet化
 ↓
@@ -1423,6 +1451,8 @@ Shaondamaとして1回だけ消費
 ```
 
 までです。
+
+Mode snapshotとConduct状態は、各Palette Bulletへ渡した後も元occurrenceの保存済み情報として扱い、発射済みPalette Bulletのためにcurrent ModeまたはPlayer側の現在Conduct選択を読み直しません。Palette Bullet側は受け取った不変情報を飛翔・Direct Contact・第一爆発・第二爆発まで保持します。
 
 Palette Bullet化された実体は、同じAttackEventのReserved Shaondamaとして再利用しません。
 
@@ -1476,11 +1506,13 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | Weak AttackEvent発火後の解決・破棄 | **本ページ** |
 | バフの具体的効果・数値・継続時間等 | バフシステム側 |
 | BGM / 音程音 / Gameplay SE同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
-| Palette Bullet発射後の飛翔・命中・Damage・消滅 | [パレットブレット](/spec/combat/palette-bullet) |
+| Palette Bullet発射後の飛翔・命中・Direct Contact・第一／第二爆発・Damage・消滅 | [パレットブレット](/spec/combat/palette-bullet) |
 | Markerの有効条件・置換・消滅 | [マーカー](/spec/combat/marker) |
 | Target候補の優先順位・座標計算 | [パレットブレット](/spec/combat/palette-bullet) |
 | AttackEvent発火時のTarget座標snapshot | **本ページ** |
 | 同一AttackEvent内でのTarget座標共有 | **本ページ** |
+| `Fire Music Position`でのMode snapshotと同一occurrence内での共有 | **本ページ** |
+| occurrenceへcommit済みのConduct状態の発射時引き渡し | **本ページ** |
 | Battle結果確定後のAttackEvent発火gate停止 | **本ページ** |
 | 発火前AttackEvent・Arpeggio残Entryの取消 | **本ページ** |
 | AttackEventが保持するGameplay用snapshotの無効化 | **本ページ** |
@@ -1489,7 +1521,7 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 | AttackEvent判定Ownerの必須cleanup完了条件・通知 | **本ページ** |
 | Palette Bulletの発射開始位置に使用する座標の規則 | [パレットブレット](/spec/combat/palette-bullet) |
 | モード／コンダクトのGameplay上の意味・付与／参照境界 | [Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct) |
-| Direct Contact / Explosion RGB Damage候補の生成 | [パレットブレット](/spec/combat/palette-bullet) |
+| Direct Contact / 第一・第二Explosion RGB Damage候補の生成 | [パレットブレット](/spec/combat/palette-bullet) |
 | Damage候補の集約・丸め・Clamp・浄化判定 | [敵の被弾と浄化](/spec/enemy/damage-and-purify) |
 
 ---
@@ -1502,6 +1534,8 @@ BGM・音程音・Gameplay SEとの同期については、[BGMとGameplayの接
 AttackEvent発火
 ↓
 Target座標を1回snapshot
+↓
+Modeを1回snapshotし、occurrenceへcommit済みのConduct状態を保持
 ↓
 発火時点のSlot / Reserved状態を確認
 ↓
@@ -1526,7 +1560,7 @@ AttackEvent Type
 │   ↓
 │   同一音楽タイミングで各Shaondamaの現在World座標を取得
 │   ↓
-│   共有Target座標とともにPalette Bulletへ渡す
+│   occurrence識別情報・共有Target座標・Mode snapshot・Conduct状態とともにPalette Bulletへ渡す
 │   ↓
 │   Palette Bullet化・発射・個体消費
 │
@@ -1536,7 +1570,7 @@ AttackEvent Type
     ↓
     各Entryの発射タイミングに対応Shaondamaの現在World座標を取得
     ↓
-    共有Target座標とともにPalette Bulletへ渡す
+    occurrence識別情報・共有Target座標・Mode snapshot・Conduct状態とともにPalette Bulletへ渡す
     ↓
     Palette Bullet化・発射・個体消費
     ↓
@@ -1552,11 +1586,13 @@ Weak AttackEvent発火
 ↓
 Target座標を1回snapshot
 ↓
+Modeを1回snapshotし、occurrenceへcommit済みのConduct状態を保持
+↓
 対応Reserved Shaondama 1つ
 ↓
 対象Shaondamaの現在World座標を取得
 ↓
-共有Target座標とともにPalette Bulletへ渡す
+occurrence識別情報・共有Target座標・Mode snapshot・Conduct状態とともにPalette Bulletへ渡す
 ↓
 Palette Bullet化・個体消費
 ↓
@@ -1590,7 +1626,7 @@ Reserved状態を分類
 └─ 未消費Reserved
     → 一度だけReleasedへ遷移
 ↓
-Target・結果・Slot・使用対象snapshotを無効化
+occurrence識別情報・Target・Mode・Conduct・結果・Slot・使用対象のGameplay用保持情報を無効化
 ↓
 Owner側参照を終了
 ↓
@@ -1608,10 +1644,10 @@ Owner側参照を終了
 - 発火時には`charge-allocation.md`で確定済みのAllocation結果を使用する
 - 発火時に別AttackEvent検索・Slot再割り当て・Weak / Normal再判定を行わない
 - Charge成功時にはPalette Bullet化せず、ReservedとしてAttackEvent発火を待つ
-- モードはCharge時のAllocation SlotまたはReserved Shaondamaへ固定せず、統合仕様に従って発火・発射処理で参照する
-- 同じ小節頭でモード適用とPalette Bullet発射が成立する場合は、新しいモードを先に適用する
-- ArpeggioのモードをAttackEvent発火時に全体へ固定するか、各Palette Bulletの実発射時点で参照するかは未決とする
-- コンダクトは静的なAttackEvent Definition、Slot、Shaondama単位ではなく、具体的なAttackEvent occurrenceへ最大一つ付与される全体の指示として扱う
+- ModeはCharge時のAllocation SlotまたはReserved Shaondamaへ固定せず、AttackEvent occurrenceが`Fire Music Position`へ到達して発火を開始した瞬間にcurrent Modeを一度だけsnapshotする
+- 同じ小節頭でMode切替と発火開始が成立する場合は、新Modeを先に適用してからsnapshotする
+- 同一occurrenceのChord／Arpeggio／Weak AttackEventはMode snapshotを共有し、Arpeggioの先頭Entryが`Empty`でも取得を遅らせず、後続Entryでcurrent Modeを読み直さない
+- Conductは静的なAttackEvent Definition、Slot、Shaondama単位ではなく、具体的なAttackEvent occurrenceへ最大一つ付与される全体の指示として扱い、Charge成功時にcommit済みの値または明示的な未選択状態をPalette Bulletへ渡す
 - AttackEvent発火時にTarget座標を1回だけ確定する
 - 同じAttackEventが発射する全Palette BulletでTarget座標を共有する
 - 各Palette Bulletの発射開始位置には、弾丸化する瞬間の対象Shaondamaの現在World座標を使用する
@@ -1648,18 +1684,18 @@ Owner側参照を終了
 - Battle結果確定後は新しいNormal / Weak AttackEventを発火しない
 - Battle結果確定時に発火前AttackEventを取り消す
 - 発火途中のArpeggioは残りの未処理Entryと遅延callbackを取り消す
-- Battle結果確定後は新しい結果判定・Target snapshot・Palette Bullet化・バフ条件成立を開始しない
+- Battle結果確定後は新しい結果判定・Target／Mode snapshot・Palette Bullet化・バフ条件成立を開始しない
 - AttackEventへcommit済みの未消費Reserved Shaondamaだけを一度だけ解放する
 - Palette Bullet化済みの`Consumed` Shaondamaを再解放しない
 - Reservedの`Consumed / Released`を排他的な終了状態として扱う
-- Reserved解放対象の確定後、Target・結果・Slot・使用対象を含むGameplay用snapshotを無効化する
+- Reserved解放対象の確定後、occurrence識別情報・Target・Mode・Conduct・結果・Slot・使用対象を含むGameplay用の保持情報を無効化する
 - AttackEvent判定Ownerのcleanupは重複通知に対して冪等とする
 - 発火通知・Arpeggio Entry callback・snapshotへ`battleId`を対応付け、旧Battleの処理を無視する
 - 必須cleanup完了後、`battleId`付きの完了通知を一度だけ上位Ownerへ送る
 - 表示専用VFX・SE・UI消去演出の完了を必須cleanup完了条件に含めない
 - Target候補の優先順位・座標計算は`combat/palette-bullet.md`を正本とする
 - AttackEvent発火時のTarget座標snapshotは本ページを正本とする
-- Direct Contact / Explosion RGB Damage候補の生成は`combat/palette-bullet.md`を正本とする
+- Direct Contact / 第一・第二Explosion RGB Damage候補の生成は`combat/palette-bullet.md`を正本とする
 - Damage候補の集約・丸め・Clamp・浄化判定は`enemy/damage-and-purify.md`を正本とする
 - Palette Bullet発射後の飛翔・命中・Damage・消滅は別正本へ委譲する
 
@@ -1692,7 +1728,7 @@ Owner側参照を終了
 
 本ページでは、これらを推測で追加しません。
 
-Palette Bulletの飛翔・命中・Direct Contact RGB Damage・Explosion RGB Damage・Bullet消滅・Battle終了時の無効化は、[パレットブレット](/spec/combat/palette-bullet)で確定済みです。Enemy側のDamage集約・丸め・Clamp・浄化判定は、[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とし、本ページの未決事項には含めません。
+Palette Bulletの飛翔・命中・Direct Contact RGB Damage・第一／第二Explosion RGB Damage・Bullet消滅・Battle終了時の無効化は、[パレットブレット](/spec/combat/palette-bullet)で確定済みです。Enemy側のDamage集約・丸め・Clamp・浄化判定は、[敵の被弾と浄化](/spec/enemy/damage-and-purify)を正本とし、本ページの未決事項には含めません。
 
 ---
 
