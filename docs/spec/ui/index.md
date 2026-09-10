@@ -12,11 +12,13 @@ status: 仮仕様
 
 ## ページ概要
 
-- 対象担当：UI担当（個人は未決）
+- 対象担当：UI・画面設計担当、UI実装担当
 - 関連ページ：[ゲーム全体](/spec/game/)、[戦闘概要](/spec/combat/)、[入力と操作](/spec/player/input-and-controls)、[プレイヤー死亡](/spec/player/player-death)、[用語集](/glossary)
 - 本ページの確定範囲：共通Result画面、`Clear / Game Over` variant、Result操作lock、Result後のroute
 
 本ページではUI全体のうち、Battle終了後に表示する共通Result画面を正本として定義します。
+
+これから画面を描く際の入口は[想定画面一覧・画面遷移](./screen-inventory.md)です。各画面の目的・操作・対象範囲と、ラフを描く順番・記録方法を整理しています。Battle画面は[バトルHUD](./battle-hud.md)へ、Resultの状態別詳細は本ページと[PB-TASK-0022](/tasks/ui/pb-task-0022)へつなぎます。
 
 HUD、Pause Menu、設定画面、拠点UI、Stage選択UIなど、Result以外のUI詳細は本ページではまだ確定しません。
 
