@@ -16,6 +16,10 @@
  */
 
 import { appendFileSync } from 'node:fs'
+import {
+  discordQuietHoursLabel,
+  isDiscordQuietHours
+} from './discord-notification-policy.mjs'
 
 const NOTION_API = 'https://api.notion.com/v1'
 const NOTION_VERSION = '2022-06-28'
@@ -46,6 +50,11 @@ async function main() {
     throw new Error(
       '環境変数DISCORD_TASK_WEBHOOK_URLが設定されていません。'
     )
+  }
+
+  if (isDiscordQuietHours()) {
+    reportQuietHoursSkip()
+    return
   }
 
   const client = createNotionClient(token)
@@ -326,6 +335,22 @@ function report({
     `- Discordへ通知：${notified.length}件${listOf(notified)}`,
     `- 通知失敗（次回再試行）：${failed.length}件${listOf(failed)}`,
     `- 再開により通知状態をリセット：${reopenedCount}件`
+  ]
+
+  console.log(`\n完了通知チェック\n${lines.join('\n')}`)
+
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(
+      process.env.GITHUB_STEP_SUMMARY,
+      `## Notion → Discord 完了通知\n\n${lines.join('\n')}\n`
+    )
+  }
+}
+
+function reportQuietHoursSkip() {
+  const lines = [
+    `- ${discordQuietHoursLabel()}のためDiscord通知を送信しませんでした。`,
+    '- 完了タスクを通知済みにしていないため、次の送信可能時間帯に再確認します。'
   ]
 
   console.log(`\n完了通知チェック\n${lines.join('\n')}`)

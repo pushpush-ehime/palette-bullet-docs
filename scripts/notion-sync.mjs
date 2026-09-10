@@ -34,6 +34,10 @@ import {
   NOTION_LINKS_FILE,
   SITE_BASE_URL
 } from '../docs/.vitepress/content/notion-fields.mjs'
+import {
+  discordQuietHoursLabel,
+  isDiscordQuietHours
+} from './discord-notification-policy.mjs'
 
 const NOTION_API = 'https://api.notion.com/v1'
 const NOTION_VERSION = '2022-06-28'
@@ -213,6 +217,13 @@ async function notifyDiscordTaskCreated({
   notionUrl
 }) {
   if (!webhookUrl) return
+
+  if (isDiscordQuietHours()) {
+    console.log(
+      `[Discord通知を抑止] ${task.taskId}｜${task.title}（${discordQuietHoursLabel()}、新規タスク通知は再送しません）`
+    )
+    return
+  }
 
   const team = task.team || DEFAULT_TASK_FIELDS.team
   const priority = task.priority || DEFAULT_TASK_FIELDS.priority
