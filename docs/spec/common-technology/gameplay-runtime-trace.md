@@ -270,52 +270,18 @@ Gameplay Runtime Trace側で再実装しません。
 
 ### Player Action／State Graph基盤
 
-[Player Action／State Graph基盤](/spec/common-technology/action-state-manage)は、
-Playerの状態・遷移判断を行う唯一のRuntime authorityです。
+[Player Action／State基盤](/spec/common-technology/action-state-manage)は標準Unity Visual Scriptingを採用済みです。保存グラフがPlayerの状態・遷移を定義し、現在状態は標準VSの実行インスタンスから観測します。
 
-同基盤が生成するState Graph Traceは、次の詳細な判断証拠を所有します。
+現行Playerのjournalには、順序、Gameplay時刻、Battle／actor／generation／run、イベント、種別・対象・詳細・payloadなどを記録します。入力要求、条件評価、遷移、停止、エラー等の記録と保存ソースの対応は[現行基盤の検証手順](/spec/common-technology/action-state-manage#verification)を参照します。
 
-- 遷移前後のActive Configuration
-- 候補Rule
-- Guard結果
-- winning Rule
-- 受理／拒否とReason Code
-- Context transaction
-- Buffer操作
-- lifecycle順序
-- 発行Command
-- Fault
-- `machineInstanceId`
-- `machineGeneration`
-- `battleId`
-- `actionRunId`
-- Eventのparent／root／origin identity
+| 対象 | 責務と提供状況 |
+|---|---|
+| 現行Playerの観測・journal | Player内の実行事実、拒否・遷移・停止等の記録と診断を提供する |
+| Gameplay Runtime Trace | 複数Systemの事実を全体Timelineへ関連付ける仕様。現行Playerへの接続や全Systemの共通ID対応は別途実装する |
 
-Gameplay Runtime Traceは、Input、Physics、AttackEvent、Projectile、Damage、Battle等を含む
-全体Timeline上へ、そのState Graph Trace recordを参照・転送・関連付けします。
+本ページの他節に残る`Context transaction`、`winning Rule`、`Command`、旧`machineInstanceId`等のState Graph Trace前提は、現行Playerからその形式のまま出力されるという提供契約ではありません。旧独自Runtimeは再導入せず、実際のjournalと保存ソースに対する対応を定めて接続します。必要なID相関や不足する観測の追加は、実装済みのPlayer基盤と区別してタスク化します。
 
-| Trace | 責務 |
-| --- | --- |
-| State Graph Trace | State Graphが行った遷移判断の詳細証拠 |
-| Gameplay Runtime Trace | 複数Systemを横断したRuntime事実の全体観測 |
-
-Gameplay Runtime Trace側でGuardを再実行したり、
-Active Configurationから遷移理由を推測したり、
-State Graphと異なる受理／拒否結果を生成したりしてはいけません。
-
-関連付けには、少なくとも次を使用します。
-
-- `eventId`
-- `rootEventId`
-- `machineInstanceId`
-- `machineGeneration`
-- `battleId`
-- `actionRunId`
-- State Graph Trace record reference
-- Runtime revision
-
-State Graph Traceの詳細recordを転送する場合は、内容を別形式へ解釈し直さず、
-元recordへの参照または正規化済みpayloadとして保持します。
+Gameplay Runtime Trace側でGuardを再実行したり、現在状態から遷移理由を推測したり、Playerと異なる受理／拒否結果を生成したりしてはいけません。転送する記録は元の証拠を参照できるようにし、未対応の項目を推測で補いません。Playerのjournalの存在を、全攻撃経路の相関追跡や本ページの全機能の完成とは扱いません。
 
 ### MusicChart Workbench
 
@@ -2097,7 +2063,7 @@ Gameplay Runtime Traceは以下の仕様を参照しますが、
 | 内容 | 正とする仕様 |
 | --- | --- |
 | 共通技術カテゴリ全体 | [共通技術](/spec/common-technology/) |
-| Player State authority・State Graph Trace | [Player Action／State Graph基盤](/spec/common-technology/action-state-manage) |
+| Player Stateの判断・現行の観測とjournal | [Player Action／State基盤（Unity Visual Scripting）](/spec/common-technology/action-state-manage) |
 | 静的コード構造・Evidence | [Project Code Catalog仕様](/spec/common-technology/project-code-catalog) |
 | Planner調整Parameter | [Planner調整Parameter管理・Excel連携仕様](/spec/common-technology/planner-tuning-parameter) |
 | MusicChart制作・Runtime Monitor | [MusicChart制作・確認ツール仕様](/spec/common-technology/music-chart-workbench) |

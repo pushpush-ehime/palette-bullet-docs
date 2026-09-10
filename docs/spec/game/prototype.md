@@ -92,7 +92,7 @@ Palette Bullet固有のコア体験が成立するかを確認することを目
 
 基盤引き渡し時の報告では、Editor 191/191、PlayMode 76/76、Windows64 Development Buildおよび各採用PRのCIが成功しています。これは開発基盤の統合・検証結果であり、プロトタイプ全機能の完成や全ツールの人間受入を示しません。
 
-Playerは採用済みの標準Unity Visual Scriptingを使用します。保存グラフ、移動・Jump・Dash・Animator、六班の接続雛形は提供済みですが、雛形から先の各機能実装と本体Game／Battle／Combatへの接続は別途必要です。[旧Player基盤ページ](/spec/common-technology/action-state-manage)の独自Runtimeを再導入しません。
+Playerは採用済みの標準Unity Visual Scriptingを使用します。保存グラフ、移動・Jump・Dash・Animator、六班の接続雛形は提供済みですが、雛形から先の各機能実装と本体Game／Battle／Combatへの接続は別途必要です。編集と接続の契約は[現行Player Action／State基盤](/spec/common-technology/action-state-manage)を参照し、旧独自Runtimeは再導入しません。
 
 MusicChart静的制作、Code Catalog、Planner Tuning Coreなどの提供済み基盤を、新規実装タスクとして重複起票しません。Runtime抽選、Excel連携、Migration、全GameplayへのTuning接続などの未実装機能は、未実装であることだけを理由に今回の必須条件へ追加しません。必要性は完成条件と採用する検証内容から個別に判断します。
 

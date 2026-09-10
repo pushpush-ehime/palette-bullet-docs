@@ -820,7 +820,7 @@ Mode／Conductのために新しい`ActionState`を追加しません。既存Ac
 - [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)
 - [パレットブレット](/spec/combat/palette-bullet)
 - [浮遊・挙動](/spec/shaondama-music/floating-behavior)
-- [現在のPlayer基盤と旧Player Action／State Graphの履歴](/spec/common-technology/action-state-manage)
+- [Player Action／State基盤（Unity Visual Scripting）](/spec/common-technology/action-state-manage)
 - [Gameplay Runtime Trace](/spec/common-technology/gameplay-runtime-trace)
 - [ラジクジラ](/spec/radiowhale/)
 

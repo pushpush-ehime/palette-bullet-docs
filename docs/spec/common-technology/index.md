@@ -17,7 +17,7 @@ status: 仮仕様
 
 現在、主に以下の共通開発基盤・開発支援ツールを扱います。
 
-- 標準Unity Visual ScriptingのPlayer基盤（旧Player Action／State Graph基盤は履歴）
+- 標準Unity Visual ScriptingのPlayer Action／State基盤
 - MusicChart Workbench
 - Project Code Catalog
 - Planner調整Parameter管理・Excel連携
@@ -53,7 +53,7 @@ Gameplay上の意味やValidation規則は各正本仕様を参照し、
 
 | 項目 | 目的 | 現在の状態 |
 | --- | --- | --- |
-| [標準Unity Visual ScriptingのPlayer基盤](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Docs/DEVELOPMENT.md) | 保存グラフを編集してPlayerを開発する | 移動・Jump・Dash・Animator、六班の接続雛形を提供済み。本体接続・全Actionの完成ではない |
+| [Player Action／State基盤（Unity Visual Scripting）](./action-state-manage) | 保存グラフを編集してPlayerを開発する | 移動・Jump・Dash・Animator、六班の接続雛形を提供済み。本体接続・全Actionの完成ではない |
 | [MusicChart制作・確認ツール](./music-chart-workbench) | MIDI、BGM Audio、MusicChart、AttackEvent、Timing、Random Section、Validation、再Import差分、Runtime状態を同一の音楽時間軸上で確認・設定・検証する | 仮仕様作成済み |
 | [Project Code Catalog](./project-code-catalog) | Unityプロジェクトのコード構造・依存関係・実装Evidence・Test・仕様書Reference等を機械収集し、AIや人間が追加調査対象を絞れるようにする | 仮仕様作成済み |
 | [Planner調整Parameter管理・Excel連携](./planner-tuning-parameter) | ProgrammerがPlannerへ公開してよいGameplay Parameterを明示し、Definition、Value、Excel Export／Import、Validation、Diff／Conflictを管理する | 仮仕様作成済み |
@@ -68,7 +68,7 @@ Gameplay上の意味やValidation規則は各正本仕様を参照し、
 
 提供済み基盤の範囲と日常の入口は[開発基盤ガイド](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Docs/DEVELOPMENT.md)を正本とします。MusicChartの静的制作、Code Catalogの生成、Planner Tuning Coreは提供済みです。個別のWeb仕様には将来の拡張も含まれるため、仕様ページの存在を全機能の実装完了とは扱いません。
 
-Playerは標準Unity Visual Scriptingの保存グラフを採用済みです。[旧Player Action／State Graph基盤](./action-state-manage)は廃止した方針の履歴として保持し、独自RuntimeのProduction導入を新規タスクとして再開しません。
+Playerは標準Unity Visual Scriptingの保存グラフを採用済みです。[Player Action／State基盤](./action-state-manage)に、現在の状態管理・編集場所・C#追加・外部接続・提供範囲を記載します。旧独自RuntimeのProduction導入を新規タスクとして再開しません。
 
 基盤の統合・自動検証と、本体Game／Battle／Combatへの接続、全Actionの実装、各ツールの人間受入は区別します。今回の必須範囲は[プロトタイプ共通仕様](/spec/game/prototype#completion-policy)から判断します。
 
@@ -96,7 +96,7 @@ Playerは標準Unity Visual Scriptingの保存グラフを採用済みです。[
 - Battle Scenario Runner
 - RGB Damage Sandbox
 
-[旧Player Action／State Graph基盤](./action-state-manage)に記載されたScenario Runnerは旧方針の記録であり、現在の開発に要求しません。ここで将来候補とするBattle Scenario Runnerは、Battle全体の複数Systemを横断して条件を再現・検証する別の候補です。
+旧独自Player Runtime用のScenario Runnerは現在の開発に要求しません。ここで将来候補とするBattle Scenario Runnerは、Battle全体の複数Systemを横断して条件を再現・検証する候補です。現在のPlayerの確認方法は[現行基盤の検証手順](./action-state-manage#verification)を参照します。
 
 MusicChart Runtime Monitorは独立した将来候補として扱いません。
 完成版では[MusicChart制作・確認ツール](./music-chart-workbench)の機能として含め、
