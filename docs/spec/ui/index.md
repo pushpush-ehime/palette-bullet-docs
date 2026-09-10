@@ -292,6 +292,8 @@ UI自身がBattle結果を変更したり、Scene遷移先を再判定したり�
 
 ### Game Over Resultの`Retry`
 
+必須機能の準備・Gameplay cleanupが失敗した場合は、[共通接続仕様D03](/spec/common-technology/feature-connections#failure-policy)を参照します。UIはGameから受けた失敗機能・段階・理由と、アプリを終了して再起動する案内を表示します。この表示は全cleanupの完了を待ちません。中断を解除するRetry／Continueは提供せず、以下の正常なGame Over時のRetryと区別します。
+
 `Game Over` variantでは`Retry`を表示します。
 
 `Retry`が有効な条件は次のとおりです。
