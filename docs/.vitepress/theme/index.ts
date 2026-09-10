@@ -10,6 +10,7 @@ import RelationMap from './components/RelationMap.vue'
 import SpecList from './components/SpecList.vue'
 import StatusBadge from './components/StatusBadge.vue'
 import TaskList from './components/TaskList.vue'
+import TaskRecordsNotice from './components/TaskRecordsNotice.vue'
 import TaskSidebarTeamFilter from './components/TaskSidebarTeamFilter.vue'
 import CategoryCreateButton from './components/CategoryCreateButton.vue'
 import CreateCategoryForm from './components/CreateCategoryForm.vue'
@@ -23,6 +24,7 @@ export default {
   Layout: () =>
     h(DefaultTheme.Layout, null, {
       'doc-before': () => h(PageMeta),
+      'doc-footer-before': () => h(TaskRecordsNotice),
       'doc-after': () => h(AutoPageRelations),
       'sidebar-nav-before': () => h(TaskSidebarTeamFilter)
     }),

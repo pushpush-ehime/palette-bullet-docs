@@ -1,5 +1,7 @@
 import { createContentLoader } from 'vitepress'
 import { loadCatalog } from './catalog.mjs'
+import type { taskProgress } from './task-progress.mjs'
+import type { taskRecords } from './task-records.mjs'
 
 export interface CatalogEntry {
   relativePath: string
@@ -10,6 +12,8 @@ export interface CatalogEntry {
   category: string
   status: string
   taskId: string
+  progress: ReturnType<typeof taskProgress> | null
+  implementationRecords: ReturnType<typeof taskRecords> | null
   team: string
   order: number
   categoryOrder: number
@@ -37,6 +41,8 @@ export default createContentLoader('**/*.md', {
       category: entry.category,
       status: entry.status,
       taskId: entry.taskId,
+      progress: entry.progress,
+      implementationRecords: entry.implementationRecords,
       team: entry.team,
       order: entry.order,
       categoryOrder: entry.categoryOrder,

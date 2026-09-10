@@ -6,6 +6,7 @@ import {
   setRelatedPages
 } from '../../content/related-specs.js'
 import { isTaskTeam, setTaskTeam } from '../../content/task-team.js'
+import { RECORDS_TEMPLATE } from '../../content/task-records.mjs'
 import MarkdownEditor from './MarkdownEditor.vue'
 import RelatedPagePicker from './RelatedPagePicker.vue'
 import TaskTeamField from './TaskTeamField.vue'
@@ -195,6 +196,8 @@ ${relatedPages}
 # ${id}｜${pageTitle}
 
 ${defaultBody.value}
+
+${RECORDS_TEMPLATE}
 `
 })
 

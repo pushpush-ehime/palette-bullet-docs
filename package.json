@@ -14,6 +14,7 @@
     "notion:init-db": "node scripts/notion-create-task-db.mjs",
     "notion:sync": "node scripts/notion-sync.mjs",
     "notion:sync:dry": "node scripts/notion-sync.mjs --dry-run",
+    "notion:progress": "node scripts/notion-progress.mjs",
     "prepare": "husky"
   },
   "keywords": [],

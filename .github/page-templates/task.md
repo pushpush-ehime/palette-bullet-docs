@@ -10,7 +10,7 @@ order: 90
 # ここから下は任意。Notionチケットを作るときの初期値になる。
 # priority: B
 # milestone: プロトタイプ
-# assignees: [高平]
+# assignees: []
 # due: 2026-08-10
 relatedSpecs: []
 ---
@@ -67,3 +67,7 @@ relatedSpecs: []
 
 - Notionタスク：<NotionTaskLink />
 - GitHub Pull Request：未登録
+
+## 実装・成果記録
+
+[途中経過・成果の記録方法](/guide/task-records)

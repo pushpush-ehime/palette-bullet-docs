@@ -3,6 +3,9 @@ import { computed, ref } from 'vue'
 import { data as catalog } from '../../content/catalog.data.js'
 import { pageHref } from '../utils'
 import { indexSpecsByTask, sortTasks } from '../relations'
+import TaskProgress from './TaskProgress.vue'
+import { PROGRESS_FILTERS, matchesTaskProgress } from '../../content/task-progress.mjs'
+import { RECORDS_ANCHOR } from '../../content/task-records.mjs'
 
 const props = withDefaults(
   defineProps<{
@@ -13,6 +16,7 @@ const props = withDefaults(
 
 const query = ref('')
 const selectedCategory = ref('')
+const selectedStatus = ref('')
 
 const tasks = sortTasks(catalog.filter((page) => page.pageType === 'task'))
 const specsByTask = indexSpecsByTask(catalog)
@@ -33,7 +37,7 @@ const filteredTasks = computed(() => {
       `${task.taskId} ${task.title} ${task.category} ${relatedSpecTitles}`
         .toLocaleLowerCase('ja')
         .includes(search)
-    return matchesCategory && matchesSearch
+    return matchesCategory && matchesSearch && matchesTaskProgress(task, selectedStatus.value)
   })
 })
 
@@ -43,7 +47,7 @@ function relatedSpecs(taskUrl: string) {
 </script>
 
 <template>
-  <div class="catalog-block">
+  <div class="catalog-block task-catalog">
     <div class="catalog-filters">
       <label>
         <span>タスクを検索</span>
@@ -59,8 +63,16 @@ function relatedSpecs(taskUrl: string) {
           </option>
         </select>
       </label>
+      <label>
+        <span>Notionの進捗</span>
+        <select v-model="selectedStatus">
+          <option value="">すべて</option>
+          <option v-for="status in PROGRESS_FILTERS" :key="status" :value="status">{{ status }}</option>
+        </select>
+      </label>
     </div>
 
+    <p class="task-progress-note">進捗はNotionから取得した時点の情報です。リアルタイムではありません。</p>
     <p class="catalog-count">{{ filteredTasks.length }}件</p>
 
     <div v-if="filteredTasks.length" class="catalog-table-wrap">
@@ -69,6 +81,8 @@ function relatedSpecs(taskUrl: string) {
           <tr>
             <th>タスクID</th>
             <th>タスク名</th>
+            <th>Notionの進捗</th>
+            <th>実装・成果記録</th>
             <th v-if="!props.category">分類</th>
             <th>関連仕様</th>
             <th>Notion</th>
@@ -80,6 +94,12 @@ function relatedSpecs(taskUrl: string) {
               <a :href="pageHref(task.url)">{{ task.taskId }}</a>
             </td>
             <td>{{ task.title }}</td>
+            <td><TaskProgress v-if="task.progress" :progress="task.progress" /></td>
+            <td>
+              <a :href="`${pageHref(task.url)}#${RECORDS_ANCHOR}`">
+                {{ task.implementationRecords?.count ? `記録あり（${task.implementationRecords.count}件）` : '実装記録は未登録' }}
+              </a>
+            </td>
             <td v-if="!props.category">{{ task.category }}</td>
             <td>
               <template
@@ -99,7 +119,7 @@ function relatedSpecs(taskUrl: string) {
               >
                 チケット
               </a>
-              <span v-else class="catalog-empty-cell">未連携</span>
+              <span v-else class="catalog-empty-cell">リンクなし</span>
             </td>
           </tr>
         </tbody>

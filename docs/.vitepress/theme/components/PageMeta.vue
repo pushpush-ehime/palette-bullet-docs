@@ -5,6 +5,12 @@ import { data as catalog } from '../../content/catalog.data.js'
 import DeletePageButton from './DeletePageButton.vue'
 import NewTaskButton from './NewTaskButton.vue'
 import StatusBadge from './StatusBadge.vue'
+import TaskProgress from './TaskProgress.vue'
+import { RECORDS_ANCHOR } from '../../content/task-records.mjs'
+
+const task = computed(() => frontmatter.value.pageType === 'task'
+  ? catalog.find((entry) => entry.pageType === 'task' && entry.taskId === frontmatter.value.taskId)
+  : undefined)
 
 const { frontmatter } = useData()
 
@@ -32,7 +38,7 @@ const notionUrl = computed(
     aria-label="ページ情報"
   >
     <StatusBadge
-      v-if="frontmatter.status"
+      v-if="frontmatter.pageType === 'spec' && frontmatter.status"
       :status="frontmatter.status"
     />
 
@@ -65,5 +71,13 @@ const notionUrl = computed(
     />
 
     <DeletePageButton />
+    <div v-if="task?.progress" class="task-page-progress">
+      <strong>Notionの進捗</strong>
+      <TaskProgress :progress="task.progress" />
+      <p class="task-progress-note">取得時点の情報です。リアルタイムではありません。</p>
+      <a :href="`#${RECORDS_ANCHOR}`">
+        {{ task.implementationRecords?.count ? `実装記録あり（${task.implementationRecords.count}件）` : '実装記録は未登録' }}
+      </a>
+    </div>
   </div>
 </template>
