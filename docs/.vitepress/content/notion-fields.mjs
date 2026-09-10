@@ -146,8 +146,16 @@ export const NOTION_TASK_FIELDS = [
   }
 ]
 
-/** タスクページだけで使えるfrontmatterの項目 */
+/**
+ * タスクページだけで使えるfrontmatterの項目。
+ * 公開側がTEAMSだけをimportしても、トップレベルのmap呼び出しは
+ * NOTION_TASK_FIELDSとMEMBERSをbundleへ残すため、キーだけを列挙する。
+ */
 export const TASK_ONLY_KEYS = [
-  ...NOTION_TASK_FIELDS.map((field) => field.key),
+  'team',
+  'priority',
+  'milestone',
+  'assignees',
+  'due',
   'notionUrl'
 ]
