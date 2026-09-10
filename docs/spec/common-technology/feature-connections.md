@@ -14,7 +14,7 @@ relatedTasks: []
 
 各機能を別々に実装する前に、機能間で共有する約束を整理します。人数・従来の六班構成・担当個人は前提にしません。ここでいうOwnerは「値や処理の正本を持つ機能」であり、人員の割り当てではありません。
 
-本ページは**接続一覧と共通技術ルールの正本（初回調査・協議版）**です。既存のGameplay規則と今回の決定は根拠を付けて記載し、未合意の技術案は「提案」と明示します。未合意のAPI名・型・更新順を、完成した共通実装として使用しないでください。個別の計算式やAction条件は各機能ページを正本とし、同じ内容を別定義しません。
+本ページは**接続一覧と共通技術ルールの正本**（初回調査・協議版）です。既存のGameplay規則と今回の決定は根拠を付けて記載し、未合意の技術案は「提案」と明示します。未合意のAPI名・型・更新順を、完成した共通実装として使用しないでください。個別の計算式やAction条件は各機能ページを正本とし、同じ内容を別定義しません。
 
 ### 調査基準
 
@@ -26,11 +26,13 @@ relatedTasks: []
 | 実装の参照 | [開発基盤ガイド][dev]、PlayerのHost／Session／Input／保存グラフ・Prefab・開発Scene、MusicChart保存型、Tuning Core |
 | 調査の限界 | ソース・保存アセットの読取確認。Unityの再実行や基盤全体の再監査は行っていない。基盤の過去の合格結果を本体接続の合格に読み替えない |
 
-**表示区分：**「一致」は記載した範囲で仕様と実装が対応、「仕様のみ」は規則があるが本体接続は未実装、「差分」は食い違いまたは接続時の変更が必要、「未決」は共有の約束が足りない、「内部」は各機能内で選べる方式です。一つの接続でも、データの意味は確定、型は未決という場合があります。
+**表示区分**：「一致」は記載した範囲で仕様と実装が対応、「仕様のみ」は規則があるが本体接続は未実装、「差分」は食い違いまたは接続時の変更が必要、「未決」は共有の約束が足りない、「内部」は各機能内で選べる方式です。一つの接続でも、データの意味は確定、型は未決という場合があります。
 
 ## 全体接続図 {#map}
 
 ![機能間の要求・通知・参照。仕様上の主要経路を示し、実装済みかどうかは接続一覧で区別する。](/images/feature-connections.svg)
+
+[接続図を大きく表示する](/images/feature-connections.svg)
 
 図は論理的な責務を表します。別々のGameObject・assembly・担当者を同じ数だけ作る指示ではありません。Combatは共通受付と終了集約を扱い、Chargeの成立やEnemyの浄化を再判定する中央計算機にはしません。
 
@@ -126,15 +128,13 @@ relatedTasks: []
 
 ### D02：完全停止を避け、無効化可能なPlayer局所減速にする
 
-**ゲーム上の判断：**2026-09-10の協議で、完全停止より短い減速を意図し、演出自体を後から除外できる方針になりました。具体的な初期方式は、実装が簡単な推奨案の採用を了承しています。
+**ゲーム上の判断**：2026-09-10の協議で、完全停止より短い減速を意図し、演出自体を後から除外できる方針になりました。具体的な初期方式は、実装が簡単な推奨案の採用を了承しています。
 
-**採用した技術上の初期方式：**Playerの移動・Animator・Action内時間だけを減速する任意のParry Slowとします。Normal／Just共通で、倍率1または時間0なら無効です。音楽・3時計・AttackEvent・Mode／Conduct・Enemy・Projectile・Shaondamaは通常進行します。減速専用の入力bufferは追加せず、通常の入力条件を使います。
+**採用した技術上の初期方式**：Playerの移動・Animator・Action内時間だけを減速する任意のParry Slowとします。Normal／Just共通で、倍率1または時間0なら無効です。音楽・3時計・AttackEvent・Mode／Conduct・Enemy・Projectile・Shaondamaは通常進行します。減速専用の入力bufferは追加せず、通常の入力条件を使います。
 
 減速の寿命は減速前Gameplay秒で測り、重なりは単一効果の残り時間更新、Pauseで残量保持、Battle終了・Deadで解除、Retryは倍率1からとします。具体的な倍率・時間は未調整です。これらの技術選択とユーザーの意図を、同じ発言として扱いません。
 
 Gameplayの詳細と操作例の正本は[Parryの任意減速](/spec/player/player-action-parry#parry-slow)、音楽側は[音楽接続](/spec/bgm/bgm-gameplay-connection#parry-hitstop)です。旧HitStopの完全停止・専用保持・減速だけによるMode入力拒否は関連ページから置き換えました。既存Playerの`HitStop` boolが停止する事実は維持し、減速の実装完了とは扱いません。
-
-
 
 ## 共通技術ルールの提案 {#proposals}
 
@@ -222,13 +222,13 @@ Gameから渡すBattle IDで「準備」と「実行開始」を分け、既存�
 
 | ID・優先度 | 現行の根拠と不足 | 影響／推奨案／判断すること |
 |---|---|---|
-| Q01・高 | Gameは共通Battle IDと準備gateを規定、I01は開発用生成・即開始 | 全機能のID・Ready・Retryに影響。**技術提案：**GameのIDを注入しPrepareとStartを分ける。ゲームの開始条件自体を再決定する必要はない |
-| Q02・高 | D02はPlayer局所減速・3時計継続。I02の`HitStop`は`GameplayTime`を停止し入力を拒否するため、そのままでは異なる動作になる | 音楽・Mode・Parry・移動に影響。**採用方向：**全体の音楽／Gameplay進行とPlayer局所動作を分ける。**残る技術境界：**Actionの局所deltaと、Status／Reactionなど既存Tick利用者への供給を分ける公開API。実装は後続 |
-| Q03・高 | ParryはPhysics Step、Enemy RGBとGame結果はframe。Player複数被弾の意味はD01で決定したが、全体の収集・確定を呼ぶ箇所は未実装 | 敵味方Damage・Charge・自然破裂・Clearへ影響。**技術提案：**Stepとframeを区別し、既存の前後関係を共通更新へ接続。物理外Damageの帰属、締切前後の配送規則を次に具体化 |
-| Q04・高 | 意味上のID・payloadは各正本にあるが、共有C#型はない。NoteEvent保存型にはRuntime occurrence IDがない | 全担当の独立実装に影響。**技術提案：**Battle ID、occurrence参照、個体・作用ID、結果型を境界だけで固定。設定はBattle開始時に固定し、表示用コードと分離。保存型の無用な全面変更は避ける |
-| Q05・高 | Reservedの解放Ownerは[攻撃判定「二重解放の防止とOwner境界」][attack-result]に確定済み。ただし生成失敗時に消費を確定する具体的な呼出し境界がない | Allocation・Shaondama・Bullet間で二重消費／消失の危険。**技術提案：**生成準備成功と一度限りの消費確定を一組にする。失敗復旧時に勝手な再発射をしない |
-| Q06・中 | Ready解除、初期化失敗、cleanup失敗の検出は必要。失敗を画面でどう終えるかは未確定。準備中は3時計が止まるが出現演出完了を待つ | Game・RadioWhale・UIへ影響。**技術提案：**準備用の進行を停止中のGameplay時計へ依存させず、失敗Ownerを示して中断可能にする。失敗後の操作と待機制限は協議対象 |
-| Q07・中 | [Chart「InitialTargetCount / MinimumLeadTime」][chart]と保存[生成設定][spawn-settings]は旧名を保持。一方[供給「選択可能Shaondamaの最低保証数」][supply]は旧Normal目標数として使うことを禁止 | 設定・供給・Readyに影響。**文書／保存値の意味の未同期：**最低保証の明示設定を用意するか既存値をどう移すか決める。旧値を無確認で転用しない。Sync Settingsの保存・Runtime参照も未実装 |
+| Q01・高 | Gameは共通Battle IDと準備gateを規定、I01は開発用生成・即開始 | 全機能のID・Ready・Retryに影響。**技術提案**：GameのIDを注入しPrepareとStartを分ける。ゲームの開始条件自体を再決定する必要はない |
+| Q02・高 | D02はPlayer局所減速・3時計継続。I02の`HitStop`は`GameplayTime`を停止し入力を拒否するため、そのままでは異なる動作になる | 音楽・Mode・Parry・移動に影響。**採用方向**：全体の音楽／Gameplay進行とPlayer局所動作を分ける。**残る技術境界**：Actionの局所deltaと、Status／Reactionなど既存Tick利用者への供給を分ける公開API。実装は後続 |
+| Q03・高 | ParryはPhysics Step、Enemy RGBとGame結果はframe。Player複数被弾の意味はD01で決定したが、全体の収集・確定を呼ぶ箇所は未実装 | 敵味方Damage・Charge・自然破裂・Clearへ影響。**技術提案**：Stepとframeを区別し、既存の前後関係を共通更新へ接続。物理外Damageの帰属、締切前後の配送規則を次に具体化 |
+| Q04・高 | 意味上のID・payloadは各正本にあるが、共有C#型はない。NoteEvent保存型にはRuntime occurrence IDがない | 全担当の独立実装に影響。**技術提案**：Battle ID、occurrence参照、個体・作用ID、結果型を境界だけで固定。設定はBattle開始時に固定し、表示用コードと分離。保存型の無用な全面変更は避ける |
+| Q05・高 | Reservedの解放Ownerは[攻撃判定「二重解放の防止とOwner境界」][attack-result]に確定済み。ただし生成失敗時に消費を確定する具体的な呼出し境界がない | Allocation・Shaondama・Bullet間で二重消費／消失の危険。**技術提案**：生成準備成功と一度限りの消費確定を一組にする。失敗復旧時に勝手な再発射をしない |
+| Q06・中 | Ready解除、初期化失敗、cleanup失敗の検出は必要。失敗を画面でどう終えるかは未確定。準備中は3時計が止まるが出現演出完了を待つ | Game・RadioWhale・UIへ影響。**技術提案**：準備用の進行を停止中のGameplay時計へ依存させず、失敗Ownerを示して中断可能にする。失敗後の操作と待機制限は協議対象 |
+| Q07・中 | [Chart「InitialTargetCount / MinimumLeadTime」][chart]と保存[生成設定][spawn-settings]は旧名を保持。一方[供給「選択可能Shaondamaの最低保証数」][supply]は旧Normal目標数として使うことを禁止 | 設定・供給・Readyに影響。**文書／保存値の意味の未同期**：最低保証の明示設定を用意するか既存値をどう移すか決める。旧値を無確認で転用しない。Sync Settingsの保存・Runtime参照も未実装 |
 | Q08・後続 | [GameのRoom節][game]はMode pending／cooldownを未決とする一方、[ModeのRoom節][mode]は破棄／保持・停止を確定済み | 文書間の食い違い。Mode側を正本として参照を同期する。今回のプロトタイプへRoom移動を新たに必須追加しない |
 | Q09・後続 | [Player基盤の既知差分][player]にDashのShift単独継続と旧説明、Traceの旧Context transaction等が残る | 旧独自Runtimeを再導入しない。現行Playerの実行・journalへ対応付ける。旧`Player Runtime`という単語だけで全Gameplay規則を廃止しない |
 
