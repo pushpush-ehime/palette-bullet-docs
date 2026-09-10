@@ -7,6 +7,7 @@ order: 20
 status: 仮仕様
 relatedTasks:
   - /tasks/ui/pb-task-0026
+  - /tasks/ui/pb-task-0048
 ---
 
 # バトルHUD
