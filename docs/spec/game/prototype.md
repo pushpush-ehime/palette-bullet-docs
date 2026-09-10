@@ -296,6 +296,8 @@ Development BuildやProfiler接続による負荷が計測結果へ影響する�
 
 ### 動作確認項目
 
+必須機能の準備・Gameplay cleanupの失敗時は、[共通接続仕様D03](/spec/common-technology/feature-connections#failure-policy)に従い、失敗した機能・理由と再起動案内を表示して受入確認を中断します。再試行はアプリを終了して起動し直す方式とし、エラー画面からの復旧は今回の必須範囲に含めません。異常時の表示・中断を確認できても、失敗した通常プレイのケースを合格にはしません。正常なGame OverからのResult Retryは従来どおり今回の必須機能です。
+
 少なくとも次をUnity EditorとWindowsビルドで確認します。
 
 1. プロトタイプを起動する

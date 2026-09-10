@@ -243,6 +243,8 @@ Combat Systemは、対象Battleについて少なくとも以下のOwnerを必�
 
 ## Battle終了時の既存object
 
+今回のプロトタイプで必須cleanupが失敗した場合、Combatは失敗したOwner・段階・理由をGameへ報告し、[共通接続仕様D03](/spec/common-technology/feature-connections#failure-policy)の中断・表示へ接続します。他Ownerへの片付け要求を継続し、失敗後の遅延完了通知でResult操作を解禁しません。再試行にはアプリ再起動を必要とし、エラー画面からの復旧は行いません。
+
 Battle結果の確定時点ですでに存在するPalette Bullet、Marker、Jaon Bullet、シャオンダマ、および保留中の命中処理は、結果確定直後にGameplay上無効化します。即時消去するか、終了演出として一時的に表示を残すかは各所有ページで定義します。
 
 ただし、以下の全体条件を満たす必要があります。

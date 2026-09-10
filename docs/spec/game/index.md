@@ -334,6 +334,8 @@ Battle終了後に表示専用として残す演出およびRuntime objectの視
 
 ## Result接続
 
+今回のプロトタイプで必須の準備またはGameplay cleanupが失敗した場合は、[共通接続仕様D03](/spec/common-technology/feature-connections#failure-policy)に従います。Gameは失敗を保持して中断情報をUIへ渡し、GameplayとResult操作を再開しません。再試行にはアプリ再起動を案内します。システム上の失敗をGame Overへ変換せず、以下の正常なResult Retryと区別します。
+
 Resultは共通画面とし、Gameが通知した確定Battle結果に応じて`Clear`または`Game Over`のvariantを1つだけ表示します。Result／UI側はEnemy状態やPlayer HPを参照して勝敗を再判定しません。同一フレームにClearとPlayer Deadが成立した場合は、Clear variantだけを表示します。
 
 | 確定Battle結果 | Result操作 | route |
