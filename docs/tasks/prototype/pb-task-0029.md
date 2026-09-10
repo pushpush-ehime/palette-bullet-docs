@@ -33,6 +33,7 @@ relatedSpecs:
 - 操作確認：完成方針・仕様の判断窓口。コードの確認担当・マージ担当は未定。
 - 相互確認：下記の送受信先を実装する枠と接続時に確認する。役割名から個人を推定して割り当てない。
 - 優先度A。枠内の着手順と先行引渡しは[カテゴリの着手順](/tasks/prototype/#sequence)を参照する。
+- 正式着手gate：PB-TASK-0018の共通契約・Fake・assembly／テスト構成がレビュー済みCommitとして引き渡された後に開始する。gate前は仕様確認・既存コード調査・機能内部の設計に留め、独自の共有型を実装しない。
 
 ## 編集するコード・グラフ・アセット
 
@@ -56,7 +57,7 @@ relatedSpecs:
 
 先行タスク：[PB-TASK-0018](/tasks/prototype/pb-task-0018)
 
-先行タスクの全機能完成を待たず、公開型とFakeが渡された時点で独立検証できます。受信先の中身は固定応答で代用できますが、独自に別の共有型を作りません。実物同士の統合は[PB-TASK-0045](/tasks/prototype/pb-task-0045)で確認し、Fakeのみの確認を実接続の合格には数えません。
+先行タスクの全機能完成を待たず、公開型とFakeが渡された時点で独立検証できます。受信先の中身は固定応答で代用できますが、独自に別の共有型を作りません。段階1の通常攻撃経路は[PB-TASK-0045](/tasks/prototype/pb-task-0045)、終了・Result・RetryとWindows短時間確認は[PB-TASK-0046](/tasks/prototype/pb-task-0046)で実物接続を確認し、Fakeのみの確認を実接続の合格には数えません。
 
 | 要求・通知元 → 接続先 | 渡すもの・責任の境界 |
 |---|---|
@@ -79,7 +80,7 @@ relatedSpecs:
 
 ## 検証・提出
 
-登録状態とobjective評価のEditMode試験、Fake Enemy生成先でのPlayMode確認。実Enemyとの確認はPB-TASK-0045。
+登録状態とobjective評価のEditMode試験、Fake Enemy生成先でのPlayMode確認。実Enemyの登録・浄化通知はPB-TASK-0045、ClearからResultへの接続はPB-TASK-0046で確認する。
 
 Unityは`6000.3.16f1`を使用します。PRには変更した入口、操作と期待／実結果、使用Commit、設定・素材、テスト結果、接続先の実／Fake、既知の問題を記載します。エラー時は接続C番号、Battle ID、必要なoccurrence／作用／run、frame／Step／音楽位置、理由と関連ログを添えます。既存のPlayer journal等を使い、ログ基盤の新設を前提にしません。
 

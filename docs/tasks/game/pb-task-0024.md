@@ -25,7 +25,7 @@ relatedSpecs:
 
 本タスクではゲーム機能を実装しません。未実装項目は`未実施`として扱えるため、全Gameplay接続の完成を待たずに開始できます。提供済みのPlayer基盤やWindows64 Development Buildの成功と、プロトタイプの実操作受入は区別します。
 
-今回の段階分けは[プロトタイプ共通仕様](/spec/game/prototype#prototype-milestones)を正本とします。通常攻撃の接続確認、固定プリセット版Mode／Conductを含む対象機能の統合確認、チーム内のWindows配布受入を、同じ計画の中で区別して記録します。
+今回の段階分けは[プロトタイプ共通仕様](/spec/game/prototype#prototype-milestones)を正本とします。通常攻撃の接続確認、固定プリセット版Mode／Conductを含む対象機能の統合確認、チーム内のWindows配布受入を、同じ計画の中で区別して記録します。[PB-TASK-0045](/tasks/prototype/pb-task-0045)の段階1結果と、[PB-TASK-0046](/tasks/prototype/pb-task-0046)のLifecycle／Windows早期確認も別の結果として記録し、0046を段階3の最終配布受入には数えません。
 
 ## 完成時にできるようになること
 

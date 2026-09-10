@@ -1,6 +1,6 @@
 ---
 title: Battle開始・共通接続の最小実装
-description: 検証用Battleで共通IDと準備完了を管理し、他の機能が仮の接続先を使って実装を始められる入口を作ります。既存PB-TASK-0018をこの最初の単位へ絞り、結果・cleanup・Retryは別タスクへ分割します。
+description: 検証用Battleの共通ID、準備・開始、共有型とFake、assembly／テスト構成を最初に実装し、後続タスクが同じ接続口から着手できる状態を作ります。
 pageType: task
 taskId: PB-TASK-0018
 category: プロトタイプ
@@ -22,6 +22,8 @@ relatedSpecs:
 
 検証用Battleで共通IDと準備完了を管理し、他の機能が仮の接続先を使って実装を始められる入口を作ります。既存PB-TASK-0018をこの最初の単位へ絞り、結果・cleanup・Retryは別タスクへ分割します。
 
+今回のプロトタイプ実装では本タスクだけを先に正式着手します。本タスクの共通契約とassembly／テスト構成がレビュー済みCommitとして引き渡されるまで、PB-TASK-0023・0027〜0046は仕様確認・既存コード調査・機能内部の設計に留め、独自の共有型を使う実装を開始しません。
+
 枠1の最初の実装単位です。仕様表の作成を提出物にはしません。共通仕様のP01〜P05は技術提案として参照し、未実装のAPIを既存APIと表記しないでください。
 
 ## 参照仕様と担当範囲
@@ -41,17 +43,24 @@ relatedSpecs:
 | 区分 | 位置 | 用途 |
 |---|---|---|
 | 新規 | `Assets/PaletteBullet/Prototype/Scenes/PrototypeBattle.unity` | 共有の統合Scene。既存PlayerDevelopmentとは別に設ける |
-| 新規 | `Assets/PaletteBullet/Prototype/Runtime/Battle/` | GameのBattle状態、開始集約、必要な境界型とFake Owner |
+| 新規 | `Assets/PaletteBullet/Prototype/Runtime/Contracts/` | Battle ID、要求・結果・通知など、他assemblyから参照する共有型と専用asmdef |
+| 新規 | `Assets/PaletteBullet/Prototype/Runtime/Battle/` | GameのBattle状態、開始集約、Fake Ownerとテスト可能なRuntime assembly |
+| 新規 | `Assets/PaletteBullet/Prototype/Tests/Editor/`、`Assets/PaletteBullet/Prototype/Tests/Runtime/` | EditMode／PlayMode用のtest asmdefと最小試験 |
 | 参照 | [Assets/PaletteBullet/Player/Runtime/PlayerBattleHost.cs](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Assets/PaletteBullet/Player/Runtime/PlayerBattleHost.cs) | 既存Hostの入口を確認する。実Playerへの変更はPB-TASK-0036 |
+| 既存／変更 | `Assets/PaletteBullet/Player/Runtime/PaletteBullet.PlayerVS.asmdef` | PlayerからPrototype Contractsを一方向参照できるようにする。実Player接続はPB-TASK-0036 |
+| 参照 | `Assets/Scripts/MusicChart/` | 現在は定義済みasmdefがない領域。ContractsとのAdapterを置くassembly境界を決める |
 
 ## 実装範囲
 
 - GameがBattle IDを一度発行し、必須Ownerへ渡す。Prepare、Ready待ち、Running、Pause、終了受付を区別する。Readyの追加・解除・失敗をOwner単位で扱い、開始を一度だけ通知する。
 - 型付きC#の要求・結果・通知と、読取用データの最小の骨組みを実装する。Battle IDは現行Playerと接続できるstringとし、PlayerTokenのactor／generation／runを置き換えない。音楽occurrenceはBattle・Chart・定義・loopを区別し、表示コードをキーにしない。個体ID、作用ID、成功／拒否／失敗と理由も境界で共有する。
-- 各枠が必要とするPrepare／開始／Pause／終了の入口、音楽位置参照、予約要求・消費確定、RGB候補の型を、Fakeでコンパイル・呼出しできる最小単位で渡す。全機能の内部状態を収めた巨大な共通型や新しい汎用フレームワークは作らない。具体的な公開名・配置はPRで送受信側を対応付ける。
+- 各枠が必要とするPrepare／開始／Pause／終了の入口、音楽位置参照、予約要求・消費確定、RGB候補の型を、Fakeでコンパイル・呼出しできる最小単位で渡す。全機能の内部状態を収めた巨大な共通型や新しい汎用フレームワークは作らない。
+- 共有契約を独立したContracts assemblyへ置き、Player側assemblyからPrototype側へはContractsだけを明示参照する。既存のVisual ScriptingやInput System等への参照は維持する。ContractsおよびPlayer側assemblyから、asmdefのない既定`Assembly-CSharp`へ参照しない。現在`Assembly-CSharp`側にあるMusicChart等との接続は、既定assembly側のAdapterからContractsを利用するか、先に対象を独立assemblyへ分けるかを本タスクのPRで決め、後続が同じ方向を使えるようにする。循環参照を作らない。
+- Battle RuntimeとContractsを参照できるEditor／Runtimeのtest asmdefを用意し、`TestAssemblies`参照を含める。後続の自動試験対象は参照可能なRuntime assemblyへ置き、既定`Assembly-CSharp`にしか存在しない実装をtest asmdefから直接参照する前提にしない。
+- 正確な公開assembly・namespace・型・メンバー名、値の型・単位・有効期間、変更Owner、呼出し順をソースと呼出し例で対応付ける。PRにはそのパスとCommitを記録する。これは既に決まった接続の意味をコード化する作業であり、新しいゲーム仕様表の作成ではない。ゲーム上の意味が不足している場合は独自判断で確定せず仕様判断窓口へ返す。
 - frameとPhysics Stepを区別する。段階1で必要な「有効Charge commit→自然破裂」「Enemy RGB確定→Stage→Game」の呼出し境界を用意し、Componentの偶然の更新順へ依存させない。音楽の受付締切を越えたChargeを後から成功にしない。
 - 準備失敗はD03に従って開始を閉じ、機能・段階・理由と再起動案内を最小UIへ表示する。応答待ちの診断はGameplay時計から独立させ、待機上限は設定可能な検証値として扱う。期限切れを成功に変えない。
-- 最初の引渡しは、この境界型・Fake・Sceneと開始確認が通った時点で行う。結果画面や実音楽の完成を待たせない。
+- 最初の引渡しは、この境界型・Fake・Sceneと開始確認に加え、Player／MusicChart／テストを含むassembly参照図、最小のEditMode／PlayMode試験が通り、レビュー済みCommitを記録した時点で行う。結果画面や実音楽の完成を待たせない。
 
 今回の範囲外：実Player・音楽・攻撃の中身、完成版HUD、結果／cleanup／Retryの実装（PB-TASK-0027・0028）、新規ツール制作。
 
@@ -59,7 +68,7 @@ relatedSpecs:
 
 先行タスク：なし。
 
-先行タスクの全機能完成を待たず、公開型とFakeが渡された時点で独立検証できます。受信先の中身は固定応答で代用できますが、独自に別の共有型を作りません。実物同士の統合は[PB-TASK-0045](/tasks/prototype/pb-task-0045)で確認し、Fakeのみの確認を実接続の合格には数えません。
+後続タスクは、本タスクの公開型・Fake・呼出し例、assembly参照構成がレビュー済みCommitとして渡された時点で正式着手できます。受信先の中身は固定応答で代用できますが、独自に別の共有型を作りません。段階1の通常攻撃経路は[PB-TASK-0045](/tasks/prototype/pb-task-0045)、終了・Result・RetryとWindows短時間確認は[PB-TASK-0046](/tasks/prototype/pb-task-0046)で実物接続を確認し、Fakeのみの確認を実接続の合格には数えません。
 
 | 要求・通知元 → 接続先 | 渡すもの・責任の境界 |
 |---|---|
@@ -84,7 +93,7 @@ relatedSpecs:
 
 ## 検証・提出
 
-開始gateとID／重複／失敗のEditMode試験、Fake OwnerによるPlayMode確認。RuntimeからEditor APIを参照しないことを確認する。
+開始gateとID／重複／失敗のEditMode試験、Fake OwnerによるPlayMode確認。RuntimeからEditor APIを参照しないこと、Player側assemblyからContractsを参照できること、Contractsとtest asmdefが`Assembly-CSharp`を参照せずコンパイルできることを確認する。
 
 Unityは`6000.3.16f1`を使用します。PRには変更した入口、操作と期待／実結果、使用Commit、設定・素材、テスト結果、接続先の実／Fake、既知の問題を記載します。エラー時は接続C番号、Battle ID、必要なoccurrence／作用／run、frame／Step／音楽位置、理由と関連ログを添えます。既存のPlayer journal等を使い、ログ基盤の新設を前提にしません。
 
