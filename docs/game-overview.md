@@ -179,6 +179,8 @@ Game Over表示とRetryへの接続だけを行いません。
 プロトタイプでは拠点やステージ選択を実装せず、
 1つのBattleを開始から終了までプレイできる最小構成で、Palette Bullet固有のコア体験を確認します。
 
+今回の完成確認は、チーム内でWindows配布ビルドを受入確認するところまで含めます。通常のCharge→発射→浄化を最初に通し、その後、完成までに固定プリセット版Mode／Conductを追加します。段階ごとの到達点と未決事項は[プロトタイプ共通仕様の完成方針](/spec/game/prototype#completion-policy)を正本とします。
+
 ### 実装する範囲
 
 - Battleを直接開始し、ClearまたはGame Overまでプレイできる
@@ -188,6 +190,7 @@ Game Over表示とRetryへの接続だけを行いません。
 - 通常シャオンダマの生成・浮遊・選択
 - シャオンダマのChargeと攻撃への割り当て
 - AttackEventに合わせたPalette Bulletの発射
+- 固定プリセット版Mode／Conduct（通常攻撃の接続確認後に追加）
 - Palette BulletによるEnemyのRGB Damageと浄化
 - 邪音玉の発射とPlayerのパリィ
 - パリィによる万能シャオンダマへの変換

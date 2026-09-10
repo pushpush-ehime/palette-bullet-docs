@@ -17,7 +17,7 @@ status: 仮仕様
 
 現在、主に以下の共通開発基盤・開発支援ツールを扱います。
 
-- Player Action／State Graph基盤
+- 標準Unity Visual ScriptingのPlayer基盤（旧Player Action／State Graph基盤は履歴）
 - MusicChart Workbench
 - Project Code Catalog
 - Planner調整Parameter管理・Excel連携
@@ -53,7 +53,7 @@ Gameplay上の意味やValidation規則は各正本仕様を参照し、
 
 | 項目 | 目的 | 現在の状態 |
 | --- | --- | --- |
-| [Player Action／State Graph基盤](./action-state-manage) | PlayerのState・遷移判断を一元管理し、Graph、Matrix、Trace、Scenario、Validationから検証可能にする | 仮仕様作成済み（Production実装未完了） |
+| [標準Unity Visual ScriptingのPlayer基盤](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Docs/DEVELOPMENT.md) | 保存グラフを編集してPlayerを開発する | 移動・Jump・Dash・Animator、六班の接続雛形を提供済み。本体接続・全Actionの完成ではない |
 | [MusicChart制作・確認ツール](./music-chart-workbench) | MIDI、BGM Audio、MusicChart、AttackEvent、Timing、Random Section、Validation、再Import差分、Runtime状態を同一の音楽時間軸上で確認・設定・検証する | 仮仕様作成済み |
 | [Project Code Catalog](./project-code-catalog) | Unityプロジェクトのコード構造・依存関係・実装Evidence・Test・仕様書Reference等を機械収集し、AIや人間が追加調査対象を絞れるようにする | 仮仕様作成済み |
 | [Planner調整Parameter管理・Excel連携](./planner-tuning-parameter) | ProgrammerがPlannerへ公開してよいGameplay Parameterを明示し、Definition、Value、Excel Export／Import、Validation、Diff／Conflictを管理する | 仮仕様作成済み |
@@ -66,21 +66,11 @@ Gameplay上の意味やValidation規則は各正本仕様を参照し、
 
 ## 現在の状態
 
-Player Action／State Graph基盤、MusicChart Workbench、
-Project Code Catalog、Planner調整Parameter管理・Excel連携、
-Gameplay Runtime Traceは、それぞれ仮仕様として個別ページを作成済みです。
+提供済み基盤の範囲と日常の入口は[開発基盤ガイド](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Docs/DEVELOPMENT.md)を正本とします。MusicChartの静的制作、Code Catalogの生成、Planner Tuning Coreは提供済みです。個別のWeb仕様には将来の拡張も含まれるため、仕様ページの存在を全機能の実装完了とは扱いません。
 
-これらは、Implementation Decisionが一部残っていても、
-目的・責務・初期版対象範囲・非目標・完了条件を基準として、
-実装設計および実装タスク設計へ移行できる状態として扱います。
+Playerは標準Unity Visual Scriptingの保存グラフを採用済みです。[旧Player Action／State Graph基盤](./action-state-manage)は廃止した方針の履歴として保持し、独自RuntimeのProduction導入を新規タスクとして再開しません。
 
-Player Action／State Graph基盤は、
-Foundationと既存Player実装の調査を終え、Production導入契約を仮仕様として確定済みです。
-
-ただし、現時点で実装済みなのはdeterministic fake-hostを用いたFoundationであり、
-Production Player用Semantic Graph、Binding、Ingress、Command Router、
-各Domain Adapter、Production Window、Scenario、IL2CPP／性能検証は未完了です。
-仕様作成済みとProduction導入完了を同一視しません。
+基盤の統合・自動検証と、本体Game／Battle／Combatへの接続、全Actionの実装、各ツールの人間受入は区別します。今回の必須範囲は[プロトタイプ共通仕様](/spec/game/prototype#completion-policy)から判断します。
 
 本ページでは、上記基盤の実装優先順位を新たに固定しません。
 具体的な実装順は、各基盤の依存関係とプロジェクト上の必要性を確認したうえで
@@ -106,10 +96,7 @@ Production Player用Semantic Graph、Binding、Ingress、Command Router、
 - Battle Scenario Runner
 - RGB Damage Sandbox
 
-[Player Action／State Graph基盤](./action-state-manage)に含まれるScenario Runnerは、
-Player Semantic Graphをofflineで検証する同基盤内のテスト機能です。
-ここで将来候補とするBattle Scenario Runnerは、Battle全体の複数Systemを横断して
-条件を再現・検証する別基盤であり、同じ機能として扱いません。
+[旧Player Action／State Graph基盤](./action-state-manage)に記載されたScenario Runnerは旧方針の記録であり、現在の開発に要求しません。ここで将来候補とするBattle Scenario Runnerは、Battle全体の複数Systemを横断して条件を再現・検証する別の候補です。
 
 MusicChart Runtime Monitorは独立した将来候補として扱いません。
 完成版では[MusicChart制作・確認ツール](./music-chart-workbench)の機能として含め、
@@ -119,10 +106,7 @@ MusicChartのRuntime進行状況、Audioとの同期差、Current AttackEvent等
 GameplayのRuntime追跡機能は
 [Gameplay Runtime Trace](./gameplay-runtime-trace)として個別仕様化済みです。
 
-Player State Graph自身の候補Rule、Guard、Commit、拒否理由は、
-[Player Action／State Graph基盤](./action-state-manage)が定義するState Graph Traceを判断証拠とします。
-Gameplay Runtime Traceはその証拠を参照・転送・関連付けし、
-State遷移を独自に再判定しません。
+現行Playerの保存グラフ、実行状態、拒否理由、検証資料の確認方法は[Player VSの開発手順](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Docs/PlayerVS/AUTHORING.md)を参照します。Gameplay Runtime Traceを接続する場合も、採用済みPlayer基盤の証拠を参照・関連付けし、State遷移を独自に再判定しません。旧RuntimeのTrace機構を必須として再導入しません。
 
 コード構造・Evidenceの機械収集は
 [Project Code Catalog](./project-code-catalog)として個別仕様化済みです。

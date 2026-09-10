@@ -38,8 +38,59 @@ relatedTasks: []
 敵の浄化、パリィによる万能シャオンダマ変換、Clear／Game Over、Result、Retryまでを通して、
 Palette Bullet固有のコア体験が成立するかを確認することを目的とします。
 
-ゲームのコンセプト、コア体験、およびプロトタイプで扱う機能の上位方針は
-[ゲーム概要](/game-overview)を正本とします。
+ゲームのコンセプトとコア体験は[ゲーム概要](/game-overview)を正本とします。
+今回のプロトタイプで扱う機能、段階、環境、完成判定は本ページを正本とし、ゲーム概要にはその要約と参照先を置きます。
+
+## 今回合意した完成方針 {#completion-policy}
+
+2026-09-10のプロトタイプ完成に向けた協議で、次の2点を決定しました。
+
+1. 完成確認は、チーム内でWindows配布ビルドを受け取り、Unityを起動せずに主要フローを操作する受入確認まで含めます。
+2. 通常のCharge→発射→Enemy浄化を最初に通し、その後、今回のプロトタイプ完成までに固定プリセット版のMode／Conductを追加します。
+
+この節は今回の対象範囲と着手順の正本です。ゲームのコア体験は[ゲーム概要](/game-overview)、Mode／Conductの操作・適用時点・効果・ライフサイクルは[Mode／Conduct仕様](/spec/player/player-action-mode-change-and-conduct)を参照します。同じ挙動を本ページで別定義しません。
+
+### 段階ごとの到達点 {#prototype-milestones}
+
+| 段階 | 操作して確認する到達点 | 判定の範囲 |
+|---|---|---|
+| 1：通常攻撃の接続 | 検証用Battleで通常シャオンダマを選択してChargeし、AttackEventの発火時にPalette Bulletが発射され、EnemyへRGB Damageを与えて浄化できる | 最初の接続確認。Mode／Conductの追加前に通常攻撃の経路を成立させる |
+| 2：今回の対象機能を接続 | 段階1の経路へ固定プリセット版Mode／Conductを追加する。既存の対象機能であるパリィ・万能変換、Clear／Game Over、Result、Retry等も接続し、主要フローを通して確認できる | プロトタイプ対象機能の統合確認。Mode／Conductの具体的なプリセット内容は後述の未決事項として管理する |
+| 3：Windows配布受入 | チーム内の受入確認担当が確認用ビルドを取得・展開し、Unityなしで主要フローと再試行を操作して結果を記録できる | 本ページの完成条件を満たす最終受入。Build成功や段階1の成功だけでは完了にしない |
+
+各担当の独立した実装、仮入力を使った検証、受入テスト計画の作成は、依存先の完成を待たずに進められます。ただし、段階1の接続合格には実際のCharge、Allocation、発射、RGB Damage、浄化の結果を用います。仮入力で代用した接続は記録し、接続済みとして数えません。
+
+段階1では、確認担当が次の順に操作し、結果を追跡できることを確認します。
+
+1. 検証用Battleを開始し、使用するBGM／MusicChart、通常シャオンダマ、Enemyを確認する。
+2. 通常シャオンダマを選択し、有効なChargeを成功させる。対象AttackEvent occurrenceへのAllocationとReservedへの移行を確認する。
+3. 対応するAttackEventの発火を待つ。ReservedのシャオンダマがPalette Bullet化され、発射されることを確認する。
+4. Enemyへの命中とRGB Damageを確認し、浄化条件を満たすまで繰り返して浄化を確認する。
+5. 使用Commit、操作手順、期待結果、実際の結果、未接続箇所を記録する。
+
+段階1のScene、検証用素材、仮パラメータ、機能ごとの実装分担は後続のタスク分担で確定します。日付や担当者をこの段階表から推定して割り当てません。
+
+### 段階1の窓口 {#first-milestone-owners}
+
+| 役割 | 今回確認した担当 | 担当範囲 |
+|---|---|---|
+| 接続の取りまとめ | 下條 | 通常のCharge→発射→浄化の接続点を整理し、各機能担当との受け渡しと接続確認を取りまとめる。全機能の実装を一人へ割り当てる意味ではない |
+| 操作結果の確認 | 今回の完成方針を決める依頼者（タスクへ登録する担当者名は確認中） | 実際の操作結果が意図した体験と合格条件に合うか確認する |
+| コードのPR確認 | 未定 | コード・グラフ変更のレビュー担当は、操作結果の確認担当と区別して後続で決める |
+
+具体的な作業時間と期限は未確定です。共有Scene／Prefab／Input／共通グラフ全体の所有者やマージ権限は、この窓口の割当だけでは確定しません。
+
+### 提供済み基盤との境界 {#foundation-baseline}
+
+開発基盤の引き渡し時点は、ゲーム本体のmain `55d050ad9760b27bb61415a0f7d2324ee9a50bec`、Unity `6000.3.16f1`です。提供範囲と各ツールの入口は[固定コミットの開発基盤ガイド](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Docs/DEVELOPMENT.md)を正本とします。後続の実装・受入では実際に使用したCommit SHAを記録します。
+
+基盤引き渡し時の報告では、Editor 191/191、PlayMode 76/76、Windows64 Development Buildおよび各採用PRのCIが成功しています。これは開発基盤の統合・検証結果であり、プロトタイプ全機能の完成や全ツールの人間受入を示しません。
+
+Playerは採用済みの標準Unity Visual Scriptingを使用します。保存グラフ、移動・Jump・Dash・Animator、六班の接続雛形は提供済みですが、雛形から先の各機能実装と本体Game／Battle／Combatへの接続は別途必要です。[旧Player基盤ページ](/spec/common-technology/action-state-manage)の独自Runtimeを再導入しません。
+
+MusicChart静的制作、Code Catalog、Planner Tuning Coreなどの提供済み基盤を、新規実装タスクとして重複起票しません。Runtime抽選、Excel連携、Migration、全GameplayへのTuning接続などの未実装機能は、未実装であることだけを理由に今回の必須条件へ追加しません。必要性は完成条件と採用する検証内容から個別に判断します。
+
+ローカルの作業コピー、キャッシュ、検証記録は保持します。新しい検証用コピーが必要な場合も、既存の作業環境を消して準備しません。
 
 ## プレイヤーから見た挙動
 
@@ -107,6 +158,7 @@ Gameplay処理は物理キーを直接参照せず、入力Actionまたは同等
 - 通常シャオンダマの生成・浮遊・選択
 - シャオンダマのChargeと攻撃への割り当て
 - AttackEventに合わせたPalette Bulletの発射
+- 固定プリセット版Mode／Conduct（通常攻撃の接続確認後に追加。[今回の完成方針](#completion-policy)と[詳細仕様](/spec/player/player-action-mode-change-and-conduct)を参照）
 - Palette BulletによるEnemyのRGB Damageと浄化
 - Enemyによる邪音玉の発射
 - Playerによる邪音玉のパリィ
@@ -259,6 +311,7 @@ Development BuildやProfiler接続による負荷が計測結果へ影響する�
 - [ ] 拠点やステージ選択を経由せず、検証用Battleを直接開始できる
 - [ ] キーボード・マウスで主要Battle操作を行える
 - [ ] 通常シャオンダマの生成、選択、Charge、Palette Bullet発射まで実行できる
+- [ ] 固定プリセット版Mode／Conductの操作・適用結果を詳細仕様に沿って確認できる
 - [ ] EnemyへRGB Damageを与えて浄化できる
 - [ ] 邪音玉のパリィから万能シャオンダマ変換まで実行できる
 - [ ] Clear、Game Over、Result、Retryの両経路を確認できる
@@ -267,6 +320,7 @@ Development BuildやProfiler接続による負荷が計測結果へ影響する�
 - [ ] Windows 64-bit Standalone Buildが成功する
 - [ ] Windowsビルドで主要フローを確認できる
 - [ ] 確認用ビルドをチームメンバーへ配布できる
+- [ ] チーム内の受入確認担当が、配布ビルドを取得・展開し、Unityなしで主要フローを操作した結果を記録している
 - [ ] 確認用ビルドに操作方法、確認項目、既知の問題、Commit SHA、Unity Versionが記載されている
 - [ ] 記録した基準PC・1920×1080で、通常Battle中の60fps目標を確認している
 - [ ] Compile Error、Build Error、通常操作を妨げる未処理例外がない
@@ -334,7 +388,16 @@ Development BuildやProfiler接続による負荷が計測結果へ影響する�
 
 ## 未決事項
 
-現時点で、プロトタイプの実装範囲と完成判定を妨げる未決事項はありません。
+今回合意した2点は[完成方針](#completion-policy)を参照します。次の具体化は未決であり、担当や期限を決定済みとして扱いません。
+
+- 段階1に使用するScene、検証用BGM／MusicChart、Enemy、仮パラメータ
+- Mode 2～4の固定プリセットの効果・数値・音の違い、および確認ケース
+- 各機能の主担当・確認担当、共有Scene／Prefab／Input／共通グラフの取りまとめ担当（段階1の窓口は上記のとおり）
+- 担当間の受け渡し、接続確認の責任者、仕様判断・PR確認・マージの窓口
+- Windows配布受入を行うメンバー・実行PC・配布先・実施時期
+- Runtime抽選や追加の制作支援機能について、今回の検証内容から必要と判断する範囲
+
+受入ケースは既存の[PB-TASK-0024](/tasks/game/pb-task-0024)を更新して整理します。担当や進捗は[Notionとの役割分担](/guide/notion-link)に従って管理します。
 
 性能確認に使用する基準PCの機種は固定しません。
 確認時に実行環境を記録し、60fps目標の達成状況を判断します。

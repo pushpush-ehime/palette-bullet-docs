@@ -14,6 +14,7 @@ relatedSpecs:
   - /spec/combat/
   - /spec/ui/
   - /spec/player/input-and-controls
+  - /spec/player/player-action-mode-change-and-conduct
 ---
 
 # PB-TASK-0024｜プロトタイプ受入テスト計画・記録テンプレート
@@ -22,7 +23,9 @@ relatedSpecs:
 
 プロトタイプ完成直前に初めて確認項目を考える状態を避けるため、現在の共通仕様から受入テストケース、必要Evidence、問題報告形式を先に作成します。
 
-本タスクではゲーム機能を実装しません。未実装項目は`未実施`として扱えるため、PlayerやWindows Buildがない現在から開始できます。
+本タスクではゲーム機能を実装しません。未実装項目は`未実施`として扱えるため、全Gameplay接続の完成を待たずに開始できます。提供済みのPlayer基盤やWindows64 Development Buildの成功と、プロトタイプの実操作受入は区別します。
+
+今回の段階分けは[プロトタイプ共通仕様](/spec/game/prototype#prototype-milestones)を正本とします。通常攻撃の接続確認、固定プリセット版Mode／Conductを含む対象機能の統合確認、チーム内のWindows配布受入を、同じ計画の中で区別して記録します。
 
 ## 完成時にできるようになること
 
@@ -46,6 +49,7 @@ relatedSpecs:
 - Player移動・Camera・Jump・Dash・Aim
 - Marker、Shaondama選択、Charge、Allocation
 - AttackEvent、Palette Bullet、RGB Damage、Enemy浄化
+- 固定プリセット版Mode／Conductの操作・適用・Charge／発射との接続・Retry時の初期化（詳細仕様を参照）
 - Jaon Bullet、Parry、Wildcard変換
 - Clear、Game Over、同一frame優先規則
 - Result lock／unlock、Continue／Retry
@@ -58,6 +62,7 @@ relatedSpecs:
 各ケースに次を持たせます。
 
 - Test ID
+- 確認する段階（通常攻撃の接続／対象機能の統合／Windows配布受入）
 - 関連仕様
 - 前提条件
 - 操作手順
@@ -67,6 +72,7 @@ relatedSpecs:
 - 使用Commit SHA
 - 実行環境
 - Screenshot、動画、Log等のEvidence
+- 使用した仮入力・仮素材と未接続箇所
 - Issueまたは修正タスク
 
 ### 3. Build・性能記録を作る
@@ -99,6 +105,9 @@ Windows Build確認用に、CPU、GPU、Memory、OS、Resolution、Quality、VSy
 
 - [ ] プロトタイプ仕様の全完成条件に対応するTest IDがある
 - [ ] EditorとWindows Buildの確認対象を区別できる
+- [ ] 通常攻撃の接続、Mode／Conductを含む対象機能の統合、Windows配布受入の段階を区別できる
+- [ ] 固定プリセット版Mode／Conductの詳細仕様に対応する確認ケースがある
+- [ ] チーム内の受入確認担当が配布ビルドを取得・展開し、Unityなしで操作するケースがある
 - [ ] ClearとGame Overの両経路がある
 - [ ] 同一frame Clear＋DeadとClear優先を確認するケースがある
 - [ ] Result lock、unlock、連打、Retryを確認するケースがある
@@ -114,7 +123,7 @@ Windows Build確認用に、CPU、GPU、Memory、OS、Resolution、Quality、VSy
 1. プロトタイプ仕様の完成条件を一つずつTest IDへ対応付けます。
 2. 代表ケース1件を仮データで記入し、不足欄がないか確認します。
 3. Clear、Game Over、Retry、性能確認の各ケースを企画・実装担当でレビューします。
-4. Player未実装の現在状態でも、該当ケースを`未実施`または`Blocked`として記録できることを確認します。
+4. 提供済み基盤がある一方で全Gameplay接続は未完了という状態でも、該当ケースを`未実施`または`Blocked`として記録できることを確認します。
 5. PB-TASK-0017／0018および後続機能タスクからTest IDを参照できることを確認します。
 
 ## 前提・依存タスク

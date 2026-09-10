@@ -147,7 +147,7 @@ Weakの場合は、既存のAllocation規則に従ってCharge成功時にWeak A
 - コンダクトによってMusicChartの元データを書き換えない
 - 実際にスピーカーから出た音声波形を解析して攻撃結果を決めない
 - 同じ安定した設定データから、音、見た目・挙動、攻撃や回復などの数値変化を決める
-- 既存のPalette State Graphと競合する第二のPlayer State管理者を作らない
+- 採用済みの標準Unity Visual ScriptingのPlayer基盤と競合する第二のPlayer State管理者を作らない
 - 具体的なクラス名、field名、Production Event、Command名は本ページで確定しない
 
 ### ShaondamaとPalette Bullet化
@@ -713,6 +713,8 @@ Mode／Conductのために新しい`ActionState`を追加しません。既存Ac
 
 ## 初期検証段階
 
+固定プリセット版Mode／Conductは今回のプロトタイプ完成範囲に含めます。プロトタイプ全体では、まず通常のCharge→発射→浄化を通し、その後に本節の導入を進めます。Windows配布受入までの段階と完成条件は[プロトタイプ共通仕様](/spec/game/prototype#completion-policy)を正本とします。
+
 現行のプロトタイプ仕様は拠点を対象外としているため、Mode 2～4は企画側が用意した固定プリセットで供給します。プリセットの具体的内容は後続のPrototype／Tuning仕様へ委譲し、Stage攻略中の編集は許可しません。
 
 ### 導入段階
@@ -818,7 +820,7 @@ Mode／Conductのために新しい`ActionState`を追加しません。既存Ac
 - [チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)
 - [パレットブレット](/spec/combat/palette-bullet)
 - [浮遊・挙動](/spec/shaondama-music/floating-behavior)
-- [Player Action／State Graph基盤](/spec/common-technology/action-state-manage)
+- [現在のPlayer基盤と旧Player Action／State Graphの履歴](/spec/common-technology/action-state-manage)
 - [Gameplay Runtime Trace](/spec/common-technology/gameplay-runtime-trace)
 - [ラジクジラ](/spec/radiowhale/)
 
