@@ -11,6 +11,8 @@ relatedTasks: []
 
 ## 目的
 
+本ページはBattle内の音楽・Gameplay接続を扱います。拠点でのラジクジラの自動演奏は[演奏広場](/spec/hub/performance-plaza)、音楽位置を受け取って行動を再生する責務は[行動パターンと設定解放](/spec/radiowhale/behavior-patterns)を正本とします。広場へ音楽再生や時間変換を共通化する場合も、本ページのBattle開始gateやAttackEvent処理を広場の開始条件にはしません。
+
 本ページでは、Palette Bulletにおける、
 
 > **BGMの時間軸とGameplay側で確定したAttackEvent結果が、最終的にプレイヤーへ聞こえる音としてどのように接続されるか**
