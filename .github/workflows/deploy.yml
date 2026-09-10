@@ -38,6 +38,7 @@ jobs:
       # Notionのチケットを作り、タスクID→チケットURLの対応表を書き出す。
       # 続くビルドがそれを読んでリンクを埋めるので、mainへは何もコミットしない。
       # Notion側の不調で公開が止まらないよう、失敗しても続行する。
+      # 新規タスクのDiscord通知は、スクリプト側で日本時間23:00〜08:00を抑止する。
       - name: Sync tasks to Notion
         continue-on-error: true
         env:

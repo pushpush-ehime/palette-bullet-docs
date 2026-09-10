@@ -1,10 +1,12 @@
 name: Notify Discord on Notion task completion
 
 on:
-  # Notionの完了タスクを1時間に1回確認する。
-  # 毎時00分付近の混雑を避け、毎時30分に実行する。
+  # 日本時間08:30〜22:30の間、1時間に1回確認する。
+  # GitHub ActionsのcronはUTCなので、08:30 JSTを前日の23:30 UTCとして分ける。
+  # 手動実行が深夜になっても、スクリプト側の判定で通知を送らない。
   schedule:
-    - cron: '30 * * * *'
+    - cron: '30 23 * * *'
+    - cron: '30 0-13 * * *'
   workflow_dispatch:
 
 permissions:
