@@ -1078,7 +1078,7 @@ export function validateCatalog(catalog) {
         if (field.type === 'multi_select') {
           if (!Array.isArray(value)) {
             errors.push(
-              `${entry.relativePath}: ${field.key}は配列で指定してください（例：[高平, 下條]）。`
+              `${entry.relativePath}: ${field.key}は配列で指定してください（空の例：[]）。`
             )
             continue
           }
