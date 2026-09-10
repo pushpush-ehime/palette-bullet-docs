@@ -418,11 +418,14 @@ Retry完了後は、新しいBattleとしてBattle開始lifecycleに従って初
 ラジクジラに関する詳細仕様は、役割ごとに以下のページを正本とします。
 
 - ラジクジラそのもの：[ラジクジラ](/spec/radiowhale/)
+- 初期行動とストーリークリア後の設定解放：[ラジクジラ｜行動パターンと設定解放](/spec/radiowhale/behavior-patterns)
 - Playerとの追従関係：[ラジクジラ｜追従・浮遊](/spec/radiowhale/follow-and-floating)
 - シャオンダマの世界内への出現：[ラジクジラ｜シャオンダマ生成](/spec/radiowhale/shaondama-spawning)
 - Gameplay上の存在・表示：[ラジクジラ｜Gameplayライフサイクル](/spec/radiowhale/gameplay-lifecycle)
 - Animation・VFX・Sound：[ラジクジラ｜Animation・VFX・Sound](/spec/radiowhale/animation-effects-sound)
 - 世界観：[ラジクジラ｜キャラクター・世界観](/spec/radiowhale/character-worldbuilding)
+
+拠点の確定施設は[拠点の町](/spec/hub/)、ラジクジラが一人で演奏する機能は[演奏広場](/spec/hub/performance-plaza)を正本とします。ゲーム進行側はストーリークリアに基づく行動設定の解放状態を提供し、移動・音楽・UIがそれぞれ独自にクリア判定を持たないようにします。広場演奏はBattleと別の実行単位であり、本ページのEnemy Ready、Combat受付、Clear／Game Overを開始条件にしません。
 
 ## 責務境界
 

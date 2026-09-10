@@ -12,6 +12,8 @@ relatedSpecs:
   - /spec/radiowhale/
   - /spec/radiowhale/character-worldbuilding
   - /spec/radiowhale/follow-and-floating
+  - /spec/radiowhale/behavior-patterns
+  - /spec/hub/performance-plaza
   - /spec/radiowhale/shaondama-spawning
   - /spec/radiowhale/gameplay-lifecycle
   - /spec/game/prototype
@@ -42,11 +44,12 @@ Playerの相棒として浮遊し、通常シャオンダマを背中側から�
 ### 1. 固定条件をデザインBriefへ整理する
 
 - Playerの相棒である
-- Playerから直接操作しない
-- 自律的に浮遊し、Player周辺を追従する
+- 演奏中の直接操縦を必須にしない。行動の事前設定はストーリークリア後に解放する
+- 最初のチュートリアルでは、行動パターンの一つとして自律的にPlayer周辺を追従する
 - 敵のTargetにならず、HP／Damage／Deadを持たない
 - 通常シャオンダマを背中側から出現させる
-- 生成中も追従できる
+- 追従パターンの実行中は、シャオンダマ生成中も追従できる
+- 広場でラジクジラが一人で演奏する場面にも使用する。追従以外の具体的な行動は未決として残す
 - 戦闘画面とレティクルを過度に隠さない
 - Player死亡演出中は非表示になる
 
@@ -91,6 +94,7 @@ Playerの相棒として浮遊し、通常シャオンダマを背中側から�
 
 - 最終3D Model、Rig、Texture
 - Runtime追従処理
+- 行動設定の編集画面、設定解放、広場の演奏Runtime実装
 - シャオンダマ生成処理
 - 最終Animation、VFX、SE、Voice
 - 戦闘外で常時同行するかの最終決定

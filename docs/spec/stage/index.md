@@ -18,6 +18,8 @@ status: 仮仕様
 
 本ページは、Battle中にStageがどのEnemyをClear対象として管理し、いつ新しいClear対象の追加が終了し、どの条件でClear候補を発生させるかを定義する正本です。
 
+拠点の施設と配置方針は[拠点の町](/spec/hub/)、ラジクジラの演奏に必要な空間は[演奏広場](/spec/hub/performance-plaza)を参照します。広場演奏の開始に、本ページのBattle用Stage objectiveやEnemy Readyを要求しません。
+
 StageはClear条件を評価しますが、最終Battle結果は確定しません。Clear条件が成立した場合は、対象`battleId`付きのClear候補をGameへ一度だけ通知します。
 
 ## 目的
