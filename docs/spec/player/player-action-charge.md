@@ -10,6 +10,8 @@ relatedTasks: []
 
 # Playerアクション｜チャージ
 
+機能をまたぐ要求・通知・参照と現在の実装との差分は[機能間の接続契約・共通ルール](/spec/common-technology/feature-connections)を参照します。各項目の決定／提案／未決を区別して使用してください。
+
 ## 目的
 
 本ページでは、Playerがシャオンダマを選択し、Charge結果を確定するまでのPlayerアクションについて定義します。

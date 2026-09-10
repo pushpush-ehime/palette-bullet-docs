@@ -129,7 +129,7 @@ ReactionState = BigHit
 
 ## 被弾成立
 
-Playerへ攻撃が命中した場合、まず現在の状態でその攻撃による被弾が成立するかを確認します。
+Playerへの命中は、以下のPhysics Step単位で収集・確定します。単独命中の場合も同じ規則を使用し、衝突通知の到着ごとに即時HP変更を行いません。
 
 被弾が成立した場合は、
 
@@ -168,6 +168,29 @@ HP確認
 ```
 
 `Dead`が成立する場合はSmallHit / BigHitを開始しません。
+
+## 同じPhysics Stepの複数被弾 {#same-step-damage}
+
+2026-09-10の協議で、同じ物理更新の受付開始時に有効だった別々の攻撃はすべて反映し、被弾リアクションを1回にまとめる方針を採用しました。共有境界と実装との差分は[機能間の接続契約](/spec/common-technology/feature-connections#decisions)を参照します。
+
+1. Physics Step開始時点のBattle、Playerの被弾受付条件・無敵を確定し、そのStepの候補判定に使います。
+2. 同Stepの[Parry batch](/spec/player/player-action-parry)を先に確定し、Parry成功した攻撃をDamage候補から除外します。
+3. 同一Battle・攻撃作用・対象Playerの重複通知を除外し、有効な別々の攻撃のDamageを合計します。弾やColliderの通知回数を攻撃回数にしません。継続攻撃の別の1回は別の作用として識別します。
+4. 合計をHPへ1回適用し、HPの下限は0とします。HP 0ならDeadを優先し、SmallHit／BigHitを開始しません。
+5. HPが残れば、1件でもBig指定がある場合はBigHit、それ以外はSmallHitを1回成立させます。Action／Aim中断・Reaction開始もこの確定結果から1回処理します。
+
+このStepで新しく成立したBigHitの無敵を、同Stepの他の有効候補へ遡って適用しません。次のStep開始時点でBigHit中なら、既存どおり追加被弾を拒否します。SmallHit中は追加被弾可能です。通知順を逆にしても結果は変えません。
+
+| 操作・入力 | 期待結果 |
+|---|---|
+| 無敵でなくHP 100、同StepにSmall 10とBig 20。通知順も反転する | どちらの順でもHP 70、BigHitを1回 |
+| HP 25で上と同じ攻撃 | HP 0、Dead。被弾Reactionを開始しない |
+| Small 10の同一作用をColliderから2回通知 | 10だけ反映し、Reactionは1回 |
+| Small 10をParry成功、別攻撃Big 20はParry対象外 | 20だけ反映。HPが残ればBigHitを1回 |
+| Step開始時にBigHit無敵、または旧Battle／終了後の通知 | DamageとReactionを成立させない |
+| Retry後に旧Battleの同じ候補が届く | 新BattleのHP・Reactionを変更しない |
+
+Physics Stepと描画frameは別です。1描画frameに複数の物理更新がある場合はStepごとに確定し、その後に[Gameのframe終了候補](/spec/game/)を集約します。物理外のDamageをどのStepへ入れるか、収集・確定を呼び出す具体的な場所と共通型は接続契約の未決事項Q03です。現在の開発用SmallHit通知を、この集約・BigHitまでの完成実装とは扱いません。
 
 ## 通常状態からの被弾
 

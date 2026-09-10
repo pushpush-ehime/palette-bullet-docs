@@ -26,7 +26,7 @@ relatedTasks: []
 * 成功・失敗・空振り
 * 連続パリィ
 * Parrying中の再入力
-* HitStop中のParry入力保持
+* 任意のPlayer局所減速と通常入力の接続
 * Aimingとの関係
 * 接地喪失による終了
 * ReactionStateによる終了
@@ -383,16 +383,16 @@ Normal ParryとJust Parryは、Damage無効化、Reaction抑止、Wildcard変換
 | Wildcardの選択可能化 | 変換commitと同時 | 変換commitと同時 |
 | 弾き方向と力の対象 | 対象ごとに方向を確定し、変換後のWildcardへ1回適用 | 対象ごとに方向を確定し、変換後のWildcardへ1回適用 |
 | 成功枠 | batch処理後に消費 | batch処理後に消費 |
-| HitStop | 1batchにつき1回 | 1batchにつき1回 |
+| 任意のParry Slow | 有効時は1batchにつき1回 | Normalと共通の倍率・時間、1batchにつき1回 |
 | スタミナ精算 | Parrying開始時に消費したコストを維持 | 現在のParrying開始時に消費した`ParryStaminaCost`を1回だけ返却し、実質消費0 |
 
 Just ParryによってWildcardの生成数、種別、選択条件、弾き方向の算出規則、または弾き移動の基本性能を変えません。追加Wildcard、強いWildcard、またはJust専用の強い弾き移動は発生させません。
 
 Just Parryのスタミナ返却は、現在のParryingについて最大1回です。同一batchに含まれる邪音玉の弾数に応じて`ParryStaminaCost`を複数回返却せず、同じbatch結果の重複処理によって再返却もしません。
 
-Normal / Justの違いは、スタミナ精算、VFX、SE、画面効果、およびHitStopの強さ・長さによって表現します。
+Normal / Justの違いは、スタミナ精算、VFX、SE、画面効果によって表現します。初期のParry Slowは共通の倍率・時間です。
 
-HitStopの具体的な音楽同期規則は「BGMとGameplayの接続」を正とし、本ページではHitStop中のParry入力だけを定義します。
+Parry Slowの音楽同期規則は「BGMとGameplayの接続」を正とし、本ページは減速対象・時間・入力・終了を定義します。
 
 Parry由来Wildcardは、Parry成立位置での変換commitと同時に選択可能になります。即時選択可能化、最低保証数への算入、RadioWhale経路を使用しないこと、および変換後の弾き移動の詳細は[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)を正とします。
 
@@ -429,7 +429,7 @@ Parrying中に新しいParryingを開始する経路は、以下の2つです。
 
 そのParryingでParry成功batchが成立した後は、通常のRecovery後半を待たずにParry再入力を受け付けます。
 
-HitStop外で新しいParry Pressを受けた場合、その時点で新しいParryingの開始条件とスタミナを確認します。
+Parry Slowの有無にかかわらず、新しいParry Pressを受けた場合、その時点で新しいParryingの開始条件とスタミナを確認します。
 
 開始条件を満たし、必要なスタミナが残っている場合のみ、現在のParryingを終了して新しいParryingを即座に最初から開始します。
 
@@ -510,62 +510,46 @@ Parrying
 * Recovery Phase
 * そのParryingの成功枠
 * 成功batchの処理状態
-* HitStop中の保持入力
 
 そのため、再開始されたParryingでは再び1つのParry判定batchを成功させられます。
 
-## HitStop中のParry入力
+## Parry Slow（任意の局所減速） {#parry-slow}
 
-Normal ParryとJust Parryのどちらでも、成功batchに対してHitStopを発生させます。
+<a id="hitstop中のparry入力"></a>
 
-同じbatch内の邪音玉数にかかわらず、HitStopは1batchにつき1回だけ発生させます。
+2026-09-10の協議で、完全停止よりも短い減速を意図し、演出自体を後から除外できる方針になりました。従来の必須HitStopと専用入力保持は、この節の規則へ置き換えます。
 
-HitStop中に新しく行われたParry Pressは、1回分だけ専用の保持枠へ保存できます。
+実装の簡単な推奨案を採用してよいという判断に基づき、初期方式は**Playerの移動・Animator・Action内の時間進行だけを減速**します。Normal／Just共通の倍率と時間を用い、成功batchにつき1回だけ適用します。弾ごとのcallbackから重複要求しません。Normal／Justの判定・スタミナ・VFX／SEの既存差は維持します。
 
-```text
-Parry成功batch
-↓
-HitStop開始
-↓
-新しいParry Press
-↓
-1回分だけ保持
-↓
-HitStop終了
-↓
-新しいParryingの開始条件とスタミナを再確認
-```
+| 項目 | 接続ルール |
+|---|---|
+| 所有 | Playerが局所倍率と残り時間を所有。Parryの成功batch確定から要求する |
+| 減速するもの | Playerの移動、Animator再生、Action内Phase・受付窓・完了タイマー。同じ局所経過時間を使う |
+| 通常進行するもの | BGM Audio、Battle／Gameplay／MusicChartの3時計、AttackEvent発火、Mode／Conduct cooldown、Enemy、Projectile、Shaondama。Cameraの既存時計も変更しない |
+| 倍率・無効化 | `0 < ParrySlowScale <= 1`。倍率1または時間0なら演出なし。0倍の完全停止は使用しない。具体値は操作確認で調整 |
+| 演出の終了時計 | 減速を掛ける前のGameplay経過秒。自分自身の減速で終了を遅らせない |
+| 入力 | 通常のAction開始条件・再入力受付・スタミナ判定を使用。減速専用buffer、終了時の自動再入力、減速だけを理由とする入力拒否は追加しない |
+| 重なり | 単一の効果として残り時間を設定時間まで更新する。倍率を掛け合わせず、時間を加算しない。同じ成功batchの再通知は無視 |
+| Pause | 既存のPause停止を優先。減速の残り時間を保持し、Resume後に残り分を進める |
+| 終了・Retry | Battle結果確定、Player終了・Deadで解除し、倍率1へ戻す。旧Battleの要求は拒否。Retryへ残り時間を持ち越さない |
+| 不正設定 | 非有限値、範囲外倍率、負の時間は設定検証で報告。Runtimeで検出した場合は原因を記録し演出を無効化。成功したParry自体は取り消さない |
 
-保持対象は、HitStop中に新しく行われたPressだけです。
+通常の入力条件とは、例えば成功後なら新しいPressで早期再入力でき、空振り時はRecovery後半まで再入力できないことです。Holdを新しいPressに変換せず、開始不能なら現在のParryingを先に終了しません。
 
-HitStop開始前からParry入力をHoldしている場合、そのHoldを新しいPressとして扱いません。
+既存Player基盤の`HitStop` boolは入力拒否・Tick停止を行う開発用機能で、今回の局所減速の実装ではありません。全体の`Time.timeScale`を変更したり、このboolを有効にして減速の代わりにしたりしません。局所経過時間とAnimatorへの接続は後続実装です。音楽側の責務は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection#parry-hitstop)、実装差分は[共通ルールD02](/spec/common-technology/feature-connections#decisions)を参照します。
 
-HitStop中に複数回Pressされても、複数のParryingを予約しません。すでに1回分を保持している場合、追加のPressによって予約数を増やしてはいけません。
-HitStop中に最初に受け付けた有効なParry Pressを保持します。保持後の追加Pressでは、保持入力の内容、受付時刻、有効期限を更新しません。
-
-Parry Pressを保持した時点では、スタミナを消費しません。
-
-HitStop終了時に、`RootState = Gameplay`、`MovementState = Grounded`、`ReactionState = None`などの開始条件と、必要なスタミナを改めて確認します。
-
-開始可能な場合に限り、保持入力を消費し、新しいParry分のスタミナを消費して現在のParryingを終了し、新しいParryingを最初から開始します。
-
-スタミナ不足などによって開始できない場合は再開始せず、保持入力を破棄します。現在のParryingが強制終了していなければ、そのParryingを継続します。
-
-保持入力には調整可能な有効時間`ParryHitStopInputBufferDuration`を設定し、HitStop終了時点で有効な入力だけを再評価します。
-
-次の場合は、HitStopの終了を待たずに保持入力を破棄します。
-
-* Battle結果が確定した
-* パリィ不成立の被弾によってParryingが強制終了した
-* `RootState = Dead`が成立した
-* 接地を失った
-* その他の理由で現在のParryingが強制終了した
-
-破棄した入力によって、後からParryingを自動再開してはいけません。
+| 操作例 | 期待結果 |
+|---|---|
+| 同Stepに3弾をParry成功 | 3弾の変換結果に対し局所減速は1回。弾数分の延長なし |
+| 減速中に予定AttackEventへ到達 | 音楽時刻どおり1回発火。Enemy・弾は通常速度 |
+| 減速中に成功後の新しいParry Press | 通常条件を満たせば即再開始し、その開始時だけスタミナ消費。減速終了まで保持しない |
+| 空振りRecovery受付前にPress、またはスタミナ不足 | 通常どおり拒否。減速終了時に自動再開始しない |
+| 減速中にPause→Resume、またはBattle終了→Retry | Pause中は残量保持。終了時は解除し、Retryは倍率1で開始 |
+| 倍率1で同じ操作を繰り返す | 演出なしでもParry成功・Wildcard変換・音楽接続が成立 |
 
 ## Parry再入力時のスタミナ不足
 
-成功後の早期再入力、HitStop終了時の保持入力再評価、または空振り時の通常再入力において、新しいParryingを開始するためのスタミナが不足している場合は再開始しません。
+成功後の早期再入力、または空振り時の通常再入力（Parry Slow中も同じ）において、新しいParryingを開始するためのスタミナが不足している場合は再開始しません。
 
 ```text
 Parrying
@@ -590,8 +574,6 @@ Parrying
 現在のParryingは、そのまま通常のRecovery Phaseを継続します。
 
 新しいParryingを開始できることを確認する前に、現在のParryingを終了してはいけません。
-
-入力保持中にスタミナが不足していることだけを理由として、HitStop中に現在のParryingを先に終了してはいけません。
 
 ## 空振り時の受付前Parry入力
 
@@ -639,8 +621,6 @@ Parry入力をHold
 
 Holdしているだけでは追加のスタミナも消費しません。
 
-HitStop中の専用保持枠についても、Holdではなく新しく行われたPressだけを対象とします。
-
 ## パリィ成功
 
 Parry Window Phase中に、そのParryingの成功枠が未使用の状態で有効なParry判定batchを処理した場合、パリィ成功となります。
@@ -655,7 +635,7 @@ Parry Window Phase中に、そのParryingの成功枠が未使用の状態で有
 * `ActionState = Parrying`を維持する
 * 現在のParryモーションを継続する
 * batch全体に1つのNormal / Just評価を適用する
-* batch全体に対してHitStopを1回だけ発生させる
+* 演出が有効ならbatch全体にParry Slowを1回だけ適用する
 * batch処理完了後に、そのParryingの成功枠を消費する
 
 弾き方向を受け取って実際に力を受けるのは、邪音玉ではなくParry成立位置で即時変換された後のWildcardです。変換後のWildcardは変換commitと同時に選択可能になり、選択可能なまま弾き移動します。
@@ -843,9 +823,6 @@ ActionState   = None
 
 消費したスタミナは返却しません。
 
-HitStop中のParry Pressを保持している場合は、接地喪失時にその保持入力を破棄します。
-
-接地喪失後に、破棄した入力によってParryingを自動再開することはありません。
 
 ## 他Actionとの関係
 
@@ -861,7 +838,7 @@ Parrying中に他のGameplay Actionを開始することはできません。
 | DragCharging | × |
 | Aim | × |
 | Jump | × |
-| Parry | 成功後は早期再入力可。空振り時はRecovery後半のみ。HitStop中は1 Pressだけ保持 |
+| Parry | 成功後は早期再入力可。空振り時はRecovery後半のみ。Parry Slow中も同じ受付条件 |
 
 `×`となっている入力は無視します。
 
@@ -886,8 +863,6 @@ ReactionState = SmallHit / BigHit
 ParryingよりReactionStateによる割り込みを優先します。
 
 被弾によって終了した場合、Parryingを自動的に再開始しません。
-
-HitStop中のParry Pressを保持している場合は、被弾による強制終了時にその保持入力を破棄します。
 
 消費済みのスタミナも返却しません。
 
@@ -914,11 +889,9 @@ ActionStateを終了
 
 RootState変更による終了後にParryingを自動再開することはありません。
 
-HitStop中のParry Pressを保持している場合は、RootState変更時にその保持入力を破棄します。
-
 消費済みのスタミナは返却しません。
 
-Battle結果が確定した場合も、Battle終了時の共通契約に従ってParryingと保留中のGameplay入力を停止し、HitStop中の保持入力を破棄します。
+Battle結果が確定した場合も、Battle終了時の共通契約に従ってParryingと保留中のGameplay入力を停止し、Parry Slowを解除します。
 
 ## Parryingの終了
 
@@ -929,7 +902,6 @@ Parryingの主な終了条件を以下に示します。
 | モーション正常終了 | `None` | 返却しない | 通常終了 |
 | 成功後の早期再入力 | `Parrying` | 新しいParry分を追加消費 | 現在のモーションを上書きし、新しいParryingを即時開始 |
 | 空振り時の通常再入力 | `Parrying` | 新しいParry分を追加消費 | Recovery後半で現在のParryingを終了し、新しいParryingを即時開始 |
-| HitStop保持入力からの再開始 | `Parrying` | 実際の開始時に新しいParry分を追加消費 | HitStop終了時に条件とスタミナを再確認 |
 | 接地喪失 | `None` | 返却しない | `MovementState = Airborne`へ変更 |
 | `SmallHit` | `None` | 返却しない | ReactionStateを優先 |
 | `BigHit` | `None` | 返却しない | ReactionStateを優先 |
@@ -962,23 +934,18 @@ Parry固有の主な調整項目を以下に示します。
 | `NormalParryWindow` | Normal Parryが成立するParry Window全体の時間範囲 | 未定 |
 | `JustParryWindow` | `NormalParryWindow`内に配置する、Just Parryが成立するより狭い時間範囲 | 未定 |
 | `ParryRestartAcceptTiming` | 空振り時にParry再入力を受け付け始めるRecovery後半のタイミング | 未定 |
-| `NormalParryHitStopDuration` | Normal Parry時のHitStop時間 | 未定 |
-| `JustParryHitStopDuration` | Just Parry時のHitStop時間 | 未定 |
-| `NormalParryHitStopStrength` | Normal Parry時のHitStopの強さ | 未定 |
-| `JustParryHitStopStrength` | Just Parry時のHitStopの強さ | 未定 |
-| `ParryHitStopInputBufferDuration` | HitStop中に受けた1回分のParry Pressを保持できる時間 | 未定 |
+| `ParrySlowScale` | Player局所時間の倍率。Normal／Just共通。0より大きく1以下、1で無効 | 未定 |
+| `ParrySlowDuration` | 減速前Gameplay秒で測る持続時間。Normal／Just共通。0で無効 | 未定 |
 | `NormalParryFeedback` | Normal Parry時のVFX、SE、画面効果 | 未定 |
 | `JustParryFeedback` | Just Parry時のVFX、SE、画面効果 | 未定 |
 
 Parry1回あたりのスタミナ消費量`ParryStaminaCost`は「Playerステータス」で管理します。
 
-HitStop中に入力を保持しただけでは`ParryStaminaCost`を消費せず、実際に新しいParryingを開始した時点で消費します。
-
 `JustParryWindow`は必ず`NormalParryWindow`の内側へ収めます。
 
 `ParryRestartAcceptTiming`は空振り時のRecovery Phase後半になるよう調整します。Parry成功後の早期再入力開始には使用しません。
 
-具体的な時間、HitStopの強さ、VFX、SE、画面効果は、連続パリィ時の操作感、モーションのつながり、Normal / Justの識別性を確認しながら調整します。
+具体的な時間、Parry Slowの倍率、VFX、SE、画面効果は、連続パリィ時の操作感、モーションのつながり、Normal / Justの識別性を確認しながら調整します。
 
 ## 各ページとの責務分離
 
@@ -991,7 +958,7 @@ HitStop中に入力を保持しただけでは`ParryStaminaCost`を消費せず�
 | 変換後のWildcardへ渡す対象ごとの弾き方向の確定 | 本ページ |
 | 1回のParryingで成功できるbatch数 | 本ページ |
 | Normal / Justの時間評価とGameplay上の共通結果 | 本ページ |
-| 成功後早期・空振り時・HitStop保持入力による再開始 | 本ページ |
+| 成功後早期・空振り時の再開始（減速中も同じ） | 本ページ |
 | Parry再入力時のスタミナ確認 | 本ページ |
 | パリィ成功・失敗・空振り | 本ページ |
 | ActionState間の遷移可否 | Playerアクション遷移 |
@@ -999,7 +966,7 @@ HitStop中に入力を保持しただけでは`ParryStaminaCost`を消費せず�
 | 邪音玉ごとのDamage無効化・projectile終了・Wildcard変換要求の1回限りの成立・Parry成立位置・`battleId`・変換元ID・弾き方向の受け渡し・重複解決防止 | [邪音玉](/spec/enemy/jaon-bullet) |
 | 邪音玉1弾からWildcard 1個への即時変換・重複生成防止・変換commitと同時の選択可能化・変換後の力の適用 | [万能シャオンダマ](/spec/shaondama-music/wildcard-orb) |
 | 力適用後のWildcardの衝突・浮遊・Lifetime・`Reserved`・消費・Battle終了 | [浮遊・挙動](/spec/shaondama-music/floating-behavior) |
-| HitStop中のBGM Audio・3時計・AttackEvent | BGMとGameplayの接続 |
+| Parry Slow中のBGM Audio・3時計・AttackEvent | BGMとGameplayの接続 |
 | Aimingのカメラ・移動・向き制御 | Playerアクション｜照準 |
 | Player通常移動の停止 | Player基本移動 |
 | Grounded / Airborne | Player移動仕様 |
@@ -1011,8 +978,8 @@ HitStop中に入力を保持しただけでは`ParryStaminaCost`を消費せず�
 * 体当たりなど、邪音玉以外の攻撃をパリィした場合に敵をひるませるか
 * 対象ごとの弾き方向を、入力方向、Playerの向き、接触方向などからどのように算出するかの具体式
 
-Normal / Justの2段階評価とHitStopの採用自体は確定事項です。また、成功した邪音玉ごとに弾き方向を確定して変換後のWildcardへ渡すこと、力を受ける対象が変換後のWildcardであること、および変換commitと同時に選択可能になることも確定事項です。
+Normal / Justの2段階評価は確定事項です。演出は完全停止を採用せず、無効化可能なPlayer局所減速を初期方式とします。操作確認によって減速演出を除外できます。また、成功した邪音玉ごとに弾き方向を確定して変換後のWildcardへ渡すこと、力を受ける対象が変換後のWildcardであること、および変換commitと同時に選択可能になることも確定事項です。
 
-各Window、空振り時の再入力受付開始、Normal / JustそれぞれのHitStop、入力保持時間、VFX、SE、画面効果の具体値は、未決仕様ではなく調整パラメータとして扱います。
+各Window、空振り時の再入力受付開始、Parry Slowの共通倍率・時間、VFX、SE、画面効果の具体値は、未決仕様ではなく調整パラメータとして扱います。
 
 <PageRelations />

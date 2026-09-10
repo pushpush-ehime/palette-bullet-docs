@@ -10,6 +10,8 @@ status: 仮仕様
 
 # ゲーム全体
 
+機能をまたぐ要求・通知・参照と現在の実装との差分は[機能間の接続契約・共通ルール](/spec/common-technology/feature-connections)を参照します。各項目の決定／提案／未決を区別して使用してください。
+
 ## ページ概要
 
 - 対象担当：全担当
@@ -296,7 +298,7 @@ Battle結果確定後は、次の処理を新しく成立させません。
 - 停止後のMusicChart Eventや予約済みGameplay callbackによる状態変更
 - 旧Battleの遅延通知、生成結果、命中、Damage、cleanup完了通知による現在Battleの状態変更
 
-同一フレームの候補収集までに成立済みのHP 0、`RootState = Dead`、Damage、および状態変更は巻き戻しません。一方、Battle結果確定後に到着した処理は、見た目上同じフレームであっても新しいGameplay結果として成立させません。同一フレームDamageの処理順の詳細は、Player Damageの正本で確定後に本規則との横断確認を行います。
+同一フレームの候補収集までに成立済みのHP 0、`RootState = Dead`、Damage、および状態変更は巻き戻しません。一方、Battle結果確定後に到着した処理は、見た目上同じフレームであっても新しいGameplay結果として成立させません。Player Damageは[同じPhysics Stepの複数被弾](/spec/player/player-reaction-damaged#same-step-damage)に従って確定します。同Stepで有効だった別攻撃のDamageを合計し、HPが残れば最も強いReactionを1回適用します。1描画frame内の必要なStepとEnemy Damageを確定してから本ページの終了候補を集約します。具体的な呼出し境界は[接続契約Q03](/spec/common-technology/feature-connections#questions)で整理します。
 
 ### Gameplay cleanupの共通契約
 

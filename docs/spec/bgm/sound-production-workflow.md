@@ -476,7 +476,7 @@ Mode／Conductを導入しても、完成済みの戦闘BGMを継続して使用
 - 小節境界より前に発火済みのArpeggioでは、戦闘BGMが新Modeへ切り替わっても後続音程音が旧occurrenceのMode snapshotを維持する
 - クリックノイズ防止用の極短いCrossfadeがGameplay上の切替時点を遅らせず、発音済みDelay／Reverb Tailを不自然に切断しない
 - Pause中は未発生Arpeggio timing、Mode／Conduct cooldown、およびやまびこRepeat delayが停止・保持され、Resume後に残量から再開する
-- HitStop中はBGM／MusicChart、AttackEvent、Mode／Conduct cooldown、およびやまびこRepeat delayが進行する
+- Parry Slow中はBGM／MusicChart、AttackEvent、Mode／Conduct cooldown、およびやまびこRepeat delayが進行する
 - Battle結果確定時に未発生のやまびこRepeatを取消し、旧`battleId`のcallbackをRetry／次Battleへ持ち越さない
 - 音響波形、DSP結果、Crossfade中の音量比がGameplay上のDamage、Explosion Radius、またはAttackEvent結果を決定しない
 

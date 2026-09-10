@@ -137,7 +137,7 @@ Gameplay入力またはResult入力が無効な期間に行われた入力は、
 
 コンダクトはマウスホイール回転で選択・変更します。正方向は`未選択 → ひろがり → やまびこ → 未選択`、逆回転は逆順です。マウスホイールはMode選択には使用しません。マウスホイール押し込みは既存どおりMarker入力であり、ホイール回転によるConduct選択とは別の入力です。
 
-Mode入力は、system pre-rollを含むPlayer操作可能なGameplayで、別の操作lockがない場合に受理します。Battle準備中、Pause中、HitStop中、Room移動演出中、Battle結果確定後、`Dead`中、およびMode cooldown中は拒否し、入力をbuffer・予約しません。Movement／Charge／Parry中であることだけを理由に拒否したり、進行中Actionを中断したりしません。
+Mode入力は、system pre-rollを含むPlayer操作可能なGameplayで、別の操作lockがない場合に受理します。Battle準備中、Pause中、Room移動演出中、Battle結果確定後、`Dead`中、およびMode cooldown中は拒否し、入力をbuffer・予約しません。Parry Slow中もこの通常規則を使用します。Movement／Charge／Parry中であることだけを理由に拒否したり、進行中Actionを中断したりしません。
 
 Conductは有効なCharge Pressでsnapshotします。WheelとCharge Pressが同時刻の場合の順序、Modeの小節境界、Conduct付与commit、およびcooldownの詳細は、[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)と[Playerアクション｜チャージ](/spec/player/player-action-charge)を正本とします。本ページではアルゴリズムを重複定義しません。
 

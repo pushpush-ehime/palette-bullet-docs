@@ -78,7 +78,7 @@ ReactionState = None
 * Mode入力はMovement、Charge、およびParryを中断しない
 * Conduct選択だけを理由に進行中Chargeを中断せず、有効なCharge Pressで取得済みのConduct snapshotも変更しない
 * 拒否・破棄されたMode／Conduct入力を、受付再開後に実行する予約入力として保持しない
-* Mode／Conduct専用ではないAction先行入力、Dashキャンセル入力buffer、およびParry専用HitStop入力bufferを流用しない
+* Mode／Conduct専用ではないAction先行入力、Dashキャンセル入力bufferを流用しない
 
 本ページでは、新しいState、遷移、buffer、Event、またはCommandを定義しません。Mode／ConductのGameplay上の意味、入力gate、WheelとCharge Pressの同時順序は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、Charge入力文脈が保持する一時snapshotは[Playerアクション｜チャージ](/spec/player/player-action-charge)、入力割り当ては[Player入力と操作](/spec/player/input-and-controls)を正本とします。
 
