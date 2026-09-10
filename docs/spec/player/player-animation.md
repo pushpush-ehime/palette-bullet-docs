@@ -85,8 +85,8 @@ Root Motion／In-placeの採用は未決です。どちらを採用する場合�
 | Marker | `ActionState = MarkerFiring` | 発射前後を含むMarker発射モーション | 身体動作要件あり | 指定時点で生成・発射要求を1回通知。発射後もモーションを継続し、正常時はモーション終了で完了。中断時は発射済みかで結果を分ける | Clip構成、発射時点、全身／上半身、空中時の合成 | [Playerアクション｜マーカー](/spec/player/player-action-marker) |
 | Click Charge | `ActionState = ClickCharging` | Charge判定Eventの前後を含む短時間のChargeモーション | 身体動作要件あり | 判定後もモーションを継続し、正常時はモーション終了で完了。Jumpしても継続。中断時は判定済みかで結果を分ける | Clip構成、判定時点、全身／上半身 | [Playerアクション｜チャージ](/spec/player/player-action-charge) |
 | Drag Charge | `ActionState = DragCharging` | Hold中の連続選択状態をPlayerへ伝える表現 | 表現要件あり／方式未決 | Releaseまたは中断まで継続。Jump、Airborne、着地でもActionは継続できる | 身体動作の有無、Loop、選択Feedbackとの分担 | [Playerアクション｜チャージ](/spec/player/player-action-charge) |
-| AttackEvent発火・Palette Bullet発射 | AttackEvent occurrenceのFire／各Arpeggio timing | Palette Bullet化・発射・発音は必要。ただしPlayerの身体発射モーションは現行仕様で必須化されていない | 身体Animation必須の根拠なし | 音楽時刻どおりに自動発火し、HitStop中も遅延しない。Charge動作の終了とは同期しない | Player側の発射Feedbackを追加するか | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet) |
-| Parry | `ActionState = Parrying` | Startup、Parry Window、Recoveryへ対応するParryモーション。1回のParrying中は開始時の向きを維持する | 身体動作要件あり | 成功しても現在のモーションを終了・再開始しない。受理された再入力は現在のモーションを上書きして先頭から再開始。通常はモーション終了で完了 | 各Phase時間、HitStop中の再生、Normal／Justの身体差分 | [Playerアクション｜パリィ](/spec/player/player-action-parry) |
+| AttackEvent発火・Palette Bullet発射 | AttackEvent occurrenceのFire／各Arpeggio timing | Palette Bullet化・発射・発音は必要。ただしPlayerの身体発射モーションは現行仕様で必須化されていない | 身体Animation必須の根拠なし | 音楽時刻どおりに自動発火し、Parry Slow中も遅延しない。Charge動作の終了とは同期しない | Player側の発射Feedbackを追加するか | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet) |
+| Parry | `ActionState = Parrying` | Startup、Parry Window、Recoveryへ対応するParryモーション。1回のParrying中は開始時の向きを維持する | 身体動作要件あり | 成功しても現在のモーションを終了・再開始しない。受理された再入力は現在のモーションを上書きして先頭から再開始。通常はモーション終了で完了 | 各Phase時間、Normal／Justの身体差分 | [Playerアクション｜パリィ](/spec/player/player-action-parry) |
 | SmallHit | `ReactionState = SmallHit` | 小さい被弾Reactionの表現 | 身体動作要件あり | 同一Reaction中のSmallHitで先頭から再開始。BigHitまたはDead等で上書き・中断。通常はReaction終了で完了 | Motion、時間、地上／空中差分、Blend | [Playerリアクション｜被弾](/spec/player/player-reaction-damaged) |
 | BigHit | `ReactionState = BigHit` | 大きい被弾Reactionの表現。地上ではGameplay側のノックバックと同時に見せる | 身体動作要件あり | BigHit中の追加被弾では再開始せず残り時間を維持。Dead等で中断。通常はReaction終了で完了 | Motion、時間、地上／空中差分、ノックバックとの同期 | [Playerリアクション｜被弾](/spec/player/player-reaction-damaged) |
 | Dead／死亡モーション | `RootState = Dead`と最終Battle結果 | Game Over確定時だけ死亡モーションを開始する。空中ではGameplay側の重力による落下が継続する | 身体動作要件あり | Dead成立だけでは開始しない。Game Overではモーション終了後にResultへ接続。ClearとDeadが同時成立した場合は開始しない | Motion、時間、落下・着地との合成、Game Over演出 | [Player死亡](/spec/player/player-death) |
@@ -159,7 +159,7 @@ Root Motion／In-placeの採用は未決です。どちらを採用する場合�
 - Charge successの到達点はAllocation commitとShaondamaの`Reserved`化です。Chargeモーションの成功表現からPalette Bullet化・発射を開始しません。
 - Palette Bullet化・発射は、AttackEvent occurrenceのFireまたは各Arpeggio Entry timingで自動的に行われます。発射時にPlayerの操作はなく、PlayerをCamera正面へ向き直らせません。
 - Palette Bulletは各Reserved Shaondamaの弾丸化時点の現在World座標から発射されます。Player共通の発射TransformやPlayer身体位置へ移してから発射しません。
-- Chord、Arpeggio、Weakごとの発射順・時刻をPlayer Animationから変更しません。HitStop中に到達した発射も音楽時刻どおりに処理します。
+- Chord、Arpeggio、Weakごとの発射順・時刻をPlayer Animationから変更しません。Parry Slow中に到達した発射も音楽時刻どおりに処理します。
 - Palette Bulletの弾丸化前後で見た目を変更する必要はありません。弾の飛翔、VFX、発射音、音程音は各所有ページへ委譲します。
 - Player側に発射反応を追加するか、その場合に身体Animation、加算表現、VFX等のどれを使うかは未決です。追加する場合もAttackEvent時刻を待たせたり、身体動作完了を発射条件にしたりしません。Chord専用またはArpeggio専用のPlayer発射Animationは、現時点では必須化しません。
 
@@ -167,11 +167,11 @@ Root Motion／In-placeの採用は未決です。どちらを採用する場合�
 
 - Parryingでは、Startup、Parry Window、Recoveryの進行へ対応する1回のParryモーションが必要です。各PhaseはGameplayの内部Phaseであり、別Player Stateや別Clipである必要はありません。
 - Parrying開始時にPlayerの向きを確定し、そのParryingの終了まで維持します。新しいParryingが正式に開始された場合だけ、向きを再取得します。
-- Parry成功時は現在のParryモーションを継続し、先頭から再生し直しません。Normal／Justの違いをPlayer身体Animationで分ける要件はなく、既存仕様ではVFX、SE、画面効果、およびHitStopの強さ・長さが識別Feedbackです。
-- 成功後の早期再入力、Recovery後半の空振り時再入力、またはHitStop中に保持した入力から新しいParryingがcommitされた場合は、現在のモーションを上書きし、Startupから再開始します。
+- Parry成功時は現在のParryモーションを継続し、先頭から再生し直しません。Normal／Justの違いをPlayer身体Animationで分ける要件はなく、既存仕様ではVFX、SE、画面効果が識別Feedbackです。
+- 成功後の早期再入力、Recovery後半の空振り時再入力から新しいParryingがcommitされた場合は、現在のモーションを上書きし、Startupから再開始します。
 - Parry失敗は通常の被弾としてSmallHit／BigHitへ接続します。Parry失敗専用Animationや空振り専用Animationは要求しません。空振りで再入力がなければRecoveryを経てモーション終了まで継続します。
 - SmallHit、BigHit、接地喪失、RootState変更、Battle結果確定ではParryingを強制終了します。中断済みモーションの完了EventからActionを再開しません。
-- HitStopの採用とNormal／Justの差は確定していますが、HitStopがPlayer Animatorの再生時間、Parry内部Phase、Blendにどう作用するかは現行仕様で確定していません。ただしBGM Audio、3時計、AttackEvent、Palette Bullet発射はHitStop中も継続します。
+- Parry Slowは任意のPlayer局所減速です。Animator再生とAction内Phase・受付窓・完了タイマーは同じ局所経過時間を使います。Normal／Just共通の減速倍率・時間とし、倍率1で無効化できます。BGM Audio、3時計、AttackEvent、Palette Bullet発射は通常進行します。詳細は[Parryの減速規則](/spec/player/player-action-parry#parry-slow)を正本とします。
 
 ### SmallHit
 
@@ -254,7 +254,7 @@ Root Motion／In-placeの採用は未決です。どちらを採用する場合�
 | Camera | Aim時の肩越しZoom、狙点、Dash時FOV、障害物処理、各状態間のCamera補間を所有する | Camera状態からPlayer Stateを決めること、AttackEvent発射時にPlayerを向き直らせること |
 | Model／Rig | Animation合成や接続点を実現できるCharacter構造を検討し、最終的なAvatar、Bone、IK、Socket等を定義する | 本ページのState／Action／Gameplay判定を再定義すること |
 
-Normal／Just Parryの違いは、既存仕様上、スタミナ精算、VFX、SE、画面効果、およびHitStopの強さ・長さで表現します。別の身体Animationは必須ではありません。SmallHit／BigHitの種別、Charge success／miss、AttackEvent結果もGameplay側から確定結果を受け取ります。
+Normal／Just Parryの違いは、既存仕様上、スタミナ精算、VFX、SE、画面効果で表現します。別の身体Animationは必須ではありません。SmallHit／BigHitの種別、Charge success／miss、AttackEvent結果もGameplay側から確定結果を受け取ります。
 
 Battle結果確定後にAnimation、VFX、SE、表示専用objectを残すことはできますが、そこから新しいDamage、Hit、Parry、Target、Charge、State変更を発生させません。また、任意の表示専用Animationの終了を必須Gameplay cleanupまたはResult操作解禁の条件へ追加しません。Game Over時の死亡モーション終了からResultへ接続する既存の同期要件は、この一般則とは別に維持します。
 
@@ -282,7 +282,6 @@ Battle結果確定後にAnimation、VFX、SE、表示専用objectを残すこと
 - Humanoid／Genericと、Animation素材のretarget方針
 - Animation Event、timer、phase data等のうち、Marker発射、Action完了、Reaction完了に使用する技術的な通知方式
 - Pause中にPlayer Animationを停止する範囲と時間軸
-- Parry HitStopがPlayer Animator、Parry内部Phase、Blendへ作用する範囲と時間軸。ただしAttackEventと音楽時計は止めない
 
 ### 表現別の未決事項
 
@@ -292,7 +291,7 @@ Battle結果確定後にAnimation、VFX、SE、表示専用objectを残すこと
 - MarkerFiringとClickChargingの具体的なMotion、時間、発射／判定時点、および全身／上半身区分
 - DragChargingにPlayer身体Animationを使用するか。使用する場合のLoopと空中・Aim合成
 - AttackEvent発火時にPlayer側の身体反応を追加するか。Chord／Arpeggio／Weakで差を設けるか
-- Normal／Just Parryの身体Animation差分を追加するか、および各PhaseとHitStopの具体時間
+- Normal／Just Parryの身体Animation差分を追加するか、および各PhaseとParry Slowの具体時間
 - SmallHit／BigHitのMotion、時間、地上／空中差分、およびBigHitノックバックとの同期
 - 死亡Motion、時間、空中落下・着地との合成、およびGame Over演出との接続
 - Conversation、Interacting、Mode、Conductに身体Animationを追加するか

@@ -214,7 +214,7 @@ MusicChartは、楽曲側が決める「何の音を、いつ使用するか」�
 
 Modeは完成済み戦闘BGMとPalette Bullet音程音へ作用し、原則としてGameplay上の発射SE、着弾SE、UI音へ作用しません。ConductはPalette Bullet音程音とGameplay上の発射SEへ作用し、戦闘BGMそのものは変更しません。
 
-AttackEvent occurrenceは`Fire Music Position`でModeをsnapshotし、Chord／Arpeggio／Weak全体で共有します。やまびこのAudio Repeatは各Palette Bulletの元の発射音から0.5秒後に一度だけ発生します。小節境界、Pause／HitStop／Room、Crossfade／Tail、Battle終了cleanupを含むAudio接続の詳細は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とします。
+AttackEvent occurrenceは`Fire Music Position`でModeをsnapshotし、Chord／Arpeggio／Weak全体で共有します。やまびこのAudio Repeatは各Palette Bulletの元の発射音から0.5秒後に一度だけ発生します。小節境界、Pause／Parry Slow／Room、Crossfade／Tail、Battle終了cleanupを含むAudio接続の詳細は[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正本とします。
 
 PlayerがStage挑戦中に選択するMode／Conduct、cooldown、occurrence snapshot、やまびこのRuntime予約、およびMode2～4のSave構成をMusicChartの元データへ保存しません。Player操作によって実行中または保存済みのMusicChart元データを書き換えません。Gameplay上の意味は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)、Mode構成は[モード構成とエフェクター](/spec/player/mode-configuration-and-effectors)を正本とします。
 
@@ -275,7 +275,7 @@ BGMカテゴリ内の各ページは、以下の責務に分けます。
 * BGM同期
 * system pre-roll
 * Pause / Resume
-* Parry HitStop
+* Parry Slow
 * Loop
 * Battle終了 / Room移動 / Retry
 

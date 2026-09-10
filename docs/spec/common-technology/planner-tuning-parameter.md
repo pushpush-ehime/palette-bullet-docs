@@ -336,8 +336,8 @@ Planner調整Parameterは、
 - 爆風倍率
 - Spawn間隔
 - Camera Shake強度
-- HitStop長
-- HitStop強度
+- Parry Slow時間（0で無効）
+- Parry Slow倍率（0より大きく1以下、1で無効）
 - UI演出時間
 - MusicChart系のうちPlanner調整対象として定義された値
 
@@ -645,7 +645,7 @@ Enemy
 
 Combat
 ├─ Damage
-└─ HitStop
+└─ Parry Slow
 ```
 
 実際に単一ScriptableObjectとするか、

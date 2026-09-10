@@ -112,7 +112,7 @@ Wildcard変換commit後も、変換元の邪音玉として移動、衝突、Hit
 
 Player Parry側の成功枠は、同じbatch内の全邪音玉を処理した後にPlayer Parry側が消費します。各邪音玉が個別に成功枠を消費したり、弾数分のParrying成功を要求したりしてはいけません。
 
-各邪音玉からHitStopを個別に発生させません。同じbatchに対するNormal / Just評価と1回のHitStopはPlayer Parry側を正本とします。
+各邪音玉からParry Slowを個別に発生させません。同じbatchに対するNormal / Just評価と有効時だけ1回のParry SlowはPlayer Parry側を正本とします。
 
 ### Wildcard変換要求
 
@@ -223,7 +223,7 @@ Battle結果確定後に、Jaon Bullet本体、軌跡、消滅VFX、SEを表示�
 
 ## 他システムとの接続
 
-- **パリィ**：同一Physics Stepのbatch収集、Normal / Just評価、成功枠消費、1batchにつき1回のHitStopはPlayer Parry側を正本とする。本ページはbatch参加条件と成功結果を受け取った後の弾単位処理を管理する（[Playerアクション｜パリィ](/spec/player/player-action-parry)）
+- **パリィ**：同一Physics Stepのbatch収集、Normal / Just評価、成功枠消費、1batchにつき有効時だけ1回のParry SlowはPlayer Parry側を正本とする。本ページはbatch参加条件と成功結果を受け取った後の弾単位処理を管理する（[Playerアクション｜パリィ](/spec/player/player-action-parry)）
 - **Wildcard**：Parry成功した邪音玉1弾につき、Parry成立時のworld位置、`battleId`、変換元邪音玉ID、対象ごとの弾き方向を渡して変換要求を1回発行する。Wildcard側は変換commitと同時に選択可能化し、変換済みWildcardへ弾き方向の力を1回だけ加える。重複変換の防止、選択可能化、弾き移動、変換後のlifecycleはWildcard側を正本とする（[万能シャオンダマ](/spec/shaondama-music/wildcard-orb)）
 - **プレイヤーへのダメージ**：命中時の被弾リアクション（SmallHit／BigHit）はPlayer側でダメージ量から自動判定せず攻撃側が指定する仕様のため、邪音玉がどちらを与えるかを本仕様で定める必要がある（未決。[Player｜被弾](/spec/player/player-reaction-damaged)）
 - **シャオンダマ**：浮遊中・Reserved中のシャオンダマと邪音玉が接触した場合の挙動は未決（[シャオンダマ・音楽連動](/spec/shaondama-music/)）

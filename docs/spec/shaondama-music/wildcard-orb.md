@@ -230,7 +230,7 @@ Wildcardへ変換できるParry対象は**邪音玉だけ**です。
 - 通常Parry
 - Just Parry
 
-同じParry判定batch内の有効な邪音玉はすべてParry成功となり、batch判定時点の同じNormal／Just評価を適用します。Normal／Justのどちらでも、生成数、Wildcard種別、選択可能化条件、および弾き移動の基本性能に差を設けません。Just Parryだけの追加報酬としてWildcardを増やしたり、別種別・高性能のWildcardへ変換したり、より強い弾き移動を適用したりしません。Just ParryのStamina返却、強い演出、およびHitStopの強さ・長さは、[Playerアクション｜パリィ](/spec/player/player-action-parry)を正本とします。
+同じParry判定batch内の有効な邪音玉はすべてParry成功となり、batch判定時点の同じNormal／Just評価を適用します。Normal／Justのどちらでも、生成数、Wildcard種別、選択可能化条件、および弾き移動の基本性能に差を設けません。Just Parryだけの追加報酬としてWildcardを増やしたり、別種別・高性能のWildcardへ変換したり、より強い弾き移動を適用したりしません。Just ParryのStamina返却、強い演出、および任意のParry Slowは、[Playerアクション｜パリィ](/spec/player/player-action-parry)を正本とします。
 
 同一Physics StepでPlayerのParry判定へ入った有効な邪音玉の収集、batch全体の成功、およびNormal／Just評価は、[Playerアクション｜パリィ](/spec/player/player-action-parry)を正本とします。本ページは、成功結果を受け取った各邪音玉からWildcardへの変換を定義します。
 
@@ -433,7 +433,7 @@ Room Retryでは新しいBattle IDを発行し、現在Roomの先頭からBattle
 | Wildcardの2つの生成元と生成個数規則 | 本ページ |
 | 最低保証数・現在数・不足数・要求中数の算出 | BGM側のShaondama生成 |
 | 最低保証補充の出現状態遷移・完了通知 | RadioWhale Spawn |
-| 同一Physics StepのParry判定batch・通常／Just判定・Stamina・HitStop | Player Parry |
+| 同一Physics StepのParry判定batch・通常／Just判定・Stamina・Parry Slow | Player Parry |
 | 邪音玉のprojectile lifecycle・Damage無効化・変換要求 | 邪音玉 |
 | 成功batch内の1弾1個変換・変換元邪音玉IDと`battleId`による重複防止 | 本ページ |
 | Parry成立位置での即時変換・変換commitと同時の選択可能化・最低保証算入条件 | 本ページ |

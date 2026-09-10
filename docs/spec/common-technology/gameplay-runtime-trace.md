@@ -33,7 +33,7 @@ relatedTasks: []
 - Damage
 - Enemy
 - Battle状態
-- HitStop／Pause等のSystem Event
+- Parry Slow／Pause等のSystem Event
 - Entity間の関係
 - 重要時点のContext Snapshot
 - Runtime時刻
@@ -855,8 +855,8 @@ Gameplay規則そのものを定義する一覧ではありません。
 
 候補：
 
-- HitStop Start
-- HitStop End
+- Parry Slow Start
+- Parry Slow End
 - Pause
 - Resume
 - Error
@@ -1063,7 +1063,7 @@ Jaon Bullet終了
 ↓
 Wildcard生成
 ↓
-HitStop
+Parry Slow
 ```
 
 等を関連付けられるようにします。

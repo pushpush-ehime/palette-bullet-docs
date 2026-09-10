@@ -305,13 +305,12 @@ system pre-roll中も、Playerが操作可能で既存の入力gateを満たす�
 
 - Battle準備中
 - Pause中
-- HitStop中
 - Room移動演出中
 - Battle結果確定後
 - `Dead`中
 - Mode cooldown中
 
-拒否した入力は保存、buffer、予約、または後から再実行しません。Action先行入力、Dashキャンセル入力buffer、およびParry専用のHitStop入力bufferをMode入力へ流用しません。
+拒否した入力は保存、buffer、予約、または後から再実行しません。Action先行入力、Dashキャンセル入力bufferをMode入力へ流用しません。
 
 ### 同じ小節頭での処理順
 
@@ -362,7 +361,7 @@ BGM LoopによってMusicChart上の表示小節番号やloop occurrenceが切�
 | 操作可能なGameplay | 入力gateを満たせば受理 | 次の有効な小節頭で適用 | 論理小節単位で進行 |
 | system pre-roll | 入力gateを満たせば受理 | 次の有効な小節頭で適用 | 通常規則どおり論理小節単位で進行 |
 | Pause | 拒否し、予約しない | 停止・保持し、小節頭適用を行わない | 残り小節数を停止・保持 |
-| HitStop | 拒否し、buffer・予約しない | 有効な小節頭へ到達した場合は適用 | 論理小節単位で進行 |
+| Parry Slow | 通常の受付条件を使用。減速だけでは拒否しない | 有効な小節頭へ到達した場合は適用 | 論理小節単位で進行 |
 | Room移動開始／演出中 | 拒否し、予約しない | 移動開始時に未適用pendingだけを破棄し、演出中は適用しない | 残り小節数を保持して停止 |
 | 新しいRoomの開始後 | Gameplayが操作可能になった後は入力gateに従う | 破棄済みpendingを復元しない | 新しいMusicChartが有効かつGameplayが操作可能になった後から再開 |
 | Stage終了／Retry | 拒否 | 破棄 | 破棄 |
@@ -375,11 +374,11 @@ Resume後は、Pause時に停止していた音楽位置と小節の関係を維
 
 Conduct cooldownもPause中は停止し、Player側の現在Conduct選択と残り時間を保持します。Resume後は保持していた残り時間から再開します。
 
-### HitStop
+### Parry Slow
 
-HitStop中も、既存のBGM／MusicChartが管理する音楽時間は進行します。したがって、Mode cooldownも論理小節単位で進行し、有効な小節頭へ到達した場合は保持済みpending Modeを適用します。適用によって実際にMode IDが変わった場合は、通常どおり4小節のMode cooldownを開始します。
+Parry Slow中も、既存のBGM／MusicChartが管理する音楽時間は進行します。したがって、Mode cooldownも論理小節単位で進行し、有効な小節頭へ到達した場合は保持済みpending Modeを適用します。適用によって実際にMode IDが変わった場合は、通常どおり4小節のMode cooldownを開始します。
 
-HitStop中の新しいMode入力は拒否し、buffer・予約しません。Parry専用のHitStop入力bufferをMode入力へ流用しません。Conduct cooldownはHitStop中も進行し、停止させません。
+新しいMode入力は通常の受付条件で判定します。Parry Slowだけを理由に拒否・保留しません。専用bufferは追加しません。Conduct cooldownはParry Slow中も進行し、停止させません。
 
 ### 通常のRoom移動
 
@@ -534,7 +533,7 @@ Conduct cooldownの初期値は3秒で、ひろがり／やまびこ共通のTun
 | --- | --- |
 | 通常Gameplay | 進行 |
 | system pre-roll | 通常規則どおり進行 |
-| HitStop | 進行 |
+| Parry Slow | 進行 |
 | Pause | 停止し、残量を維持 |
 | Room移動演出 | 停止し、残量を維持 |
 | 新しいRoomのMusicChart有効化・操作可能後 | 残り時間から再開 |
@@ -672,10 +671,10 @@ Audio、Presentation、Gameplayは同じ設定を参照しますが、音声波�
 | Charge入力文脈 | 有効なCharge Pressで取得した一時Conduct snapshot |
 | AttackEvent occurrence | 付与済みConduct、`Fire Music Position`で取得したMode snapshot |
 | Palette Bullet | Mode／Conduct由来の不変派生dataまたは算出済み値 |
-| Battle lifecycle | Pause／HitStop／Room／Stage終了／Retryにおける維持・停止・破棄 |
+| Battle lifecycle | Pause／Parry Slow／Room／Stage終了／Retryにおける維持・停止・破棄 |
 | Save Data | Mode 2～4の構成 |
 
-Mode／Conductのために新しい`ActionState`を追加しません。既存Action buffer、Dashキャンセル入力buffer、およびParry専用HitStop入力bufferも流用しません。
+Mode／Conductのために新しい`ActionState`を追加しません。既存Action buffer、Dashキャンセル入力bufferも流用しません。
 
 ## RadioWhaleとの関係
 
@@ -746,7 +745,7 @@ Mode／Conductのために新しい`ActionState`を追加しません。既存Ac
 - Modeは`1`～`4`で直接選択し、次の対象小節頭で適用する
 - Mode cooldownは論理4小節で、実際に別Mode IDへ適用した場合だけ開始する
 - system pre-roll中も入力gateを満たすMode入力を受け付け、次の有効な小節頭でpendingを適用する
-- Pauseではpendingと両cooldownを停止・保持し、HitStopでは音楽時間に従ってModeの小節頭適用と両cooldownを進行する
+- Pauseではpendingと両cooldownを停止・保持し、Parry Slowでは音楽時間に従ってModeの小節頭適用と両cooldownを進行する
 - 通常のRoom移動ではpendingだけを破棄し、current Mode、保存済み構成、Conduct選択、および両cooldown残量を維持する。Stage終了／RetryではRuntime状態を破棄する
 - BGM LoopをまたいでもMode cooldownを初期化せず、残り小節数から継続する
 - Modeは`Fire Music Position`でAttackEvent occurrence全体へsnapshotする
@@ -800,7 +799,7 @@ Mode／Conductのために新しい`ActionState`を追加しません。既存Ac
 
 | 担当 | 所有する詳細責務 | 主な参照先 |
 | --- | --- | --- |
-| PR B | 本ページで確定したPause、HitStop、Room、Stage終了、RetryのGameplay契約をGame／Player Status／States／Deathの詳細表へ同期する。新しい挙動は決定しない | [ゲーム全体](/spec/game/)、[Player状態](/spec/player/states)、[Playerステータス](/spec/player/player-status)、[Player死亡](/spec/player/player-death) |
+| PR B | 本ページで確定したPause、Parry Slow、Room、Stage終了、RetryのGameplay契約をGame／Player Status／States／Deathの詳細表へ同期する。新しい挙動は決定しない | [ゲーム全体](/spec/game/)、[Player状態](/spec/player/states)、[Playerステータス](/spec/player/player-status)、[Player死亡](/spec/player/player-death) |
 | PR C | AttackEvent発火、Mode snapshotの受け渡し、Palette Bullet／Damage候補／Enemy接続 | [AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet) |
 | PR #72 | BGM／MusicChart／音響実装境界、Crossfade、Tail、具体DSP | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)、[MusicChart仕様](/spec/bgm/bgm-music-chart) |
 | PR D | Prototype固定プリセット、Tuning、Runtime Trace | [プロトタイプ](/spec/game/prototype)、[プランナー向け調整パラメータ管理](/spec/common-technology/planner-tuning-parameter)、[Gameplay Runtime Trace](/spec/common-technology/gameplay-runtime-trace) |

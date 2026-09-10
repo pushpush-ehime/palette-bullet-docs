@@ -133,7 +133,9 @@ RunOperation(channel, duration, tick, cleanup, completedEvent, cost, prepare)
 | `cleanup` | 移動、購読、外部処理などを解放する。成功報酬や攻撃成立の処理を置かない |
 | `completedEvent` | 正常終了候補を通知する。被弾・終了・取消で無効になる場合があるため、受理された完了側でGameplay結果を反映する |
 
-PauseとHitStopは既存の入力・時計の制御に従います。独自の`Update`、`Wait`、Coroutineを追加しただけでは、PlayerのPause／HitStopに追従する保証はありません。外部Componentを使う場合も、共通時計・取消・購読解除に接続します。
+現行実装の`HitStop` boolは入力拒否・Tick停止を行います。今回決めた[Parry Slow](/spec/player/player-action-parry#parry-slow)は任意のPlayer局所減速であり、このboolで実装済みとは扱いません。音楽・Modeの全体時計とPlayer局所時間の分離が後続に必要です。接続全体は[機能間の共通ルール](./feature-connections)を参照します。
+
+基盤の検証用PauseとHitStopは既存の入力・時計の制御に従います。独自の`Update`、`Wait`、Coroutineを追加しただけでは、PlayerのPause／HitStopに追従する保証はありません。外部Componentを使う場合も、共通時計・取消・購読解除に接続します。
 
 正常完了、中断、Game終了、Faultを区別します。Stopは一つの解放失敗で残りを省略せず、所有した処理の解放を試みてエラーを保持します。必須cleanupの失敗が記録されたactorは、後でStopが成功したように見えてもResult／Retryを解禁しません。
 
@@ -158,7 +160,7 @@ PauseとHitStopは既存の入力・時計の制御に従います。独自の`U
 | Movement：`Graphs/Movement`、`Settings/Movement.asset` | Move／Jump／Dash、Burst／Run、開始拒否、費用、壁・落下・勢い、単一Body／Animator | Gameplayに合わせた調整、本番モデル・Animationの接続。現行Dashと旧説明の差は後述 |
 | Aim／Marker：`Graphs/AimMarker`、`Runtime/PlayerTargetInfo.cs` | Aim、Markerのタイマー・排他・停止の雛形。Aim解除後も進行中Markerを継続する | 実カメラ・照準、発射Event時の狙点と武器位置の取得、対象探索、Projectile生成・寿命 |
 | Charge：`Graphs/Charge` | Click／Dragのタイマー・排他・中断、Jump時のAction維持 | 実際の選択、Charge成立、Allocation／Reservedとの接続、攻撃経路への受け渡し |
-| Parry：`Graphs/Parry` | 接地・Reaction・費用の開始条件、受付タイマー、停止 | 実Combatの成功判定、報酬・万能変換、再受付窓、HitStop中の先行入力 |
+| Parry：`Graphs/Parry` | 接地・Reaction・費用の開始条件、受付タイマー、停止 | 実Combatの成功判定、報酬・万能変換、再受付窓、任意のParry Slow |
 | Damage／Status：`Graphs/DamageStatus` | HP・スタミナ所有、Reaction／Dead、被弾候補と成立通知の区別 | 実CombatのDamage算出、被弾分類、BigHit等との接続 |
 | Interaction：`Graphs/Interaction` | 接地・Reactionの開始条件、空中要求の拒否、Conversation／Interactingの停止・被弾差 | 対象物、会話UI、実際のInteraction処理。今回の採否はプロトタイプ仕様に従う |
 

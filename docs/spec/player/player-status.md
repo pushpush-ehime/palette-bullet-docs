@@ -355,45 +355,7 @@ Parry入力
 
 スタミナ不足の場合、現在のParryingを先に終了してはいけません。新しいParryingの開始条件と必要スタミナを満たしていることを確認してから、現在のParryingを終了します。
 
-HitStop中にParry入力を1回分保持した時点では、スタミナを消費しません。
-
-```text
-HitStop中
-↓
-Parry Pressを保持
-↓
-スタミナ消費なし
-↓
-HitStop終了
-↓
-新しいParryingの開始条件を再確認
-│
-├─ 条件不成立
-│   ↓
-│   再開始しない
-│
-└─ 条件成立
-    ↓
-    必要スタミナを再確認
-    │
-    ├─ 足りる
-    │   ↓
-    │   スタミナ消費
-    │   ↓
-    │   現在のParrying終了
-    │   ↓
-    │   新しいParrying開始
-    │
-    └─ 足りない
-        ↓
-        再開始しない
-        ↓
-        現在のParrying継続
-```
-
-スタミナを消費するのは、HitStop終了後に確認を行い、実際に新しいParryingを開始するときです。入力を保持しただけでは、スタミナ消費や現在のParryingの終了を行いません。
-
-開始条件を満たさない場合の現在のParryingの終了・継続や、保持入力の破棄はスタミナでは決めません。成功後の早期再入力、空振り時の再入力受付、HitStop中の入力保持および保持入力の破棄条件については「Playerアクション｜パリィ」を正とします。
+Parry Slow中も通常の開始条件で入力を評価し、新しいParryingを実際に開始したときだけスタミナを消費します。減速専用の入力保持や、減速終了時の自動再開始は行いません。成功後の早期再入力・空振り時の受付は[Playerアクション｜パリィ](/spec/player/player-action-parry#parry-slow)を正本とします。
 
 ---
 
@@ -526,7 +488,7 @@ RecoveryDelay
 
 `ActionState = Parrying`の間はスタミナを回復しません。
 
-Recovery後半からの再入力またはParry成功後の早期再入力によって新しいParryingを連続して開始した場合も、Parryingが継続している間は回復しません。HitStop中に保持した入力から新しいParryingを開始する場合も同様です。
+Recovery後半からの再入力またはParry成功後の早期再入力によって新しいParryingを連続して開始した場合も、Parryingが継続している間は回復しません。Parry Slow中の通常再入力でも同様です。
 
 ```text
 Parrying

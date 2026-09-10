@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1120" viewBox="0 0 1440 1120" role="img" aria-labelledby="title desc">
+<title id="title">Palette-Bullet 機能間の接続図</title>
+<desc id="desc">仕様上の要求・通知・参照を5つの経路に整理した図。C01からC19は本文の接続契約一覧へ対応する。実装完了を示す図ではない。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="none" stroke="#547086" stroke-width="1.5"/></marker></defs>
+<style>text{font-family:'Yu Gothic','Meiryo',sans-serif;fill:#18354b} .heading{font-size:23px;font-weight:700}.sub{font-size:15px;fill:#51677c}.name{font-size:19px;font-weight:700}.detail{font-size:14px;fill:#466075}.edge{font-size:14px;font-weight:700;fill:#304b63} .line{fill:none;stroke:#547086;stroke-width:2;marker-end:url(#arrow)}</style>
+<rect width="1440" height="1120" rx="18" fill="#f4f7fb"/>
+<text x="40" y="47" class="heading">Palette-Bullet  /  機能間の接続図</text>
+<text x="40" y="76" class="sub">矢印は要求・通知・参照の向き。C番号は本文に対応。仕様上の経路であり、実装済みの範囲は一覧で区別する。</text>
+<rect x="24" y="96" width="1392" height="198" rx="12" fill="white" stroke="#d8e2ec"/><text x="44" y="128" class="heading">01  Battleの準備・実行・終了</text>
+<rect x="44" y="153" width="190" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="139" y="180" text-anchor="middle" class="name">Game</text><text x="139" y="203" text-anchor="middle" class="detail">Battle ID・開始／結果</text>
+<rect x="370" y="153" width="235" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="487.5" y="180" text-anchor="middle" class="name">各準備Owner</text><text x="487.5" y="203" text-anchor="middle" class="detail">Stage・Player・音楽・供給</text>
+<rect x="748" y="153" width="240" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="868" y="180" text-anchor="middle" class="name">Combat＋各Owner</text><text x="868" y="203" text-anchor="middle" class="detail">受付gate・cleanup</text>
+<rect x="1135" y="153" width="237" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="1253.5" y="180" text-anchor="middle" class="name">Result UI</text><text x="1253.5" y="203" text-anchor="middle" class="detail">結果表示・操作lock</text>
+<path d="M234 179L370 179" class="line"/><text x="302" y="169" text-anchor="middle" class="edge">C01 準備要求</text>
+<path d="M370 205L234 205" class="line"/><text x="302" y="230" text-anchor="middle" class="edge">C02 Ready通知</text>
+<path d="M605 180L748 180" class="line"/><text x="676.5" y="170" text-anchor="middle" class="edge">C03 開始／Pause</text>
+<path d="M988 180L1135 180" class="line"/><text x="1061.5" y="170" text-anchor="middle" class="edge">C18 Game経由</text>
+<text x="44" y="271" class="sub">C17：Gameの終了要求 → 各Ownerの片付け → Combatの完了集約 → Game。C18：Result操作 → Game → 新IDでRetry。</text>
+<rect x="24" y="309" width="1392" height="303" rx="12" fill="white" stroke="#d8e2ec"/><text x="44" y="341" class="heading">02  通常攻撃：選択・Charge・予約・発射・浄化</text>
+<rect x="44" y="367" width="210" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="149" y="394" text-anchor="middle" class="name">音楽実行・供給</text><text x="149" y="417" text-anchor="middle" class="detail">時刻と必要数を判断</text>
+<rect x="396" y="367" width="210" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="501" y="394" text-anchor="middle" class="name">RadioWhale</text><text x="501" y="417" text-anchor="middle" class="detail">出現完了まで所有</text>
+<rect x="748" y="367" width="235" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="865.5" y="394" text-anchor="middle" class="name">Shaondama</text><text x="865.5" y="417" text-anchor="middle" class="detail">選択可・Reserved・消費</text>
+<rect x="1150" y="367" width="222" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="1261" y="394" text-anchor="middle" class="name">Player Charge</text><text x="1261" y="417" text-anchor="middle" class="detail">選択・Click／Drag</text>
+<path d="M254 400L396 400" class="line"/><text x="325" y="390" text-anchor="middle" class="edge">C04 生成要求</text>
+<path d="M606 400L748 400" class="line"/><text x="677" y="390" text-anchor="middle" class="edge">C05 制御移譲</text>
+<path d="M983 400L1150 400" class="line"/><text x="1066.5" y="390" text-anchor="middle" class="edge">C06 選択参照</text>
+<rect x="1150" y="506" width="222" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="1261" y="533" text-anchor="middle" class="name">Allocation</text><text x="1261" y="556" text-anchor="middle" class="detail">Slot割当・成立</text>
+<rect x="748" y="506" width="235" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="865.5" y="533" text-anchor="middle" class="name">AttackEvent判定</text><text x="865.5" y="556" text-anchor="middle" class="detail">結果・発火・Reserved解放</text>
+<rect x="396" y="506" width="210" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="501" y="533" text-anchor="middle" class="name">Palette Bullet</text><text x="501" y="556" text-anchor="middle" class="detail">生成・最終RGB</text>
+<rect x="44" y="506" width="210" height="66" rx="8" fill="#edf5fb" stroke="#b7cddf"/><text x="149" y="533" text-anchor="middle" class="name">Enemy → Stage</text><text x="149" y="556" text-anchor="middle" class="detail">浄化通知 → Clear候補</text>
+<path d="M1261 433L1261 506" class="line"/><text x="1261" y="466.5" text-anchor="middle" class="edge">C07</text>
+<path d="M1150 539L983 539" class="line"/><text x="1066.5" y="529" text-anchor="middle" class="edge">C07 割当確定</text>
+<path d="M748 539L606 539" class="line"/><text x="677" y="529" text-anchor="middle" class="edge">C10 発射要求</text>
+<path d="M396 539L254 539" class="line"/><text x="325" y="529" text-anchor="middle" class="edge">C11 Damage</text>
+<text x="44" y="596" class="sub">C08：音楽境界 → Mode／AttackEvent／供給。C11：自然破裂もEnemyへ。C12：Stage → Combat → GameへClear候補を通知。</text>
+<rect x="24" y="627" width="1392" height="176" rx="12" fill="white" stroke="#d8e2ec"/><text x="44" y="659" class="heading">03  敵攻撃：パリィを先に確定し、残る有効攻撃を被弾へ</text>
+<rect x="44" y="685" width="230" height="66" rx="8" fill="#fff3e8" stroke="#b7cddf"/><text x="159" y="712" text-anchor="middle" class="name">Enemy → Jaon Bullet</text><text x="159" y="735" text-anchor="middle" class="detail">接触・攻撃作用・Physics Step</text>
+<rect x="455" y="685" width="255" height="66" rx="8" fill="#fff3e8" stroke="#b7cddf"/><text x="582.5" y="712" text-anchor="middle" class="name">Player Parry／Damage</text><text x="582.5" y="735" text-anchor="middle" class="detail">batch判定 → 同Step被弾合算</text>
+<rect x="958" y="685" width="414" height="66" rx="8" fill="#fff3e8" stroke="#b7cddf"/><text x="1165" y="712" text-anchor="middle" class="name">Jaon Bullet → Wildcard</text><text x="1165" y="735" text-anchor="middle" class="detail">変換commit・選択可能化・弾き移動</text>
+<path d="M274 718L455 718" class="line"/><text x="364.5" y="708" text-anchor="middle" class="edge">C13 接触候補</text>
+<path d="M710 718L958 718" class="line"/><text x="834" y="708" text-anchor="middle" class="edge">C14 成功結果／変換要求</text>
+<text x="44" y="781" class="sub">同じ攻撃の重複を除外。Small 10＋Big 20は合計30、HPが残ればBigHitを1回。Parry Slowは有効時だけPlayerへ適用。</text>
+<rect x="24" y="818" width="1392" height="150" rx="12" fill="white" stroke="#d8e2ec"/><text x="44" y="850" class="heading">04  狙点・効果・表示</text>
+<text x="44" y="887" class="name">C09  Camera＋武器 → Marker → 発火時Target</text><text x="765" y="887" class="name">C15  Mode／Conduct → 音楽・攻撃snapshot</text><text x="44" y="927" class="sub">C16  Playerの確定状態 → Camera・Animator・HUD。表示側でHP・成立結果・状態を再判定しない。</text>
+<rect x="24" y="983" width="1392" height="113" rx="12" fill="white" stroke="#d8e2ec"/><text x="44" y="1015" class="heading">05  設定は保存値、実行中の状態は各機能が所有</text>
+<text x="44" y="1055" class="name">C19  MusicChart・各設定Asset・Tuning保存値 → 各Runtime → UI／診断の参照</text><text x="44" y="1081" class="sub">Code Catalogは保存済みコードから作る開発資料。Gameplayの要求元・状態所有者にはしない。</text></svg>

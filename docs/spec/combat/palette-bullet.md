@@ -454,7 +454,7 @@ Enemy同士は、他のEnemyに対する爆風遮蔽物として扱いません�
 | 状況 | 第二爆発予約の扱い |
 |---|---|
 | 通常Gameplay | 待機時間を進め、期限に達したら処理する |
-| HitStop | 待機時間を進め、期限に達したらHitStop中でも処理する |
+| Parry Slow | 待機時間を進め、期限に達したらParry Slow中でも処理する |
 | Pause | 残り時間と予約データを保持し、時計・範囲判定・Damage候補・Marker消滅を停止する |
 | Resume | 保持した残り時間から再開し、実行時に受付条件を再確認する |
 | Battle結果確定・終了 | 未発生予約を取り消し、新しい第二爆発・候補・Marker消滅を成立させない |
@@ -667,7 +667,7 @@ Gameplay無効化後に、Palette Bulletの軌跡、object、すでに開始済�
 
 Mode／Conductの初期効果と全体の正本は[Playerアクション｜モードチェンジとコンダクト](/spec/player/player-action-mode-change-and-conduct)です。本ページはPalette Bulletへ接続する値を示し、具体的なC# class名、field名、object pooling方式を固定しません。
 
-調整用の不変設定と、各Palette Bulletまたは第二爆発予約がRuntimeで保持するMode snapshot、算出済み値、残り待機時間、予約状態を区別します。第二爆発の待機時計は、HitStop中も進み、Pause中は停止するという本ページの挙動を満たすものとします。
+調整用の不変設定と、各Palette Bulletまたは第二爆発予約がRuntimeで保持するMode snapshot、算出済み値、残り待機時間、予約状態を区別します。第二爆発の待機時計は、Parry Slow中も進み、Pause中は停止するという本ページの挙動を満たすものとします。
 
 音響Repeatの待機時間と音量倍率はAudio側の調整値であり、`EchoSecondExplosionDelay`または`EchoSecondExplosionDamageMultiplier`を音響予約のRuntime状態として共用しません。
 
@@ -694,7 +694,7 @@ Mode／Conductの初期効果と全体の正本は[Playerアクション｜モ�
 - 最初に成立した終了条件の位置で、1発につき飛行終了に伴う第一爆発を最大1回だけ発生させる
 - 最大飛行距離または最大飛行時間による終了でも、同じ第一爆発処理を使用する
 - やまびこは第一爆発から0.5秒後に、同じ固定World座標で通常半径・通常Explosion RGB payloadの50%による第二爆発を最大1回発生させる
-- 第二爆発の待機時間はHitStop中も進め、Pause中は残量を保持して停止する
+- 第二爆発の待機時間はParry Slow中も進め、Pause中は残量を保持して停止する
 - 第二爆発時にEnemyの範囲・壁／地形の遮蔽とMarker接触を再判定し、第一爆発の結果を再利用しない
 - Palette Bullet側でDirect Contact／第一・第二Explosionの判定と、Multiplier／override・Mode／Conduct適用済み最終RGB Damage payload生成を行い、共通RGB Damage候補としてEnemy Damageへ出力する
 - Direct Contact候補の生成条件を満たすEnemyへの直接接触では、Direct ContactとExplosionの両方のRGB Damage候補を生成する
