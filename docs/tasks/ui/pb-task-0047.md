@@ -116,6 +116,8 @@ PB-TASK-0026でレビュー済みとなった画面IDと対象範囲を正とし
 2. Notionタスクへ共有リンク、レビュー結果、未決事項、決定が必要な時点を記載します。
 3. PB-TASK-0048へ、ラフで確認する入口・出口・状態差分を引き継ぎます。
 
+レビュー記録は[PB-TASK-0026の記録項目](/tasks/ui/pb-task-0026#review-record)を使用し、対象の入口・出口と、未決の受け先を残して確認した範囲を明記します。未決事項は[画面一覧の確認先・決定時点](/spec/ui/screen-inventory#open-questions)に対応付けます。
+
 ## 関連リンク
 
 - Notionタスク：<NotionTaskLink />
