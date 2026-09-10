@@ -45,7 +45,7 @@ onBeforeUnmount(() => {
       {{ preview.error }}
     </p>
 
-    <PageMetaPreview :frontmatter="preview.frontmatter" />
+    <PageMetaPreview :frontmatter="preview.frontmatter" :source="source" />
 
     <div
       v-if="source"

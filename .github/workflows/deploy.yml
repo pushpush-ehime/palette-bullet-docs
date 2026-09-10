@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    # Web進捗の取得・ビルド・公開を毎日12:00 JSTに開始（実際の反映は遅延し得る）。
+    - cron: '0 3 * * *'
 
 permissions:
   contents: read
@@ -16,12 +19,22 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          # キュー順や古い実行の再試行に依存せず、開始時の最新mainを使う。
+          ref: main
+
+      - name: Record source commit
+        id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -40,6 +53,7 @@ jobs:
       # Notion側の不調で公開が止まらないよう、失敗しても続行する。
       # 新規タスクのDiscord通知は、スクリプト側で日本時間23:00〜08:00を抑止する。
       - name: Sync tasks to Notion
+        if: github.event_name != 'schedule'
         continue-on-error: true
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
@@ -52,6 +66,31 @@ jobs:
           fi
 
           node scripts/notion-sync.mjs
+
+      # 成功データだけをGitの外に保持する。消失時も本文・記録は閲覧可能。
+      - name: Restore last successful progress
+        id: progress-cache
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: docs/.vitepress/content/task-progress.json
+          key: notion-progress-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: notion-progress-v1-
+
+      - name: Read task progress from Notion
+        id: progress
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_TASK_DB_ID: ${{ secrets.NOTION_TASK_DB_ID }}
+        run: npm run notion:progress
+
+      - name: Save successful progress
+        if: steps.progress.outputs.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: docs/.vitepress/content/task-progress.json
+          key: notion-progress-v1-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Check and build documentation
         run: npm run docs:check
@@ -68,6 +107,22 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # ビルド中にmainが進んだ場合は次の通常公開へ任せる。
+      # workflow全体のpages concurrencyにより、この確認から公開までも直列。
+      - name: Check source is still current
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+        run: |
+          latest=$(gh api "repos/${{ github.repository }}/git/ref/heads/main" --jq '.object.sha')
+          if [ "$latest" = "$SOURCE_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::mainが更新されたため、古いソースの公開をスキップします。"
+          fi
+
       - name: Deploy to GitHub Pages
+        if: steps.current.outputs.publish == 'true'
         id: deployment
         uses: actions/deploy-pages@v4

@@ -6,6 +6,7 @@ docs/.vitepress/dist/
 .DS_Store
 Thumbs.db
 docs/.vitepress/content/notion-links.json
+docs/.vitepress/content/task-progress.json
 fake-requests*.json
 .codex
 .agents

@@ -231,6 +231,40 @@
   border-radius: 8px;
 }
 
+.task-page-progress {
+  flex: 1 0 100%;
+  padding: 14px 16px;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.task-progress { display: grid; justify-items: start; gap: 5px; margin: 6px 0; }
+.task-progress small { color: var(--vp-c-text-2); font-size: 12px; line-height: 1.6; }
+.task-progress-badge { padding: 2px 9px; border-radius: 6px; background: var(--vp-c-default-soft); font-weight: 700; white-space: nowrap; }
+.task-progress-badge[data-state="着手"] { color: var(--vp-c-brand-1); background: var(--vp-c-brand-soft); }
+.task-progress-badge[data-state="レビュー"] { color: var(--vp-c-yellow-1); background: var(--vp-c-yellow-soft); }
+.task-progress-badge[data-state="完了"] { color: var(--vp-c-green-1); background: var(--vp-c-green-soft); }
+.task-progress small.task-progress-warning { color: var(--vp-c-warning-1); }
+.task-progress-note { color: var(--vp-c-text-2); font-size: 13px; line-height: 1.7; }
+.task-page-progress a { color: var(--vp-c-brand-1); text-decoration: underline; }
+.task-records-notice { margin-top: 32px; }
+.task-catalog table { min-width: 1050px; }
+.task-catalog th { white-space: nowrap; }
+.task-catalog td:first-child { white-space: nowrap; }
+.task-catalog td:nth-child(2) { min-width: 170px; }
+.task-catalog td:nth-child(3) { min-width: 170px; }
+.task-catalog td:nth-child(4) { min-width: 125px; }
+
+@media (max-width: 640px) {
+  .task-catalog table,
+  .task-catalog tbody { display: block; min-width: 0; }
+  .task-catalog thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .task-catalog tr { display: grid; gap: 8px; padding: 16px; margin: 12px 0; border: 1px solid var(--vp-c-divider); border-radius: 10px; }
+  .task-catalog td { display: block; min-width: 0; border: 0; padding: 0; overflow-wrap: anywhere; }
+}
+
 .page-relations {
   margin: 12px 0 4px;
 }

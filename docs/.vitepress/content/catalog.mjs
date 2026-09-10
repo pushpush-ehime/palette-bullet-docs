@@ -4,6 +4,8 @@ import { basename, dirname, relative, resolve } from 'node:path'
 import MarkdownIt from 'markdown-it'
 import { nextTaskId, TASK_ID_PATTERN } from './task-id.js'
 import { sidebarTeamKey } from './sidebar-team-filter.js'
+import { TASK_PROGRESS_FILE, taskProgress } from './task-progress.mjs'
+import { taskRecords } from './task-records.mjs'
 import {
   DUE_PATTERN,
   NOTION_LINKS_FILE,
@@ -414,6 +416,12 @@ function loadNotionLinks(repositoryRoot) {
 export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), includeUpdated = true } = {}) {
   const repositoryRoot = resolve(docsRoot, '..')
   const notionLinks = loadNotionLinks(repositoryRoot)
+  let progressSnapshot = null
+  const progressPath = resolve(repositoryRoot, TASK_PROGRESS_FILE)
+  if (existsSync(progressPath)) {
+    try { progressSnapshot = JSON.parse(readFileSync(progressPath, 'utf8')) }
+    catch { progressSnapshot = { version: 1, outcome: 'failed', entries: {} } }
+  }
 
   const entries = markdownFiles(docsRoot)
     .map((filePath) => {
@@ -422,6 +430,9 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
       const { data: frontmatter, hasFrontmatter } = parseFrontmatter(source)
       const structure = getDocumentStructure(source)
       const specSections = extractSpecSections(structure, frontmatter.pageType ?? '')
+      const progress = frontmatter.pageType === 'task'
+        ? taskProgress(progressSnapshot, toText(frontmatter.taskId)) : null
+      const implementationRecords = frontmatter.pageType === 'task' ? taskRecords(source) : null
 
       return {
         filePath,
@@ -437,6 +448,8 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
         category: frontmatter.category ?? '',
         status: frontmatter.status ?? '',
         taskId: frontmatter.taskId ?? '',
+        progress,
+        implementationRecords,
         order: Number.isFinite(frontmatter.order) ? frontmatter.order : 9999,
         categoryOrder: Number.isFinite(frontmatter.categoryOrder)
           ? frontmatter.categoryOrder
@@ -465,7 +478,8 @@ export function loadCatalog({ docsRoot = resolve(process.cwd(), 'docs'), include
          */
         notionUrl:
           toText(frontmatter.notionUrl) ||
-          toText(notionLinks[toText(frontmatter.taskId)]),
+          toText(notionLinks[toText(frontmatter.taskId)]) ||
+          progress?.notionUrl || '',
         openQuestions: extractOpenQuestions(source),
         purpose: specSections.purpose,
         constraints: specSections.constraints,

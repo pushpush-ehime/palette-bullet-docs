@@ -20,6 +20,7 @@ const generatedSidebars = buildSidebars(catalog, {
         { text: '仕様・タスク対応', link: '/relations' },
         { text: '新しいページを作る', link: '/guide/new-page' },
         { text: 'Notionタスクとの連携', link: '/guide/notion-link' },
+        { text: '進捗と実装・成果記録', link: '/guide/task-records' },
         { text: '用語集', link: '/glossary' }
       ]
     }
