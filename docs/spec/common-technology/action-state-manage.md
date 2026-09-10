@@ -1,13 +1,30 @@
 ---
-title: "Player Action／State Graph基盤"
-description: "Player専用Palette State GraphのProduction導入、Runtime接続、閲覧・診断、Validation、既存Player実装からの移行を定義する共通技術仕様"
+title: "旧Player Action／State Graph基盤（履歴）"
+description: "標準Unity Visual Scriptingへ移行済みの旧Palette State Graph仕様を履歴として保持し、現在の採用基盤への参照先を示す"
 pageType: spec
 category: "共通技術"
-status: 仮仕様
+status: 廃止
 relatedTasks: []
 ---
 
-# Player Action／State Graph基盤
+# 旧Player Action／State Graph基盤（履歴）
+
+::: warning 現在の実装基盤として使用しないでください
+Playerは標準Unity Visual Scriptingの保存グラフを使用する基盤へ移行済みです。このページの独自Palette State Graph、Compiler、Production Semantic Graph、旧Runtimeの導入手順は履歴です。以下に残る「採用方針」「現在」「未実装」「Production完了条件」等は旧方針を記録した時点の記述であり、現在の開発指示や今回のプロトタイプ完成条件には使用しません。
+:::
+
+## 現在の参照先
+
+- 提供済み機能、未接続範囲、担当の入口：[開発基盤ガイド](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Docs/DEVELOPMENT.md)
+- 保存グラフの編集手順：[標準Unity Visual Scriptingの開発手順](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Docs/PlayerVS/AUTHORING.md)
+- 現行の技術契約：[Player VS SPEC](https://github.com/pushpush-ehime/Palette-Bullet/blob/55d050ad9760b27bb61415a0f7d2324ee9a50bec/Docs/PlayerVS/SPEC.md)
+- 今回の完成範囲と段階：[プロトタイプ共通仕様](/spec/game/prototype#completion-policy)
+
+Gameplay上の挙動は引き続き[Player State仕様](/spec/player/states)、[Player Action遷移仕様](/spec/player/player-action-transitions)および各Domainの仕様を参照します。基盤の移行は全ActionやGame／Battle／Combat接続の完成を意味しません。旧基盤の機構を再導入して既存仕様を満たそうとせず、採用済み基盤上で必要な機能と接続を具体化します。
+
+---
+
+以下は旧基盤の仕様記録です。
 
 ## ページ概要
 
