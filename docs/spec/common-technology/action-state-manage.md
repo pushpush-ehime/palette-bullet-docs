@@ -182,7 +182,7 @@ Markerは開始時に発射用の狙点を固定しません。本番の発射Ev
 
 現在のHostは生成候補の子Objectも所有し、生成・初期化に失敗した場合の停止を扱います。本体接続でも、古い通知の拒否、部分生成の後始末、cleanup成功による解禁条件を保持します。Room移動を扱う場合は同じBattle／Session、Retryは新Battleとして区別します。Room移動の実装を今回の必須条件として追加するものではありません。
 
-Game側の全Ready条件、全ownerの終了集約、Clear／Game Overの優先判定、Result画面への遷移は[ゲーム全体](/spec/game/)と既存の[Battle基盤タスク](/tasks/game/pb-task-0018)を参照します。Mode／Conductは[専用仕様](/spec/player/player-action-mode-change-and-conduct)を正本とし、固定プリセットの具体値をこの基盤ページで補いません。
+Game側の全Ready条件、全ownerの終了集約、Clear／Game Overの優先判定、Result画面への遷移は[ゲーム全体](/spec/game/)と既存の[Battle基盤タスク](/tasks/prototype/pb-task-0018)を参照します。Mode／Conductは[専用仕様](/spec/player/player-action-mode-change-and-conduct)を正本とし、固定プリセットの具体値をこの基盤ページで補いません。
 
 ## 担当と変更の進め方 {#team-workflow}
 

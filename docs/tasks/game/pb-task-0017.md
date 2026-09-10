@@ -302,9 +302,9 @@ ZIP、共有URL、確認手順、および未確認状態を明示して引き�
 
 本タスクは、以下の後続タスクの前提になります。
 
-- PB-TASK-0018｜プロトタイプBattle開始・結果確定・Result・Retry基盤
-- 以降のプロトタイプGameplay実装タスク
-- Windowsビルドによる統合確認・性能確認タスク
+- [PB-TASK-0018｜Battle開始・共通接続の最小実装](/tasks/prototype/pb-task-0018)
+- 0018の引渡しgate後に開始する[プロトタイプGameplay実装タスク](/tasks/prototype/)
+- [PB-TASK-0046｜段階1後の終了・Result・Retry・Windows短時間確認](/tasks/prototype/pb-task-0046)と、後続のWindows配布受入・性能確認タスク
 
 ## 実装時の注意点
 
