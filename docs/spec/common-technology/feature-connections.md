@@ -196,7 +196,7 @@ Gameplayの詳細と操作例の正本は[Parryの任意減速](/spec/player/pla
 
 Contractsは `PaletteBullet.Prototype.Contracts`（UnityEngine依存なし）。`PaletteBullet.Prototype.Runtime` とPlayer assemblyはContractsを参照します。MusicChartの保存型は既定 `Assembly-CSharp` に維持し、同じ側の `PrototypeConnections` AdapterからContracts／Runtimeを利用するA案を採用しました。Runtime／Player／test asmdefからAssembly-CSharp参照、循環、Runtime→Editor依存は作りません。実Chartの試験は既定Editor assembly、PrototypeのEditMode／PlayModeはRuntime／Contractsを参照する専用test asmdefに置きます。
 
-Prepareで採用値を深くコピーし、元Assetや公開コレクションの後の変更で既存snapshotを変えません。Noteの固定Track／Note索引は同一性、同時Noteの優先順は別 `MusicChartGameplayBinding` への明示指定です。再Import・索引や内容の変更はfingerprintで検出し、再確認操作は旧順序を破棄します。Track／Pitch／列挙順へのfallbackをしません。順序不成立でも有効な位置・個別定義読取は分離し、順序を必須採用する構成ではMusic Ownerが準備失敗を報告します。曲ごとの音楽的な順序判断と本番検索／配送は後続です。詳細は[MusicChart](/spec/bgm/bgm-music-chart#common-note-binding)。
+Prepareで採用値を深くコピーし、元Assetや公開コレクションの後の変更で既存snapshotを変えません。Noteの固定Track／Note索引は同一性、同時Noteの優先順は別 `MusicChartGameplayBinding` への明示指定です。再ImportなどでChart参照またはfingerprint対象のPPQN・順序付きTrack／Noteデータが変わった場合、順序読取時に不一致を検出します。同一対象データの再Importや対象外のTempoイベント・Audio・Attack・Gameplay設定変更だけでは検出せず、再Import操作自体は監視しません。別の明示的な再確認／reset操作では旧順序を全破棄します。Track／Pitch／列挙順へのfallbackをしません。順序不成立でも有効な位置・個別定義読取は分離し、順序を必須採用する構成ではMusic Ownerが準備失敗を報告します。曲ごとの音楽的な順序判断と本番検索／配送は後続です。詳細は[MusicChart](/spec/bgm/bgm-music-chart#common-note-binding)。
 
 要求の実効キーはBattle・登録Owner・操作・RequestId。同内容は固定コピーした初回結果を返します。新規予約は同期読取前に元Frame／Pause世代を捕捉し、commit直前に同じ受付・Game activation・個体／Entryを再照合します。途中のClose→次FrameやPause→Resumeで現在gateが開いても元要求を付け替えません。9.990秒の有効確定を10.010秒のFrame終端で取り消さず、10.010秒に初めて届いた未確定要求を10.000秒締切のAへ遡及させません。入力を外部キューへ移す方式ではありません。
 
