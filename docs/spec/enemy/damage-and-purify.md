@@ -259,6 +259,16 @@ Direct Contact RGB Damage候補
 
 ## Damage候補の最終重複除外
 
+### 0018の共有RGB事実 {#common-rgb-fact}
+
+2026-09-11の共通実装では、Battle・発生源種別・Effect／作用・Enemyを重複キーとし、Frame／Physics Stepは初回の属性として保持します。別Frame／Step・別の正規Producerから再送されても、同キー・同じ最終RGB payloadなら最初の事実を返し、最初のFrame／Step／Producer／Source個体／実効基礎値を上書きしません。最終payloadの比較にこれらの属性は含めません。第一・第二爆発は同じExplosion種別でも別Effectです。
+
+正規Producerの同キー・異なる最終payloadは[D03の契約矛盾](/spec/common-technology/feature-connections#failure-policy)として元事実を保持して中断します。未知Producer・旧Battle・不正Stepは先に拒否します。RGBは有限非負doubleで、共有境界では0・小数・255超を丸めたりclampしたりしません。本ページのEnemy演算はEnemy Ownerの責務です。
+
+開始snapshotと現在の登録・受付状態は別に確認します。通常除外前に有効収集済みの候補と、除外後に初めて収集しようとする候補を区別し、後者を過去時刻で復活させません。Pause時の元Frame保持・明示再開は[共通境界](/spec/common-technology/feature-connections#frame-retention)を参照します。Pause後の新Frame候補との再集約や、Battle終了後の新規浄化・Stage通知を認める追加規則ではありません。
+
+0018のEnemy Fakeは明示設定した結果を返す接続確認で、以下の実RGB演算・浄化を実装したという意味ではありません。
+
 同一Damage作用から同じEnemyへ発生した重複候補は、Enemy Damage側で最終的に1件へまとめます。
 
 ```text

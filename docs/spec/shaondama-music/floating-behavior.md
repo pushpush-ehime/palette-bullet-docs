@@ -379,6 +379,8 @@ AttackEventで使用対象に確定したReserved Shaondamaは、対応する発
 - 同じobjectを状態遷移させるか、情報を引き継いだ別objectへ置き換えるかは実装方式とします。
 - 個体情報・有効RGB情報・実効音程・Damage dataの受け渡しは、[玉のデータ](/spec/shaondama-music/orb-data)、[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)、[パレットブレット](/spec/combat/palette-bullet)を正本とします。
 
+0018の共通契約で、所有記録が存在を保証するReserved個体がConsumed／Released・正常取消・Battle終了以外で消失する場合は、[D03の内部異常](/spec/common-technology/feature-connections#failure-policy)へ接続します。未予約個体の通常消失を同じ中断対象にはしません。同frameの自然破裂より前に同期commit済みの予約だけを保護し、未確定要求の遅延やFrame付替えで予約済みだったことにしません。
+
 ### Pause
 
 通常Battle中のPauseでは、シャオンダマのGameplay lifecycleを停止します。

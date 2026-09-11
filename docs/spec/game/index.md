@@ -334,7 +334,7 @@ Battle終了後に表示専用として残す演出およびRuntime objectの視
 
 ## Result接続
 
-今回のプロトタイプで必須の準備またはGameplay cleanupが失敗した場合は、[共通接続仕様D03](/spec/common-technology/feature-connections#failure-policy)に従います。Gameは失敗を保持して中断情報をUIへ渡し、GameplayとResult操作を再開しません。再試行にはアプリ再起動を案内します。システム上の失敗をGame Overへ変換せず、以下の正常なResult Retryと区別します。
+今回のプロトタイプで必須準備・Gameplay cleanupが失敗した場合、および追加採用した実行中の内部異常は、[共通接続仕様D03](/spec/common-technology/feature-connections#failure-policy)に従います。通常miss・Target／Enemyの通常消失・任意読取失敗を一律に中断へ変換しません。Gameは対象Battle・登録Ownerの有効な失敗を保持して中断情報をUIへ渡し、GameplayとResult操作を再開しません。再試行にはアプリ再起動を案内します。システム上の失敗をGame Overへ変換せず、以下の正常なResult Retryと区別します。
 
 Resultは共通画面とし、Gameが通知した確定Battle結果に応じて`Clear`または`Game Over`のvariantを1つだけ表示します。Result／UI側はEnemy状態やPlayer HPを参照して勝敗を再判定しません。同一フレームにClearとPlayer Deadが成立した場合は、Clear variantだけを表示します。
 
@@ -370,6 +370,8 @@ Pauseは、Playerが通常操作できる次の段階でのみ利用できます
 - 通常操作を受け付けない画面遷移・演出中
 
 Pause開始後にBattle結果を確定させる処理は進行させません。Pause画面の内容、再開操作、およびPause中も継続する表示・音響の詳細はUI、BGM、および各所有ページで定義します。
+
+0018で採用した[Frame保留と明示再開](/spec/common-technology/feature-connections#frame-retention)では、元Frame・snapshot・候補・必要時刻・完了記録を保持し、Resumeだけでは未完了処理を実行しません。同じFrameへの明示Closeで未完了部分だけを続け、新Frame候補と混ぜません。この技術境界は同じUnity frameの集約所属やGameの勝敗規則を変更せず、検証UIの論理Frameシミュレーションを実PlayerLoop接続の完成とも扱いません。
 
 ## Retry・リセット契約
 

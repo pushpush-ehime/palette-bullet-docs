@@ -1140,6 +1140,14 @@ NoteEvent Definition
 
 具体的なsource NoteEvent occurrence identityの保持方法は、シャオンダマ側のデータ仕様へ委譲します。
 
+### 0018の固定Note参照と明示順序Binding {#common-note-binding}
+
+2026-09-11の実装調整で、MusicChart保存型とImport／Workbenchを維持し、既定assembly側のAdapterがPrepare時の固定snapshotへ変換する方式を採用しました。Note同一性はsnapshot内のTrack／Note索引で表し、優先順位には使いません。同時NoteのGameplay優先順は別の `MusicChartGameplayBinding` に全Noteを明示指定します。既存Chartの全Track列挙順やPitch順で不足を補いません。
+
+音楽制作側が曲ごとの順序を提示し、Gameplay上の採用はプランナーが決めます。2-Aの固定fixtureの順序指定は、その曲別判断を完了した証拠ではありません。0031がこの読取を使う本番検索／配送を実装します。BindingはChart identityとNote fingerprintを保持し、再Import・追加／交換・内容変更で古い指定を無効化します。元Chartの再確認操作は旧指定を破棄し、索引が変わった旧順序を自動再承認しません。
+
+順序読取の不成立は、有効な音楽位置・個別Note／Attack定義の読取と分離します。順序を必須採用する構成ではMusic Ownerが準備失敗として報告します。必須Chartデータの欠損をdefault値で補わず、実ChartではChartのpre-rollを唯一採用します。Prepare後の元Asset変更は既存snapshotへ混入させません。型・単位・assemblyと提供範囲は[共通接続追記](/spec/common-technology/feature-connections#provided-common-connections)、監査・公開版は[0018](/tasks/prototype/pb-task-0018#handoff)で照合します。
+
 ### Weak AttackEventとの分離
 
 Weak AttackEventはNormal AttackEventのようにMusicChartへ事前登録しません。

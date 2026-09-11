@@ -305,6 +305,10 @@ AttackEvent Typeごとの取得タイミングは次のとおりです。
 
 ## Palette Bulletへ渡す発射情報
 
+0018の共通境界は発火snapshot、所有された準備ticket、一度の消費・発射事実を分けます。初回準備呼出し中の成功通知だけでは公開せず、呼出しが正常に戻り準備Readyとなった後、明示commitでConsumedとShot事実を一度確定します。途中構築・未公開候補は準備Ownerが所有し、予約のConsumed／Released確定は本ページの攻撃解決Ownerが行います。Fakeの記録であり、実Unity弾の生成・activation・Audioの原子性の証明ではありません。
+
+正常な必須経路の情報欠落・準備失敗、保証されたReserved／未公開候補の不正消失、登録要求の内容矛盾は追加採用した[D03](/spec/common-technology/feature-connections#failure-policy)へ接続します。通常Target消失と区別し、消費済み事実を戻さず、自動再発射をしません。同じ発火snapshot要求の処理中再入は初回内容を保持して一時拒否し、完了後は元結果を返します。Pause中の未公開準備完了とResume後の実発射は別で、Resumeだけで発射しません。
+
 各Palette Bullet化では、少なくとも次の情報を一体としてPalette Bullet側へ渡します。
 
 | 情報 | 内容 |

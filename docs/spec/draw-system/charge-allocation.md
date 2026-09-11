@@ -1236,6 +1236,10 @@ Drag全体がmissの場合、どのShaondamaもそのbatchによってReserved�
 
 ## Charge commitと自然破裂の優先順位
 
+0018の共有入口では、Clickの判定Event／Drag Release内で現在の音楽位置を読み、同期呼出しの成功時点ですでに全体Reservedを確定します。Press時刻で締切を延長せず、未確定要求を外部キューへ移しません。締切10.000秒のAには10.010秒到着の要求を遡及させず、9.990秒に確定した予約を10.010秒のFrame終端で取り消しません。別Current／適法なWeakの規則は本ページどおりです。
+
+同期読取中に元の受付Frameが閉じた場合、別Frameが開いていても未確定要求を付け替えません。元Frame／Pause世代・個体／Entryをcommit直前に再照合します。同IDの処理中再入と完了後の再送、契約矛盾と通常拒否は[共通接続実装](/spec/common-technology/feature-connections#provided-common-connections)と[D03](/spec/common-technology/feature-connections#failure-policy)に従います。未確定選択は自然破裂の保護根拠になりません。
+
 Charge成功と、通常Shaondamaのsource NoteEvent時刻到達による自然破裂候補が同一フレームに成立した場合は、**Charge成功のcommitを先に確定**します。
 
 ただし、同一フレームですでにBattle結果が確定している場合は、後述する旧Battle状態のcleanupを優先し、そのBattleへ新しいCharge commitを残しません。
