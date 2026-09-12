@@ -19,7 +19,7 @@ collapsed: false
 
 0018のPRで正確な公開名・型・単位・有効期間・Owner・呼出し順、Fakeと呼出し例、assembly参照図とテスト構成を提示し、レビュー済みの引渡しCommitを記録した時点を、他タスクの正式着手gateとします。gate前は仕様確認・既存コード調査・機能内部の設計まで進められますが、他タスクを正式配分せず、独自の共有型を作りません。gate後は枠1の終了・Retryや全機能の完成を待たず、各枠を並行して開始できます。
 
-2026-09-11の[0018実装・引渡し記録](/tasks/prototype/pb-task-0018#handoff)に、第1段階のPR #46／main反映と、第2段階2-A〜2-Cのローカル候補を分けて登録しました。第2段階は未公開・未統合で、正式着手gateは未解禁です。以下の初回課題表は過去の計画として残し、提供済みの型・Fake・assembly／呼出し例は同記録と[共通接続追記](/spec/common-technology/feature-connections#provided-common-connections)で照合します。
+2026-09-13（JST）の[0018実装・引渡し記録](/tasks/prototype/pb-task-0018#handoff)に、第2段階2-A〜2-Cの監査済み引渡しHEAD、[PR #47](https://github.com/pushpush-ehime/Palette-Bullet/pull/47)、ゲームmainのmerge Commitと実在する版固定ガイドを登録しました。このWeb追記がmainへ反映された時点で、後続は同じ共通型・Fake・呼出し例を使って正式着手できます。9月11日の機械検証と今回の公開結果、実Owner接続・人間受入は区別します。以下の初回課題表は過去の計画として残し、提供済みの型・Fake・assembly／呼出し例は同記録と[共通接続追記](/spec/common-technology/feature-connections#provided-common-connections)で照合します。
 
 仕様表の作成は実装担当への提出物にしません。プログラマーは仕様を読んでコード・グラフ・アセット接続を作り、動作確認してPRを提出します。仕様の不足は仕様判断窓口へ報告し、決まった内容を正本へ反映します。
 
