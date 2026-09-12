@@ -16,7 +16,9 @@ relatedTasks: []
 
 本ページは**接続一覧と共通技術ルールの正本**（初回調査・協議版）です。既存のGameplay規則と今回の決定は根拠を付けて記載し、未合意の技術案は「提案」と明示します。未合意のAPI名・型・更新順を、完成した共通実装として使用しないでください。個別の計算式やAction条件は各機能ページを正本とし、同じ内容を別定義しません。
 
-### 調査基準
+### 初回の調査基準
+
+以下のC一覧・I一覧・Q論点表は、この初回基準での調査記録です。2026-09-11に0018で採用・実装した共有契約は[共通接続の実装追記](#provided-common-connections)、固定Commitの監査・公開状況は[0018の引渡し記録](/tasks/prototype/pb-task-0018#handoff)を参照します。初回表の「仕様のみ」「型は未実装」を、追記後の共通型・Fakeも存在しないという意味には使いません。実Ownerへの接続完了とは引き続き区別します。
 
 | 対象 | 固定した版・確認範囲 |
 |---|---|
@@ -136,7 +138,7 @@ relatedTasks: []
 
 Gameplayの詳細と操作例の正本は[Parryの任意減速](/spec/player/player-action-parry#parry-slow)、音楽側は[音楽接続](/spec/bgm/bgm-gameplay-connection#parry-hitstop)です。旧HitStopの完全停止・専用保持・減速だけによるMode入力拒否は関連ページから置き換えました。既存Playerの`HitStop` boolが停止する事実は維持し、減速の実装完了とは扱いません。
 
-### D03：必須の準備・後片付けに失敗したら理由を表示して中断する {#failure-policy}
+### D03：必須準備・実行中の内部異常・後片付けの失敗で中断する {#failure-policy}
 
 今回のプロトタイプでは、**必須機能の準備またはGameplay cleanupに失敗した場合、理由を表示して受入確認を中断し、アプリ再起動で再試行する**方針を採用しました。エラー画面からのBattle再準備・Retryや自動復旧は今回の必須範囲に含めません。この節を失敗時の機能間契約の正本とし、[プロトタイプ完成条件](/spec/game/prototype)、[Game][game]、[Combat][combat]、[UI][ui]から参照します。
 
@@ -161,7 +163,58 @@ Gameplayの詳細と操作例の正本は[Parryの任意減速](/spec/player/pla
 | 原因を修正したビルドを起動し直す | 新しいBattle IDで準備し、前回の失敗・予約・callbackを引き継がない |
 | 正常なGame OverからRetryする | 全必須cleanup成功後、アプリ再起動を要求せず従来のRetryが成立する |
 
-具体的な失敗通知の型はQ04、準備が応答しない場合の検出方法・待機制限はQ06に残します。ここで確定したのは、失敗を検出した後の中断・表示・再試行方針です。
+初回D03では、具体的な失敗通知の型はQ04、準備が応答しない場合の検出方法・待機制限はQ06に残し、失敗検出後の中断・表示・再試行方針を確定しました。0018で具体化した境界は下の追記を参照します。
+
+#### 2026-09-11の実行中失敗の追加採用
+
+0018の完了・監査・修正・統合を進めるユーザー委任に基づく実装調整判断として、次の3条件も本プロトタイプの共有中断契約へ追加しました。上の初回D03にすでに明記されていた内容や、各操作の個別の人間受入という扱いにはしません。
+
+| 追加条件 | 帰結と所有 |
+|---|---|
+| 現Battleの登録済みOwnerから、同じ要求IDへ異なる内容が届く。正規Producerの同じ作用・Enemyへの最終RGB payload矛盾も含む | 元の確定事実を保持し、契約矛盾を記録してAborted。未知Owner・旧Battleは先に拒否し、その入力だけで現Battleを中断しない |
+| 正常な必須発射経路の情報が欠ける、または必須の生成準備を完了できない | 発射せずAborted。暗黙補完・自動再発射をしない。未公開候補は準備Ownerが途中構築前から所有して片付ける |
+| 所有記録で存在を保証したReserved個体・未公開候補が、Consumed／Released・正常取消・Battle終了以外で消失する | 所有保証の内部異常としてAborted。未消費予約だけを攻撃解決Ownerが一度解放し、消費済み事実を巻き戻さない |
+
+通常miss、締切後の対象Aへの拒否、未予約個体・Target・Enemyの通常消失、Pause中の新規要求、任意の順序読取失敗は、それだけでAbortedにしません。Clickが判定時の別Currentや適法なWeakへ成立し得る規則も維持します。読取・操作のFailedとBattle全体の中断は別の判断です。同内容再送は元結果の読取であり、再度の予約・発射・RGB適用ではありません。
+
+実行中の失敗入口は、構成時のOwner実体と固定した受付段階を登録した接続を使います。報告はBattle・段階・FailureId・種別・理由を持ち、自称Owner文字列だけで正規性を判断しません。現在ID・登録・段階・内容・実行phaseを検証し、同一失敗の再送は一度、同IDの内容矛盾や独立したcleanup失敗は元の失敗を消さず保持します。正常終了後の新規runtime失敗は受け付けず、旧Battleを現在IDに付け替えません。準備報告と終了応答は既存の入口を使用します。
+
+有効な内部異常は同期callback中でも直ちにgateを閉じます。終了要求の配送は進行中の通知・callbackが戻るまで待ち、各Ownerの独立したcleanupを一度ずつ試みます。準備成功通知だけで未完了の構築を公開せず、準備呼出しの正常returnと明示的な消費確定を分離します。結果・再試行・UIの中断方針は上のD03を再利用し、Game OverやResult／Retryの新規規則を追加しません。
+
+初回に未決だった具体型・待機方法は、次の0018実装追記に対応付けます。実Ownerの内容判定と全終了集約は各後続タスクの責務です。
+
+### 2026-09-11の共通接続実装 {#provided-common-connections}
+
+正確なゲーム版・公開状況は[0018](/tasks/prototype/pb-task-0018#handoff)で一元管理します。ゲームRepositoryの `Docs/Prototype/CONNECTIONS.md` と `PHASE2A.md`～`PHASE2C.md` が実API・単位・寿命・Owner・コンパイルできる呼出し例の入口です。後続の正式着手はレビュー済み引渡し条件に従い、ローカル候補や初回だけの成功では解禁しません。
+
+| 対応 | 共有実装で提供する境界 | 実Owner側に残る内容 |
+|---|---|---|
+| C01～C03／Q01・Q06 | `BattleCoordinator`、`IBattleOwner`、Prepare／Ready・解除・失敗、開始一回性、共通gate、Pause／Resume、終了要求・応答。準備の実時間上限は検証用既定30秒、同時刻以上で期限切れ。再送や解除で期限を延長しない | Stage／供給／Player等が自身の必須条件を準備する。Enemy数・供給数をGameが再計算しない。0036のPlayer実接続、0027／0028の終了集約・Result／Retry |
+| C19／Q04 | `IMusicReference`、固定Chart／Note／Attack snapshot、定義とoccurrence、音楽位置、明示Note順序の読取。Gameの有効経過をMusicが投影。実ChartではChartのpre-rollを唯一採用し、Fake値は混ぜない | 0030の実Audio同期、0031の検索／選択／境界配送。定義参照が有効でも配送済みとは限らない |
+| C07・C10／Q04・Q05 | `IChargeReservation.TryReserve`、予約／Entry／準備ticket、`IAttackEmission`。判定Event／Drag Release内の同期一括Reserved、準備PendingとReady、明示commit時の一度のConsumed／Shot事実 | Current／Slot／Weakの本番選択、実個体変換・弾・Audio。攻撃解決が予約のConsumed／Releasedを所有する |
+| C11・C12／Q03～Q05 | `FrameRef`／`PhysicsStepRef`／`RgbCandidate`、登録Producer入口、Enemy所有の重複台帳、明示Closeの固定順。RGBは有限非負double、小数・255超を保持 | Enemy演算／浄化、Stage objective、Combat転送とGame勝敗。Player Damage・Parry・物理外DamageのStep帰属は未実装 |
+
+Contractsは `PaletteBullet.Prototype.Contracts`（UnityEngine依存なし）。`PaletteBullet.Prototype.Runtime` とPlayer assemblyはContractsを参照します。MusicChartの保存型は既定 `Assembly-CSharp` に維持し、同じ側の `PrototypeConnections` AdapterからContracts／Runtimeを利用するA案を採用しました。Runtime／Player／test asmdefからAssembly-CSharp参照、循環、Runtime→Editor依存は作りません。実Chartの試験は既定Editor assembly、PrototypeのEditMode／PlayModeはRuntime／Contractsを参照する専用test asmdefに置きます。
+
+Prepareで採用値を深くコピーし、元Assetや公開コレクションの後の変更で既存snapshotを変えません。Noteの固定Track／Note索引は同一性、同時Noteの優先順は別 `MusicChartGameplayBinding` への明示指定です。再ImportなどでChart参照またはfingerprint対象のPPQN・順序付きTrack／Noteデータが変わった場合、順序読取時に不一致を検出します。同一対象データの再Importや対象外のTempoイベント・Audio・Attack・Gameplay設定変更だけでは検出せず、再Import操作自体は監視しません。別の明示的な再確認／reset操作では旧順序を全破棄します。Track／Pitch／列挙順へのfallbackをしません。順序不成立でも有効な位置・個別定義読取は分離し、順序を必須採用する構成ではMusic Ownerが準備失敗を報告します。曲ごとの音楽的な順序判断と本番検索／配送は後続です。詳細は[MusicChart](/spec/bgm/bgm-music-chart#common-note-binding)。
+
+要求の実効キーはBattle・登録Owner・操作・RequestId。同内容は固定コピーした初回結果を返します。新規予約は同期読取前に元Frame／Pause世代を捕捉し、commit直前に同じ受付・Game activation・個体／Entryを再照合します。途中のClose→次FrameやPause→Resumeで現在gateが開いても元要求を付け替えません。9.990秒の有効確定を10.010秒のFrame終端で取り消さず、10.010秒に初めて届いた未確定要求を10.000秒締切のAへ遡及させません。入力を外部キューへ移す方式ではありません。
+
+Battle IDはGameがPrepareで発行しPause／Resumeで維持します。PlayerTokenのactor／generation／channel／runとは別寿命です。Entityは珠→弾でも同じ個体を表し、直接接触と各爆発は別Effect。RGBキーはBattle・source kind・Effect・Enemyで、Frame／Stepは初回属性です。同キーの再送は最終payloadのみ比較し、同値なら元Frame／Step／Producer／Source／基礎値を保持して二重適用しません。詳細は[Enemyの重複除外](/spec/enemy/damage-and-purify#common-rgb-fact)。
+
+予約と発火snapshotは、外部の同期読取より前に初回payloadと処理中状態を所有します。同ID・同内容の処理中再入には副作用なく一時Rejected（RequestInProgress）を返し、外側が確定する最終履歴を上書きしません。異内容再入は元内容を保持してD03の矛盾処理へ接続します。例外後も処理中のまま残さず最終失敗を記録します。すでに返せるPending ticket／Shot事実がある準備・発射入口は、その同じticket／事実を返す契約を維持します。
+
+準備の待機計測は `Time.realtimeSinceStartupAsDouble` を注入し、Gameplay時計・timeScaleから独立させます。Prepare受付時を起点にReady報告・Pump・開始commit直前で期限を照合し、到達時は未Ready Ownerと理由を表示してD03へ接続します。既定30秒は変更可能な検証仮値で、ゲームとして採用済みの待ち時間ではありません。Editor停止等の後は復帰時に期限切れとなり得ます。制御が戻らない同期処理へ強制割込みする機構は含みません。
+
+#### Frame終端とPause保持 {#frame-retention}
+
+2026-09-11の実装調整判断で、Frameを開いて最初の候補より前にsnapshotを取得し、0／1／複数StepをそのFrameへ所属させる境界を採用しました。非PhysicsはStepなしで、架空のStep 0を使いません。Closeでは新規Chargeを閉じ、確定済み予約→自然破裂→due発射／Entryと候補収集→RGB受付閉鎖→Enemy確定→Stage反映／Clear候補→Game評価入口の順に進めます。調整役は個別演算や勝敗を決めません。
+
+Pause後は新しいGameplayを受け付けず、元Battle／Frame・snapshot・収集済み候補・必要な判定時刻・重複記録・段階とparticipant完了記録を所有したまま保持します。Resumeだけでは実行せず、同じFrameへの明示Closeで未完了部分だけ続行します。callback内でPause→Resumeが連続してもそのCloseは一度保留します。呼ばれたことと完了を分け、Succeeded相当だけを完了、Accepted相当を保留とし、部分的な副作用は担当participantのcheckpointから再開します。完了済み通知を重ねません。
+
+保持Frameを閉じる前に次Frameを開かず、再開後の新規入力・別Frameの候補を保持Frameへ混ぜません。元Frameで予定・所有していた自然破裂／due処理の続行と、新しい候補の混入は区別します。再snapshotや現在時刻への差替えで結果を変えず、End／Abort／Disposeでは未処理分を取消します。Pauseだけの暗黙破棄・Pause中の確定・Close中のPause拒否という別規則は採用しません。
+
+この具体的な保持・明示再開の手順は初回Webには未定義だった技術判断です。Enemy／Game正本の「同じUnity frameで集約する」という所属規則は変更しません。PrototypeBattle UIは複数クリックをまたぐ**論理Frame／Stepシミュレーション**で、実Unity PlayerLoop・Physics・Player入力との統合は後続です。Frame所属を維持して後で未完了部分を終えることと、複数frameの新候補を再集約することを混同しません。
 
 ## 共通技術ルールの提案 {#proposals}
 

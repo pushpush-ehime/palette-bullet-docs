@@ -245,6 +245,8 @@ Combat Systemは、対象Battleについて少なくとも以下のOwnerを必�
 
 今回のプロトタイプで必須cleanupが失敗した場合、Combatは失敗したOwner・段階・理由をGameへ報告し、[共通接続仕様D03](/spec/common-technology/feature-connections#failure-policy)の中断・表示へ接続します。他Ownerへの片付け要求を継続し、失敗後の遅延完了通知でResult操作を解禁しません。再試行にはアプリ再起動を必要とし、エラー画面からの復旧は行いません。
 
+D03には、登録Ownerの要求矛盾、必須発射準備の不成立、所有保証されたReserved／未公開候補の不正消失も追加採用されています。Combatの担当範囲で検出・受領した有効な内部異常は同じGame中断へ接続し、通常拒否・Target／Enemyの通常消失はそれだけで中断にしません。0018の共通型・Fake・終了応答は本ページの全終了集約やResult解禁の実装完了ではありません。[Frame保留の共通境界](/spec/common-technology/feature-connections#frame-retention)と元のPause契約を維持します。
+
 Battle結果の確定時点ですでに存在するPalette Bullet、Marker、Jaon Bullet、シャオンダマ、および保留中の命中処理は、結果確定直後にGameplay上無効化します。即時消去するか、終了演出として一時的に表示を残すかは各所有ページで定義します。
 
 ただし、以下の全体条件を満たす必要があります。

@@ -55,6 +55,8 @@ relatedSpecs:
 
 ## 依存と受け渡し
 
+0018の[Frame／Step・RGB候補・Enemy→Stage→Gameの共有境界](/tasks/prototype/pb-task-0018#handoff)を受け取り、本タスクで実RGB演算・浄化を実装します。[最終重複台帳とsnapshot／現在受付](/spec/enemy/damage-and-purify#common-rgb-fact)はEnemyが所有し、Gameへ数え直しを移しません。Pauseでは[元Frame保持・未完了部分の明示再開](/spec/common-technology/feature-connections#frame-retention)に従い、新Frame候補と混ぜません。
+
 先行タスク：[PB-TASK-0018](/tasks/prototype/pb-task-0018)、[PB-TASK-0029](/tasks/prototype/pb-task-0029)
 
 先行タスクの全機能完成を待たず、公開型とFakeが渡された時点で独立検証できます。受信先の中身は固定応答で代用できますが、独自に別の共有型を作りません。段階1の通常攻撃経路は[PB-TASK-0045](/tasks/prototype/pb-task-0045)、終了・Result・RetryとWindows短時間確認は[PB-TASK-0046](/tasks/prototype/pb-task-0046)で実物接続を確認し、Fakeのみの確認を実接続の合格には数えません。

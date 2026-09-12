@@ -38,7 +38,7 @@ relatedSpecs:
 
 ## 編集するコード・グラフ・アセット
 
-パスはゲーム本体Repository内の位置です。「既存／参照」は基盤Commit `55d050ad9760b27bb61415a0f7d2324ee9a50bec`で確認した入口、「新規」は作成先の提案です。実装着手時のmainを確認し、同等の追加済み実装があれば再利用します。新規配置・クラス名は既存assemblyの依存方向へ合わせて調整できます。
+パスはゲーム本体Repository内の位置です。以下は初回計画で、「既存／参照」は基盤Commit `55d050ad9760b27bb61415a0f7d2324ee9a50bec`で確認した入口、「新規」は当時の作成先の提案です。追加済みの実装・採用方式・公開状況は[引渡し記録](#handoff)で確認し、同じ入口を再作成しません。
 
 | 区分 | 位置 | 用途 |
 |---|---|---|
@@ -100,5 +100,60 @@ Unityは`6000.3.16f1`を使用します。PRには変更した入口、操作と
 コード・グラフ変更と接続確認をレビューし、必要なCIと対象範囲の検証を通してmainへ反映します。操作確認だけでコードレビューを代替しません。作業コピー・キャッシュ・検証記録を保持し、提供済み基盤の全再監査や仕様表作成をこの実装タスクの提出物にしません。
 
 - Notionタスク：<NotionTaskLink />
-- 実装Pull Request：未登録
+- 実装Pull Request：[第1段階 #46](https://github.com/pushpush-ehime/Palette-Bullet/pull/46)、[第2段階2-A〜2-C #47](https://github.com/pushpush-ehime/Palette-Bullet/pull/47)（ともにマージ済み）。最新版と正式引渡しの状態は[下記](#handoff)。
 - [プロトタイプタスク一覧](/tasks/prototype/)
+
+## 共通接続の実装版と引渡し {#handoff}
+
+2026-09-13（JST）時点。**第2段階2-A〜2-Cは監査済みHEADのCI成功を確認してゲームmainへ統合済みです。このWeb追記がmainへ反映された時点で、後続タスクは下記の共通型・Fake・呼出し例を受け取って正式着手できます。** 第1段階だけの成功を引渡し完了へ読み替えず、全共通契約の監査・検証とゲーム公開結果を対応付けました。実Ownerとの通し接続、人間の操作受入は別の確認です。Notionの進捗・担当割当は変更していません。
+
+| 版 | Commit／公開状況 | 確認できる範囲 |
+|---|---|---|
+| 第1段階のレビュー済みHEAD | [eb69210da7e8252054c9e5c39685e479c4c72479](https://github.com/pushpush-ehime/Palette-Bullet/commit/eb69210da7e8252054c9e5c39685e479c4c72479)、[PR #46](https://github.com/pushpush-ehime/Palette-Bullet/pull/46) | Prepare／Ready・解除・失敗、開始、Pause／Resume、終了受付、5 Fake Owner、保存Scene、基本Contracts／assembly・試験構成 |
+| 第1段階のmerge Commit | [0f46026b58ad938e1805713c44ea67012438c322](https://github.com/pushpush-ehime/Palette-Bullet/commit/0f46026b58ad938e1805713c44ea67012438c322) | 2026-09-11に通常merge。第1段階だけで0018全体の完了にはしない |
+| 第2段階のレビュー済み引渡しHEAD | [1d145b792aa82ddd23fc8685a9e92d5e34c57c07](https://github.com/pushpush-ehime/Palette-Bullet/commit/1d145b792aa82ddd23fc8685a9e92d5e34c57c07)、tree `7051df9b35745d023aa6d90764d79f6a62e699c1` | 2-Aの固定音楽参照／Binding、2-Bの予約・準備・一度の消費、2-CのFrame／RGB固定順とFake、共通APIの送受信例。独立最終監査合格、2件の指摘を修正済み、追加指摘なし。正式Unity証拠とソース・ガイド例の一致を独立照合済み |
+| 第2段階のmerge Commit | [a3793dd1eb1bd3389fddeb4aabd5722146705806](https://github.com/pushpush-ehime/Palette-Bullet/commit/a3793dd1eb1bd3389fddeb4aabd5722146705806)、[PR #47](https://github.com/pushpush-ehime/Palette-Bullet/pull/47) | 2026-09-13 00:01:43 JSTに通常merge。CI 2件が上記HEADで成功し、merge後のtreeも監査版と同一 |
+
+後続はレビュー済み引渡しHEADの契約を基準に接続し、ゲームmainには同じtreeが取り込まれています。2026-09-11のUnity・独立監査結果と、2026-09-13のGitHub CI・merge結果は別の実績です。このWeb追記自体のCI・main反映・Pages公開結果を、ゲームの結果から推定して成功扱いにはしません。
+
+引渡し版の入口はゲームRepository相対パスで次のとおりです。実API・単位・寿命・Owner・呼出し順・C#例は[CONNECTIONS.md](https://github.com/pushpush-ehime/Palette-Bullet/blob/1d145b792aa82ddd23fc8685a9e92d5e34c57c07/Docs/Prototype/CONNECTIONS.md)、段階別の操作と検証範囲は[PHASE1.md](https://github.com/pushpush-ehime/Palette-Bullet/blob/1d145b792aa82ddd23fc8685a9e92d5e34c57c07/Docs/Prototype/PHASE1.md)・[PHASE2A.md](https://github.com/pushpush-ehime/Palette-Bullet/blob/1d145b792aa82ddd23fc8685a9e92d5e34c57c07/Docs/Prototype/PHASE2A.md)・[PHASE2B.md](https://github.com/pushpush-ehime/Palette-Bullet/blob/1d145b792aa82ddd23fc8685a9e92d5e34c57c07/Docs/Prototype/PHASE2B.md)・[PHASE2C.md](https://github.com/pushpush-ehime/Palette-Bullet/blob/1d145b792aa82ddd23fc8685a9e92d5e34c57c07/Docs/Prototype/PHASE2C.md)です。すべてレビュー済みHEADへ固定したリンクです。
+
+| 接続口 | 引渡し版の実装 | 後続の実物接続 |
+|---|---|---|
+| 音楽位置・固定定義・occurrence | `Assets/PaletteBullet/Prototype/Runtime/Contracts/MusicReferences.cs`、`Runtime/Music/`、`Assets/Scripts/PrototypeConnections/` | 0030のAudio同期、0031のCurrent／Weak検索・境界配送。明示順の音楽的採用は曲別に判断 |
+| 予約・Entry準備・消費確定 | `Runtime/Contracts/AttackTransactions.cs`、`Runtime/Fakes/FakeAttackPipeline.cs`、`FakeEmissionPreparation.cs`（`Runtime/`は上のPrototype配下） | 0033／0039の実個体・Allocation、0042／0043の発射・変換・弾・音。準備Readyだけでは発射しない |
+| Frame／Step・RGB事実・結果転送 | `Runtime/Contracts/BattleFrames.cs`、`Runtime/Battle/BattleFrameCoordinator.cs`、`Runtime/Fakes/FakeEnemyRgbFrame.cs` | 0044のRGB演算と浄化、0029のStage、0027のCombat／Game結果。調整役が数・RGB・勝敗を再判定しない |
+| 共通構成・実行例 | `Prototype/Scenes/PrototypeBattle.unity`、`Prototype/Tests/Editor/`・`Tests/Runtime/`（`Assets/PaletteBullet/`配下） | 保存Sceneの明示操作は論理Frame／Stepシミュレーション。実Player接続は0036、通し実接続は0045／0046 |
+
+採用されたD03拡張、固定snapshot／Binding、assembly A案、同期要求とFrame保持の詳細は[共通接続追記](/spec/common-technology/feature-connections#provided-common-connections)を正本とします。Contracts・Player・test asmdefからAssembly-CSharpへの参照、循環、Runtime→Editor依存を作らない構成です。Playerの変更はContracts参照の追加だけで、実Player APIは未接続です。
+
+## 実装・成果記録
+
+### 2026-09-11｜第1段階（main反映）
+
+- できるようになったこと：検証用Sceneで必須Readyの保留・解除・再送、開始一回性、Pause／Resume、準備失敗・旧Battle拒否・終了受付を確認できる共通入口ができました。
+- 実装・制作方法：Gameの集約、Owner別Fake、独立Contracts／RuntimeとEditor／Runtimeテスト構成を追加しました。開始通知、3時計の開始、pre-roll後のAudio開始表示を区別しています。
+- 成果物：[PR #46](https://github.com/pushpush-ehime/Palette-Bullet/pull/46)、レビュー済みHEAD `eb69210da7e8252054c9e5c39685e479c4c72479`、merge Commit `0f46026b58ad938e1805713c44ea67012438c322`。公開ガイドは[PHASE1.md](https://github.com/pushpush-ehime/Palette-Bullet/blob/eb69210da7e8252054c9e5c39685e479c4c72479/Docs/Prototype/PHASE1.md)。
+- 確認した操作・テスト・版と結果：上記HEADの独立監査とPRの必須CI 2件の成功を確認して2026-09-11に通常mergeしました。下の第2段階の518件を、この旧HEADの実行結果として転記しません。
+- 実接続／Fake：Game状態・gate・時計制御・保存Scene／共通型は実装。Stage・Supply・Player・Music・CombatはFake。Audio開始表示は実再生ではありません。
+- 制限・残作業・対象外：第1段階だけでは0018の全共通契約・正式引渡し条件を満たしません。実Player、音楽、攻撃、Enemy、結果／Retryは後続です。
+
+### 2026-09-11｜第2段階2-A〜2-C（ローカル検証・独立監査済み）
+
+以下は9月11日の実施時点の記録です。後日の公開・main反映は次の9月13日の記録に分けています。
+
+- できるようになったこと：実Chartから固定参照を作り、同期予約→未公開準備→明示的な一度の消費→RGB候補→Enemy・Stage・Game入口まで、同じ公開型とFakeで検証できます。Pauseでは元Frameの状態を保持し、明示Closeで未完了部分だけ続けます。
+- 実装・制作方法：既定assembly側Adapterと明示Note順序Bindingを採用し、Runtime／Contractsを分離しました。最初の要求内容・処理中状態を同期callback前に所有し、予約commit直前に元Frame／Pause世代を再検証します。RGBの最終重複台帳はEnemyが所有します。
+- 成果物：ローカル固定Commit `1d145b792aa82ddd23fc8685a9e92d5e34c57c07`。共通API・呼出し例はゲームの `Docs/Prototype/CONNECTIONS.md`、段階ガイドは `PHASE2A.md`〜`PHASE2C.md`。未公開のためリンクは未掲載です。[引渡し記録](#handoff)で公開状況を分けて管理します。
+- 確認した操作・テスト・版と結果：同Commit、Unity 6000.3.16f1でEditMode 425件／PlayMode 93件、計518件が成功し失敗・skipは0。保存Scene／Binding再読込、実Chart参照を使った公開操作、Player回帰を含み、646追跡ソースの実行前後が一致しました。C#送受信例コンパイルとRepository差分監査も成功。独立最終監査では既存pure C# 258件・独立133 probesが全成功し、正式証拠・ソース・例の一致を確認、追加指摘なしです。これら独立試験をUnity518件へ加算しません。
+- 実接続／Fake：固定Chart／定義／位置読取、共通受付・ID・順序・所有の境界は実装。Current／Weak選択、供給・Target・準備候補・Shot・Enemy結果・Stage Clear候補・Game評価はFake。実Audio・弾・RGB演算・勝敗には接続していません。
+- 制限・残作業・対象外：未公開・未統合で正式引渡し前です。人間の初見操作・物理入力・UI目視・聴感、実PlayerLoop／Physics統合、Windows配布Build、GitHub CIは未確認。Fakeの成功を0045／0046の実接続合格やNotionの完了状態にはしません。
+
+### 2026-09-13｜第2段階のゲーム公開・main反映と共通契約の引渡し
+
+- できるようになったこと：第2段階の共通型・Fake・保存Scene・コンパイル可能な呼出し例をゲームmainから取得できます。このWeb追記のmain反映により、後続は[引渡し版](#handoff)の共通契約を使って正式着手できます。
+- 実装・制作方法：監査済み第2段階の9 Commitを専用branchから累積PR #47で公開し、同じHEADのCI成功を確認して通常mergeしました。レビュー済みHEADとmerge Commitを分け、merge後のtree一致を確認しています。ゲームソースの追加修正や履歴書換えはしていません。
+- 成果物：[PR #47](https://github.com/pushpush-ehime/Palette-Bullet/pull/47)、[監査HEAD 1d145b79](https://github.com/pushpush-ehime/Palette-Bullet/commit/1d145b792aa82ddd23fc8685a9e92d5e34c57c07)、[merge a3793dd1](https://github.com/pushpush-ehime/Palette-Bullet/commit/a3793dd1eb1bd3389fddeb4aabd5722146705806)。[共有API・送受信例](https://github.com/pushpush-ehime/Palette-Bullet/blob/1d145b792aa82ddd23fc8685a9e92d5e34c57c07/Docs/Prototype/CONNECTIONS.md)から段階別ガイドと実コードへ進めます。
+- 確認した操作・テスト・版と結果：2026-09-13に同HEADのGitHub CI [retirement](https://github.com/pushpush-ehime/Palette-Bullet/actions/runs/34700927555/job/103572437691)・[Lightweight Unity repository audit](https://github.com/pushpush-ehime/Palette-Bullet/actions/runs/34700927556/job/103572437637)のsuccessを確認。00:01:43 JSTにmergeし、tree `7051df9b35745d023aa6d90764d79f6a62e699c1` が監査版と一致しました。Unity518件と独立コード監査は上の9月11日の実績で、公開時の再実行とはしていません。
+- 実接続／Fake：公開した内容は9月11日の監査版と同じです。固定Chart参照・共通受付・所有・Frame順序は実装済み。実Player・Audio・本番選択／配送・弾・Enemy演算・勝敗を新たに実接続した記録ではありません。
+- 制限・残作業・対象外：この記録でWeb自身のCI・merge・Pages公開や人間の初見操作・UI目視・聴感を実施済みにはしません。実Ownerの本実装、0045／0046の通し接続・配布Buildは後続です。Notionの進捗、完了checkbox、担当割当、Discord通知は変更していません。

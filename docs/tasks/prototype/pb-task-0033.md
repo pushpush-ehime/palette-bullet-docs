@@ -55,6 +55,8 @@ relatedSpecs:
 
 ## 依存と受け渡し
 
+0018の[共通契約・Fakeと引渡し状態](/tasks/prototype/pb-task-0018#handoff)を受け取り、実個体の所有・予約・消費へ接続します。同frameで確定済み予約を自然破裂より優先し、未確定要求を後から予約扱いにしません。所有保証したReserved個体の異常消失と未予約個体の通常消失は[D03](/spec/common-technology/feature-connections#failure-policy)で区別します。
+
 先行タスク：[PB-TASK-0018](/tasks/prototype/pb-task-0018)
 
 先行タスクの全機能完成を待たず、公開型とFakeが渡された時点で独立検証できます。受信先の中身は固定応答で代用できますが、独自に別の共有型を作りません。段階1の通常攻撃経路は[PB-TASK-0045](/tasks/prototype/pb-task-0045)、終了・Result・RetryとWindows短時間確認は[PB-TASK-0046](/tasks/prototype/pb-task-0046)で実物接続を確認し、Fakeのみの確認を実接続の合格には数えません。

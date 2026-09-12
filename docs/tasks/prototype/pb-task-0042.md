@@ -56,6 +56,8 @@ relatedSpecs:
 
 ## 依存と受け渡し
 
+0018の[発火snapshot・準備ticket・消費確定APIとFake](/tasks/prototype/pb-task-0018#handoff)を実発射へ接続します。準備Ownerは構築前から未公開候補を所有し、準備の正常returnとReadyを満たした後、攻撃解決が明示commitで一度だけConsumed／Shot事実を確定します。ReadyやResumeだけでは発射しません。通常Target消失と必須準備・所有保証の異常を[D03](/spec/common-technology/feature-connections#failure-policy)で分けます。
+
 先行タスク：[PB-TASK-0018](/tasks/prototype/pb-task-0018)、[PB-TASK-0031](/tasks/prototype/pb-task-0031)、[PB-TASK-0039](/tasks/prototype/pb-task-0039)
 
 先行タスクの全機能完成を待たず、公開型とFakeが渡された時点で独立検証できます。受信先の中身は固定応答で代用できますが、独自に別の共有型を作りません。段階1の通常攻撃経路は[PB-TASK-0045](/tasks/prototype/pb-task-0045)、終了・Result・RetryとWindows短時間確認は[PB-TASK-0046](/tasks/prototype/pb-task-0046)で実物接続を確認し、Fakeのみの確認を実接続の合格には数えません。
