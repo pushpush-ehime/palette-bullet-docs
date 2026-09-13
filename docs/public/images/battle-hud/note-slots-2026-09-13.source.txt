@@ -1,0 +1,201 @@
+<div id="pb-preview-note-study" aria-label="要求音の装填状態と、コード・アルペジオの配置の比較案">
+  <style>
+    #pb-preview-note-study {
+      --pb-surface: light-dark(#f6f7fa, #141a25);
+      --pb-ink: light-dark(#202938, #eef2fa);
+      --pb-sub: light-dark(#536177, #a8b8cd);
+      --pb-line: light-dark(#b8c3d3, #52627a);
+      --pb-pink: light-dark(#b91c60, #fb8ab5);
+      --pb-green: light-dark(#137b5d, #5cdbb0);
+      --pb-blue: light-dark(#225bd6, #8badff);
+      --pb-filled-ink: light-dark(#ffffff, #0b1020);
+      --pb-radius: 9px;
+      color: var(--pb-ink);
+      font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      width: 100%;
+    }
+    #pb-preview-note-study * { box-sizing: border-box; }
+    #pb-preview-note-study .pb-state-strip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 24px;
+      padding: 20px 12px;
+      background: var(--pb-surface);
+      border-radius: 12px;
+    }
+    #pb-preview-note-study .pb-state-example {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    #pb-preview-note-study .pb-state-name { font-weight: 500; }
+    #pb-preview-note-study .pb-note {
+      --pb-tone: var(--pb-pink);
+      flex: 0 0 auto;
+      width: 60px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      position: relative;
+      border: 3px solid var(--pb-tone);
+      border-radius: var(--pb-radius);
+      background: var(--pb-surface);
+      color: var(--pb-tone);
+      font-size: 21px;
+      line-height: 1;
+      font-weight: 500;
+    }
+    #pb-preview-note-study .pb-note[data-tone="e"] { --pb-tone: var(--pb-green); }
+    #pb-preview-note-study .pb-note[data-tone="gs"] { --pb-tone: var(--pb-blue); }
+    #pb-preview-note-study .pb-note[data-filled="true"] {
+      background: var(--pb-tone);
+      color: var(--pb-filled-ink);
+    }
+    #pb-preview-note-study .pb-check {
+      display: none;
+      position: absolute;
+      top: 3px;
+      right: 4px;
+      font-size: 11px;
+      line-height: 1;
+    }
+    #pb-preview-note-study .pb-note[data-filled="true"] .pb-check { display: block; }
+    #pb-preview-note-study .pb-comparison {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    #pb-preview-note-study .pb-event {
+      background: var(--pb-surface);
+      padding: 18px 14px;
+      border-radius: 12px;
+      min-width: 0;
+    }
+    #pb-preview-note-study .pb-event-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    #pb-preview-note-study .pb-event-meaning { color: var(--pb-sub); font-size: 12px; font-weight: 400; }
+    #pb-preview-note-study .pb-event-field {
+      height: 218px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #pb-preview-note-study .pb-chord-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 0 12px;
+      border-left: 3px solid var(--pb-line);
+      border-right: 3px solid var(--pb-line);
+      border-radius: 8px;
+    }
+    #pb-preview-note-study .pb-arp-chain {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      position: relative;
+    }
+    #pb-preview-note-study .pb-arp-chain::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 3px;
+      background: var(--pb-line);
+    }
+    #pb-preview-note-study .pb-arp-entry { position: relative; }
+    #pb-preview-note-study .pb-entry-order {
+      position: absolute;
+      left: 0;
+      right: 0;
+      text-align: center;
+      bottom: calc(100% + 8px);
+      color: var(--pb-sub);
+      font-size: 12px;
+    }
+    #pb-preview-note-study .pb-state-caption { color: var(--pb-sub); text-align: center; font-size: 12px; }
+    #pb-preview-note-study .pb-footnote { margin-top: 10px; color: var(--pb-sub); font-size: 12px; }
+    @media (max-width: 570px) {
+      #pb-preview-note-study .pb-comparison { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      #pb-preview-note-study .pb-note { transition: background-color 160ms ease, color 160ms ease, border-radius 160ms ease; }
+    }
+  </style>
+
+  <div class="pb-state-strip" role="img" aria-label="未装填は音の色の枠と音名、装填済みは同じ色の塗りつぶしとチェックで区別する案">
+    <div class="pb-state-example">
+      <span class="pb-note" aria-hidden="true">C♯</span>
+      <span class="pb-state-name">未装填</span>
+    </div>
+    <div class="pb-state-example">
+      <span class="pb-note" data-filled="true" aria-hidden="true">C♯<span class="pb-check">✓</span></span>
+      <span class="pb-state-name">装填済み</span>
+    </div>
+  </div>
+
+  <div class="pb-comparison" aria-label="攻撃の種類と装填状態の比較">
+    <section class="pb-event" aria-label="コードは同時に鳴る音を縦にまとめる配置案">
+      <div class="pb-event-title"><span>コード</span><span class="pb-event-meaning">縦に束ねる・同時</span></div>
+      <div class="pb-event-field">
+        <div class="pb-chord-stack" role="group" aria-label="コードの要求音">
+          <span class="pb-note pb-demo-note" data-entry="0" data-filled="true" aria-label="Cシャープ、装填済み">C♯<span class="pb-check" aria-hidden="true">✓</span></span>
+          <span class="pb-note pb-demo-note" data-entry="1" data-tone="e" aria-label="E、未装填">E<span class="pb-check" aria-hidden="true">✓</span></span>
+          <span class="pb-note pb-demo-note" data-entry="2" data-tone="gs" data-filled="true" aria-label="Gシャープ、装填済み">G♯<span class="pb-check" aria-hidden="true">✓</span></span>
+        </div>
+      </div>
+      <div class="pb-state-caption">C♯・G♯は装填済み／Eが不足</div>
+    </section>
+    <section class="pb-event" aria-label="アルペジオは順に鳴る音を横につなぐ配置案">
+      <div class="pb-event-title"><span>アルペジオ</span><span class="pb-event-meaning">横につなぐ・順番</span></div>
+      <div class="pb-event-field">
+        <div class="pb-arp-chain" role="group" aria-label="アルペジオの要求音。横の間隔は配置例で、実際の音の時間間隔を表すものではありません">
+          <div class="pb-arp-entry"><span class="pb-entry-order">1</span><span class="pb-note pb-demo-note" data-entry="0" data-filled="true" aria-label="1番目、Cシャープ、装填済み">C♯<span class="pb-check" aria-hidden="true">✓</span></span></div>
+          <div class="pb-arp-entry"><span class="pb-entry-order">2</span><span class="pb-note pb-demo-note" data-entry="1" data-tone="e" aria-label="2番目、E、未装填">E<span class="pb-check" aria-hidden="true">✓</span></span></div>
+          <div class="pb-arp-entry"><span class="pb-entry-order">3</span><span class="pb-note pb-demo-note" data-entry="2" data-tone="gs" data-filled="true" aria-label="3番目、Gシャープ、装填済み">G♯<span class="pb-check" aria-hidden="true">✓</span></span></div>
+        </div>
+      </div>
+      <div class="pb-state-caption">C♯・G♯は装填済み／Eが不足</div>
+    </section>
+  </div>
+  <div class="pb-footnote">配置・配色の比較案／音名は例示／横の間隔は発射間隔を表さない</div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('pb-preview-note-study');
+      const state = { loading: 'partial', shape: 'angular' };
+      const noteNames = ['Cシャープ', 'E', 'Gシャープ'];
+      function render() {
+        root.style.setProperty('--pb-radius', state.shape === 'round' ? '26px' : '9px');
+        root.querySelectorAll('.pb-demo-note').forEach(note => {
+          const index = Number(note.dataset.entry);
+          const filled = state.loading === 'full' || (state.loading === 'partial' && index !== 1);
+          note.dataset.filled = String(filled);
+          const prefix = note.closest('.pb-arp-chain') ? `${index + 1}番目、` : '';
+          note.setAttribute('aria-label', `${prefix}${noteNames[index]}、${filled ? '装填済み' : '未装填'}`);
+        });
+        const caption = state.loading === 'empty' ? 'すべて未装填' : state.loading === 'full' ? 'すべて装填済み' : 'C♯・G♯は装填済み／Eが不足';
+        root.querySelectorAll('.pb-state-caption').forEach(label => { label.textContent = caption; });
+      }
+      render();
+      if (globalThis.Tweak) {
+        const tweak = new Tweak({ container: root, onChange: render });
+        tweak.addSelect(state, 'loading', { label: '装填状態', options: [{ label: 'すべて未装填', value: 'empty' }, { label: '一部装填', value: 'partial' }, { label: 'すべて装填済み', value: 'full' }] });
+        tweak.addSelect(state, 'shape', { label: '音枠の形', options: [{ label: '角形', value: 'angular' }, { label: '丸形', value: 'round' }] });
+      }
+    })();
+  </script>
+</div>
