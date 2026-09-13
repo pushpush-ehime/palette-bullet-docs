@@ -260,6 +260,8 @@ MusicChartを切り替えたとき、
 
 system pre-roll、曲本編のMusic Position、AudioClipの音源位置を混同しない表示とします。
 
+実効Charge受付終了はFire Music Positionと同じ位置に重ねて示します。別の早期Close線や旧Close Offsetによる先行位置を有効境界として表示しません。固定AttackEventとRandom Candidate、曲共通設定と個別Overrideのいずれも[MusicChartの移行契約](/spec/bgm/bgm-music-chart#旧charge-close-offsetの移行)に従います。
+
 必要に応じて同じ画面上で複数の時間表現を併記しても構いませんが、
 どの値がMusicChart時計で、どの値がAudioClip位置かを明確に識別できる必要があります。
 
@@ -1059,7 +1061,7 @@ Runtime Monitor自体は完成版仕様に含みますが、
 2. AudioClipを再生し、タイムライン位置と対応付けられる
 3. シャオンダマ使用Trackを確認・設定できる
 4. AttackEventの基本データを確認・編集できる
-5. Preview、Charge受付開始、Charge受付終了、Fireを同一時間軸で確認できる
+5. Preview、Charge受付開始、Charge受付終了、Fireを同一時間軸で確認できる（終了とFireは同一位置。旧Close先行線を有効境界と誤認しない）
 6. MusicChart正本仕様に基づくValidation結果を表示できる
 7. Validation対象位置へ移動できる
 8. MIDI再ImportでMIDI由来データを更新できる

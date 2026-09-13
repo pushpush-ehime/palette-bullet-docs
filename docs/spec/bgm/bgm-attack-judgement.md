@@ -229,6 +229,8 @@ Reserved Shaondama
 
 です。
 
+Normal AttackEventのCharge受付終了はこの発火と同じ音楽時刻です。発火時刻ちょうどの新規Click判定／Drag Releaseを同じoccurrenceのSlotへ加えず、発火前にcommit済みのReservedをsnapshotします。Currentの再選択先は[Allocation](/spec/draw-system/charge-allocation)に従います。
+
 ## Target座標を発火時にsnapshotする
 
 AttackEventは、発火時にTarget座標を1回だけ確定してsnapshotします。
@@ -728,6 +730,8 @@ G Reserved Shaondama
 ```
 
 発火後に、Slot状態やAllocation結果を再評価しません。
+
+後続Arpeggio Entryの発射までの間も新しいChargeをこのoccurrenceへ追加しません。各EntryのHUD表示終了方法は未決で、最後のTimingでのGameplay解決完了とは別です。
 
 通常解決では、snapshotした結果、Target座標、Mode、および付与済みConductまたは明示的な未選択状態を、最後のArpeggio timingの処理が完了するまで維持します。
 

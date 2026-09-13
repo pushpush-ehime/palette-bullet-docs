@@ -49,9 +49,7 @@ AttackEvent音楽情報
 ↓
 予告 / Charge受付開始
 ↓
-Charge受付終了
-↓
-AttackEvent発火
+Charge受付終了 = AttackEvent発火
 ↓
 Gameplay側で発火結果を解決
 ```
@@ -66,7 +64,7 @@ Gameplay側で発火結果を解決
 | --- | --- |
 | AttackEvent音楽情報 | **本ページ** |
 | AttackEvent Fire音楽位置 | **本ページ** |
-| 3 Progressの音楽時間関係 | **本ページ** |
+| 予告／Charge開始と発火／Charge終了の音楽時間関係 | **本ページ** |
 | system pre-roll中のPreview / Charge開始条件 | **本ページ** |
 | Charge受付開始 / 終了の音楽条件 | **本ページ** |
 | 各要求Entryのexact MIDI Note | **本ページ** |
@@ -195,19 +193,16 @@ Normal AttackEvent
 
 AttackEventごとに独立した複数の時計を進める方式にはしません。
 
-> **1本のBGM音楽時間軸を正本とし、その時間軸に対してオフセットされた3つの参照Progressを使用します。**
+> **1本のBGM音楽時間軸を正本とし、予告／Charge開始を先行させ、Charge終了はActual BGMの発火位置と一致させます。**
 
-3つのProgressは同じ速度で進行します。
+参照Progressは同じ速度で進行します。旧`Charge Close Progress`を独立したGameplay境界として進めません。
 
 ```text
 ① Preview / Charge Start Progress
    最も先行
 
-② Charge Close Progress
-   ①より後ろ、Actual BGMより前
-
-③ Actual BGM Progress
-   最も後ろ
+② Actual BGM Progress
+   FireとCharge Closeの共通境界
 ```
 
 同じAttackEvent音楽位置`T`に対して、それぞれのProgressが`T`へ到達した時点をイベント境界として使用します。
@@ -238,7 +233,7 @@ pre-roll中を含む基準時計、実音源の開始offset、および音響同
 
 ---
 
-## 3つのProgress
+## 予告と発火の境界
 
 ```text
 Preview / Charge Start Progress が T へ到達
@@ -247,13 +242,9 @@ AttackEvent予告開始
 +
 Charge受付開始
 
-Charge Close Progress が T へ到達
-↓
-Charge受付終了
-
 Actual BGM Progress が T へ到達
 ↓
-AttackEvent発火
+Charge受付終了 = AttackEvent発火
 ```
 
 したがって、時間関係は以下です。
@@ -263,13 +254,9 @@ Preview / Charge Start
 ↓
 Charge受付中
 ↓
-Charge Close
-↓
-Charge受付終了
-↓
 Actual BGM
 ↓
-AttackEvent発火
+Charge受付終了 = AttackEvent発火
 ```
 
 ---
@@ -292,7 +279,7 @@ Charge受付開始
 
 ## Charge Close
 
-`Charge Close Progress`が同じAttackEventのFire Music Positionへ到達した時点で、そのNormal AttackEventのCharge受付を終了します。
+Actual BGMが同じAttackEventのFire Music Positionへ到達した時点で、そのNormal AttackEventのCharge受付を終了します。`Charge Close`と発火は同一の音楽時刻であり、発火前の別の終了窓を設けません。
 
 Charge受付終了後、そのAttackEventは新しいChargeの対象にはなりません。
 
@@ -303,6 +290,14 @@ Current Normal AttackEventの決定アルゴリズム自体は[チャージ先�
 ## Actual BGM / Fire
 
 Actual BGMの音楽時間がAttackEventのFire Music Positionへ到達した時点で、そのAttackEventは発火します。
+
+この境界のCharge判定は半開区間 `[予告／受付開始, Fire)` で評価します。Fire時刻ちょうどのClick判定EventまたはDrag Releaseは、その発火するoccurrenceへcommitできません。時刻がFire未満で正常にcommit済みのReservedだけを発火snapshotへ含めます。判定・Fire通知の処理が同じUnity frameに入っても、`T`と`T`未満の出来事をframe実行順だけで入れ替えません。後続Currentへの割り当ては[Allocation](/spec/draw-system/charge-allocation)を正とします。
+
+| Charge判定の音楽時刻 | Fireが`T`のoccurrence A |
+| --- | --- |
+| `T`未満（受付開始以後） | AがCurrentかつ未充填ならAへのcommitを試行。成功済み分はFireへ引き渡す |
+| `T`ちょうど | Aおよび同時刻発火のoccurrenceを先に受付候補から外す。発火snapshotへ新規追加しない |
+| `T`より後 | Aへ遡及しない。次の有効CurrentまたはNormalなし規則を使用 |
 
 発火後の、
 
@@ -337,23 +332,20 @@ AttackEvent発火後の`Complete / Incomplete / Zero Charge`、使用Reserved Sh
 
 ## Offsetパラメータ
 
-3つのProgressの位置差はパラメータ化します。
+予告／Charge開始のFireに対する先行時間だけをGameplay調整値とします。
 
 概念上、
 
 ```text
 Preview Lead Offset
-Charge Close Lead Offset
 ```
 
 等により、
 
 ```text
-Preview Progress
->
-Charge Close Progress
->
-Actual BGM Progress
+Preview / Charge Start Progress
+>=
+Actual BGM Progress = Charge Close境界
 ```
 
 の関係を作ります。
@@ -364,18 +356,18 @@ Actual BGM Progress
 - 秒で保存するか、別の音楽時間単位で保存するか
 - Inspector上の構造
 - 共通値 / 曲単位override / AttackEvent単位overrideの保存方式
-- 具体的なOffset値
+- Preview / Charge Start Offsetの具体値
 - system pre-rollの具体的な長さ
 
 これらの保存構造は[MusicChart仕様](/spec/bgm/bgm-music-chart)で整理します。
 
 本ページが正とするのは、
 
-> **1本のBGM時間軸から一定のoffset関係を持つ3つのProgressによって、予告・Charge開始・Charge終了・発火を判定する**
+> **1本のBGM時間軸から、先行する予告／Charge開始と、同時に成立するCharge終了／発火を判定する**
 
 という音楽時間上の意味です。
 
-Pause / Resume等によって3つの独立タイマーが互いにずれる構造にはしません。
+Pause / Resume等によって独立タイマーが互いにずれる構造にはしません。旧`Charge Close Lead Offset`は受付終了の調整値として廃止します。既存の保存値をPreview側やAudio同期補正へ転用せず、移行時のデータと表示・validationの扱いは[MusicChart仕様](/spec/bgm/bgm-music-chart)に従います。
 
 ---
 
@@ -392,7 +384,7 @@ Preview / Charge Start ProgressがFire位置へ到達
 
 〜
 
-Charge Close ProgressがFire位置へ到達
+Actual BGMがFire位置へ到達
 ↓
 受付終了
 ```
@@ -405,7 +397,7 @@ Charge Close ProgressがFire位置へ到達
 
 ## Charge受付終了
 
-Charge Close到達後は、そのAttackEventへ新たなChargeを受け付けません。
+Fire到達時（ちょうどを含む）から、そのAttackEventへ新たなChargeを受け付けません。Clock／表示の丸めで境界を前後させません。
 
 すでに確定済みのAllocation / Reservedをどう保持するかは[チャージ先・スロット割り当て仕様](/spec/draw-system/charge-allocation)を正とします。
 
@@ -601,6 +593,8 @@ Chordでは、各Entryは同一のChord音楽タイミングを使用します�
 
 発火時に、どのEntryが実際の攻撃へ使用されるかは[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)へ委譲します。
 
+ChordのCharge受付終了はこのAttackEventのFire時刻です。全Entryを同時発射するかどうかは発火時の確定済みSlot状態によって決まり、FireちょうどのCharge判定を後から同じChordへ足しません。
+
 ---
 
 ## Harmony
@@ -702,6 +696,8 @@ G5
 各Timingは同じBGM音楽時間軸へ変換可能な情報とし、実時間への変換にはMusicChartのTempoMapを利用できる構造とします。
 
 すべてのArpeggio Entryの音楽的Timingは、そのAttackEventのFire Music Positionと同じloop occurrence内へ収めます。loop境界を越えるTimingは許可しません。
+
+ArpeggioもAttackEvent単位でCharge受付をFire時刻に終了します。後続EntryのTimingを個別のCharge締切にはせず、発火時の使用Slot／Reserved snapshot後に空きSlotを補充しません。各音のHUD表示終了方法は未決であり、このGameplay受付・発射契約から推定しません。
 
 Arpeggio発火時のsnapshot、Empty Entryのスキップ、最後のTimingでの解決完了は[AttackEvent成立判定](/spec/bgm/bgm-attack-judgement)を正とします。
 
@@ -987,7 +983,7 @@ Random SectionのCandidateとして抽選されないNormal AttackEventについ
 
 - Fire Music Position
 - Preview / Charge Start
-- Charge Close
+- Charge Close（Fireと同時刻）
 - Type
 - Music Requirement Entries
 - exact MIDI Note
@@ -1081,7 +1077,7 @@ MusicChart上に保存される静的なAttackEvent Definitionには、Playerが
 各Normal AttackEvent occurrenceごとに、少なくとも以下を別周回として扱える必要があります。
 
 - Preview / Charge Start
-- Charge Close
+- Charge Close（Fireと同時刻）
 - Current候補
 - 発火
 - Slot / Reservedとの対応
@@ -1306,13 +1302,9 @@ Allocation
 Reserved
 （この時点ではPalette Bullet化しない）
 ↓
-Charge Close ProgressがFire位置へ到達
-↓
-Charge受付終了
-↓
 Actual BGMがFire位置へ到達
 ↓
-AttackEvent発火
+Charge受付終了 = AttackEvent発火
 ↓
 Complete / Incomplete / Zero Charge
 ↓
@@ -1369,14 +1361,14 @@ Normal AttackEventではAttackEvent自身のMusic Requirement Entryが実発音�
 - 本ページをAttackEventがGameplayへ提供する音楽情報・音楽時間情報の正本とする
 - Normal AttackEventはMusicChartへ事前設定される
 - AttackEventごとに独立した3本の時計を持たず、1本のBGM音楽時間軸を正本とする
-- その音楽時間軸に対して`Preview / Charge Start`、`Charge Close`、`Actual BGM`の3 Progressを同じ速度で進める
+- その音楽時間軸に対して`Preview / Charge Start`を先行させ、`Charge Close`は`Actual BGM`のFire境界に一致させる
 - 冒頭AttackEventの予告・Charge受付はsystem pre-roll中に開始可能とする
 - system pre-rollを完成楽曲・音源・MIDI内の無音として追加しない
 - 最初のAttackEventだけPreview／Charge受付時間を短縮または破棄しない
 - `Preview / Charge Start`到達時に予告開始とCharge受付開始を同時に行う
-- `Charge Close`到達時にCharge受付を終了する
-- `Actual BGM`がFire Music Positionへ到達した時点でAttackEventを発火する
-- 3 Progress間の位置差はパラメータ化する
+- `Actual BGM`がFire Music Positionへ到達した時点でCharge受付を終了し、AttackEventを発火する
+- Charge受付は開始を含みFire時刻を含まない。旧occurrenceへのFire同時刻のCharge判定は不成立とする
+- Preview／Charge開始の先行時間のみ調整可能とし、旧Charge Close先行時間は受付判定へ使わない
 - Current Normal AttackEventの決定そのものは`charge-allocation.md`を正とする
 - 複数の受付中Normal AttackEventはFire Music Positionが早いものを音楽時間上先とする
 - Fire Music Positionが完全同時の場合のみMusicChart定義順をtie-breakに使用する
@@ -1424,16 +1416,12 @@ Normal AttackEventではAttackEvent自身のMusic Requirement Entryが実発音�
 
 残る未決事項は、主に調整値と実装表現です。
 
-## 3 ProgressのOffset具体値
+## Preview／Charge開始のOffset具体値
 
-以下の具体的な時間差は未確定です。
+以下の具体的な先行時間は未確定です。
 
 ```text
 Preview / Charge Start
-と
-Charge Close
-
-Charge Close
 と
 Actual BGM
 ```
@@ -1461,7 +1449,7 @@ pre-roll長は、冒頭AttackEventのPreview／Chargeに必要な先行時間を
 - 実フィールド名
 - 時間単位
 
-時間モデル自体は本ページの3 Progress方式で確定しています。
+時間モデル自体は本ページの予告／Charge開始とFire／Charge終了の共通境界で確定しています。
 
 ---
 
