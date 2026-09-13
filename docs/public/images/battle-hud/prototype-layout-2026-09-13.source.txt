@@ -1,0 +1,378 @@
+<div id="pb-hud-layout-study" aria-label="Battle HUDの配置案とAttackEvent予告の動き">
+  <style>
+    #pb-hud-layout-study {
+      --pb-ground: light-dark(#e8edf0, #18212a);
+      --pb-far: light-dark(#f8fafb, #25313b);
+      --pb-ink: light-dark(#263645, #f0f4f6);
+      --pb-sub: light-dark(#536878, #b7c6cf);
+      --pb-panel: light-dark(#f8fafc, #17212d);
+      --pb-border: light-dark(#9caebb, #728695);
+      --pb-accent: light-dark(#956500, #ffcf62);
+      --pb-accent-fill: light-dark(#ffe7a6, #59451f);
+      --pb-pink: light-dark(#b91c60, #fb8ab5);
+      --pb-green: light-dark(#137b5d, #5cdbb0);
+      --pb-blue: light-dark(#225bd6, #8badff);
+      --pb-note-ink: light-dark(#ffffff, #101823);
+      --pb-hp: light-dark(#218467, #79dfb5);
+      --pb-stamina: light-dark(#a66b08, #f0c764);
+      font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--pb-ink);
+      width: 100%;
+    }
+    #pb-hud-layout-study * { box-sizing: border-box; }
+    #pb-hud-layout-study .pb-battle {
+      position: relative;
+      isolation: isolate;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 400px;
+      background: linear-gradient(to bottom, var(--pb-far) 0%, var(--pb-far) 39%, var(--pb-ground) 40%, var(--pb-ground) 100%);
+      border-radius: 12px;
+    }
+    #pb-hud-layout-study .pb-horizon {
+      position: absolute;
+      top: 40%;
+      left: 0;
+      right: 0;
+      border-top: 1px solid var(--pb-border);
+      opacity: .4;
+    }
+    #pb-hud-layout-study .pb-timeline {
+      position: absolute;
+      top: 14px;
+      left: 3%;
+      right: 3%;
+      height: 66px;
+      z-index: 2;
+    }
+    #pb-hud-layout-study .pb-timeline svg { display: block; width: 100%; height: 66px; }
+    #pb-hud-layout-study .pb-player {
+      position: absolute;
+      left: 31%;
+      bottom: 20%;
+      width: 42px;
+      height: 104px;
+      border: 2px dashed var(--pb-border);
+      border-radius: 22px 22px 9px 9px;
+      background: var(--pb-ground);
+    }
+    #pb-hud-layout-study .pb-player span {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 6px);
+      transform: translateX(-50%);
+      color: var(--pb-sub);
+      font-size: 12px;
+    }
+    #pb-hud-layout-study .pb-enemy {
+      position: absolute;
+      left: 59%;
+      top: 40%;
+      width: 56px;
+      height: 57px;
+      display: grid;
+      place-items: center;
+      border: 2px dashed var(--pb-border);
+      border-radius: 16px;
+      background: var(--pb-ground);
+      color: var(--pb-sub);
+      font-size: 12px;
+    }
+    #pb-hud-layout-study .pb-reticle {
+      position: absolute;
+      top: calc(50% - 9px);
+      left: calc(50% - 9px);
+      width: 18px;
+      height: 18px;
+    }
+    #pb-hud-layout-study .pb-reticle::before,
+    #pb-hud-layout-study .pb-reticle::after {
+      content: "";
+      position: absolute;
+      background: var(--pb-ink);
+    }
+    #pb-hud-layout-study .pb-reticle::before { top: 8px; width: 18px; height: 2px; }
+    #pb-hud-layout-study .pb-reticle::after { left: 8px; width: 2px; height: 18px; }
+    #pb-hud-layout-study .pb-status {
+      position: absolute;
+      left: 20px;
+      bottom: 21px;
+      width: clamp(108px, 22%, 170px);
+      display: grid;
+      gap: 9px;
+    }
+    #pb-hud-layout-study .pb-meter-label { font-size: 11px; margin-bottom: 2px; }
+    #pb-hud-layout-study .pb-track { height: 7px; border-radius: 4px; background: var(--pb-border); }
+    #pb-hud-layout-study .pb-track span { display: block; height: 100%; border-radius: inherit; background: var(--pb-hp); }
+    #pb-hud-layout-study .pb-track.pb-stamina span { background: var(--pb-stamina); }
+    #pb-hud-layout-study .pb-modes {
+      position: absolute;
+      top: 25%;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    #pb-hud-layout-study .pb-modes-title { font-size: 11px; }
+    #pb-hud-layout-study .pb-mode {
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      background: var(--pb-panel);
+      border: 1px solid var(--pb-border);
+      border-radius: 50%;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    #pb-hud-layout-study .pb-mode.pb-current { border: 3px solid var(--pb-accent); background: var(--pb-accent-fill); }
+    #pb-hud-layout-study .pb-conducts {
+      position: absolute;
+      bottom: 18px;
+      right: 18px;
+      text-align: center;
+      width: 144px;
+    }
+    #pb-hud-layout-study .pb-conduct-triangle { position: relative; width: 144px; height: 118px; }
+    #pb-hud-layout-study .pb-conduct-cycle { position: absolute; inset: 0; width: 144px; height: 118px; pointer-events: none; }
+    #pb-hud-layout-study .pb-conduct {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      width: 48px;
+      min-height: 53px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--pb-ink);
+      font-family: inherit;
+      line-height: 1.4;
+      cursor: pointer;
+    }
+    #pb-hud-layout-study .pb-conduct[data-conduct="spread"] { left: 48px; top: 0; }
+    #pb-hud-layout-study .pb-conduct[data-conduct="none"] { left: 0; top: 64px; }
+    #pb-hud-layout-study .pb-conduct[data-conduct="echo"] { right: 0; top: 64px; }
+    #pb-hud-layout-study .pb-conduct-face {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      background: var(--pb-panel);
+      border: 1px solid var(--pb-border);
+      border-radius: 50%;
+      font-size: 12px;
+    }
+    #pb-hud-layout-study .pb-conduct.pb-selected .pb-conduct-face { border: 3px solid var(--pb-accent); background: var(--pb-accent-fill); }
+    #pb-hud-layout-study .pb-conduct-name { font-size: 11px; white-space: nowrap; }
+    #pb-hud-layout-study .pb-conduct-help { margin-top: 3px; color: var(--pb-sub); font-size: 11px; }
+    #pb-hud-layout-study .pb-actions {
+      position: absolute;
+      bottom: 19px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    #pb-hud-layout-study .pb-actions kbd {
+      padding: 1px 4px;
+      background: var(--pb-panel);
+      border: 1px solid var(--pb-border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 11px;
+    }
+    #pb-hud-layout-study .pb-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 18px;
+      margin-top: 9px;
+      font-size: 12px;
+      color: var(--pb-sub);
+    }
+    #pb-hud-layout-study .pb-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    #pb-hud-layout-study .pb-legend-ring { width: 16px; height: 12px; border: 2px solid var(--pb-accent); border-radius: 3px; }
+    #pb-hud-layout-study .pb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    @media (max-width: 550px) {
+      #pb-hud-layout-study .pb-battle { min-height: 430px; }
+      #pb-hud-layout-study .pb-status { left: 13px; bottom: 56px; width: 108px; }
+      #pb-hud-layout-study .pb-conducts { right: 11px; bottom: 50px; }
+      #pb-hud-layout-study .pb-actions { bottom: 15px; flex-direction: row; gap: 14px; }
+      #pb-hud-layout-study .pb-modes { right: 13px; top: 23%; }
+      #pb-hud-layout-study .pb-player { left: 29%; bottom: 32%; }
+      #pb-hud-layout-study .pb-enemy { left: 55%; top: 42%; }
+    }
+  </style>
+
+  <div class="pb-battle" aria-label="上部にAttackEvent予告、左下にHPとStamina、右側にMode、右下にConduct、下部中央に操作ガイドを置く配置案">
+    <div class="pb-horizon" aria-hidden="true"></div>
+    <div class="pb-timeline" aria-label="AttackEventの予告帯。発射ポイントは一番左に固定">
+      <svg role="img" aria-label="右から左端の発射ポイントへ流れるAttackEvent。囲み枠でまとまり、太い枠で装填対象を示す"></svg>
+    </div>
+    <div class="pb-player" aria-label="Playerの位置の目安"><span>Player</span></div>
+    <div class="pb-enemy" aria-label="Enemyの位置の目安">Enemy</div>
+    <div class="pb-reticle" role="img" aria-label="中央のレティクル"></div>
+    <div class="pb-status" aria-label="HPとStaminaの配置例。値は仮">
+      <div><div class="pb-meter-label">HP</div><div class="pb-track"><span style="width:78%"></span></div></div>
+      <div><div class="pb-meter-label">Stamina</div><div class="pb-track pb-stamina"><span style="width:61%"></span></div></div>
+    </div>
+    <div class="pb-modes" aria-label="Modeは数字1から4。現在のModeは2の表示例">
+      <div class="pb-modes-title">Mode</div>
+      <span class="pb-mode">1</span><span class="pb-mode pb-current">2</span><span class="pb-mode">3</span><span class="pb-mode">4</span>
+    </div>
+    <div class="pb-conducts" role="group" aria-label="次回用Conductの三角配置。ホイールで未選択、ひろがり、やまびこの順に循環選択する配置例">
+      <div class="pb-conduct-triangle">
+        <svg class="pb-conduct-cycle" viewBox="0 0 144 118" aria-hidden="true">
+          <defs>
+            <marker id="pb-conduct-cycle-arrow" markerWidth="5" markerHeight="5" refX="3" refY="2.5" orient="auto-start-reverse" markerUnits="strokeWidth">
+              <path d="M 0 0 L 5 2.5 L 0 5 Z" fill="var(--pb-border)"></path>
+            </marker>
+          </defs>
+          <g fill="none" stroke="var(--pb-border)" stroke-width="1.6" marker-start="url(#pb-conduct-cycle-arrow)" marker-end="url(#pb-conduct-cycle-arrow)">
+            <path d="M 48 28 Q 29 36 24 55"></path>
+            <path d="M 96 28 Q 115 36 120 55"></path>
+            <path d="M 49 86 Q 72 95 95 86"></path>
+          </g>
+        </svg>
+        <button class="pb-conduct pb-selected" data-conduct="spread" type="button" aria-pressed="true" aria-label="次回用Conduct：ひろがり"><span class="pb-conduct-face" aria-hidden="true">広</span><span class="pb-conduct-name">ひろがり</span></button>
+        <button class="pb-conduct" data-conduct="none" type="button" aria-pressed="false" aria-label="次回用Conduct：未選択"><span class="pb-conduct-face" aria-hidden="true">－</span><span class="pb-conduct-name">未選択</span></button>
+        <button class="pb-conduct" data-conduct="echo" type="button" aria-pressed="false" aria-label="次回用Conduct：やまびこ"><span class="pb-conduct-face" aria-hidden="true">響</span><span class="pb-conduct-name">やまびこ</span></button>
+      </div>
+      <div class="pb-conduct-help">ホイール：次回用の選択</div>
+      <div class="pb-sr pb-conduct-status" aria-live="polite"></div>
+    </div>
+    <div class="pb-actions" aria-label="操作ガイドの配置候補。表示内容は一例">
+      <span><kbd>左クリック</kbd> Charge</span>
+      <span><kbd>Shift</kbd> 回避</span>
+    </div>
+  </div>
+  <div class="pb-legend">
+    <span class="pb-legend-item"><span class="pb-legend-ring" aria-hidden="true"></span>装填対象</span>
+    <span>縦の束：コード／横の連なり：アルペジオ</span>
+    <span>配置・配色・譜面は比較用の案</span>
+  </div>
+  <div class="pb-sr pb-study-status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('pb-hud-layout-study');
+      const svg = root.querySelector('.pb-timeline svg');
+      const ns = 'http://www.w3.org/2000/svg';
+      const state = { elapsed: 0, conduct: 'spread' };
+      const conductOrder = ['none', 'spread', 'echo'];
+      const conductNames = { none: '未選択', spread: 'ひろがり', echo: 'やまびこ' };
+      const events = [
+        { id: 'a', type: 'arp', fire: 1, notes: [
+          { name: 'C♯', tone: 'pink', time: 1, filled: true },
+          { name: 'E', tone: 'green', time: 1.65, filled: false },
+          { name: 'G♯', tone: 'blue', time: 2.3, filled: true }
+        ] },
+        { id: 'b', type: 'chord', fire: 3.6, notes: [
+          { name: 'C♯', tone: 'pink', time: 3.6, filled: false },
+          { name: 'E', tone: 'green', time: 3.6, filled: false },
+          { name: 'G♯', tone: 'blue', time: 3.6, filled: false }
+        ] }
+      ];
+      function element(name, attributes, parent, text) {
+        const item = document.createElementNS(ns, name);
+        Object.entries(attributes || {}).forEach(([key, value]) => item.setAttribute(key, String(value)));
+        if (text !== undefined) item.textContent = text;
+        (parent || svg).appendChild(item);
+        return item;
+      }
+      function render() {
+        root.querySelectorAll('.pb-conduct').forEach(button => {
+          const selected = button.dataset.conduct === state.conduct;
+          button.classList.toggle('pb-selected', selected);
+          button.setAttribute('aria-pressed', String(selected));
+        });
+        root.querySelector('.pb-conduct-status').textContent = `次回用Conduct：${conductNames[state.conduct]}`;
+        const width = Math.max(260, svg.getBoundingClientRect().width || 690);
+        const fireX = 16;
+        const pps = (width - fireX - 24) / 4.2;
+        const noteW = Math.max(24, Math.min(32, .65 * pps - 6));
+        const xAt = time => fireX + (time - state.elapsed) * pps;
+        const current = events.find(event => event.fire > state.elapsed && !event.notes.every(note => note.filled));
+        svg.replaceChildren();
+        svg.setAttribute('viewBox', `0 0 ${width} 66`);
+        element('title', {}, svg, 'AttackEvent予告の配置と消え方の比較案');
+        element('desc', {}, svg, '各音は発射予定時刻で消え、残りの音の時間間隔は詰めない。アルペジオの受付は先頭の発火時刻で終了し、装填対象の強調は次の予告へ移る。');
+        const defs = element('defs');
+        const clip = element('clipPath', { id: 'pb-hud-study-timeline-clip' }, defs);
+        element('rect', { x: 0, y: 0, width, height: 66 }, clip);
+        element('line', { x1: fireX, x2: width - 6, y1: 40, y2: 40, stroke: 'var(--pb-border)', 'stroke-width': 1, opacity: .45 });
+        element('line', { x1: fireX, x2: fireX, y1: 17, y2: 65, stroke: 'var(--pb-ink)', 'stroke-width': 2 });
+        element('text', { x: fireX, y: 12, 'text-anchor': 'middle', fill: 'var(--pb-ink)', 'font-size': 11 }, svg, '発射');
+        const layer = element('g', { 'clip-path': 'url(#pb-hud-study-timeline-clip)' });
+        events.forEach(event => {
+          const remaining = event.notes.filter(note => note.time > state.elapsed);
+          if (!remaining.length) return;
+          const active = current && current.id === event.id;
+          const firstX = xAt(event.fire);
+          const lastX = xAt(event.notes[event.notes.length - 1].time);
+          const left = Math.max(fireX - 5, firstX - noteW / 2 - 7);
+          const right = lastX + noteW / 2 + 7;
+          const top = event.type === 'chord' ? 15 : 23;
+          const height = event.type === 'chord' ? 49 : 34;
+          const group = element('g', { 'aria-label': `${event.type === 'chord' ? 'コード' : 'アルペジオ'}、${active ? '装填対象' : event.fire <= state.elapsed ? '受付終了・発射進行中' : '後続の予告'}` }, layer);
+          element('rect', { x: left, y: top, width: Math.max(1, right - left), height, rx: 5, fill: 'var(--pb-panel)', stroke: active ? 'var(--pb-accent)' : 'var(--pb-border)', 'stroke-width': active ? 3 : 1 }, group);
+          event.notes.forEach((note, index) => {
+            if (note.time <= state.elapsed) return;
+            const x = xAt(note.time);
+            const cy = event.type === 'chord' ? 24 + index * 16 : 40;
+            const nh = event.type === 'chord' ? 14 : 22;
+            const tone = `var(--pb-${note.tone})`;
+            const mark = element('g', { 'aria-label': `${note.name}、${note.filled ? '装填済み' : '未装填'}` }, group);
+            element('rect', { x: x - noteW / 2, y: cy - nh / 2, width: noteW, height: nh, rx: 3, fill: note.filled ? tone : 'var(--pb-panel)', stroke: tone, 'stroke-width': 1.5 }, mark);
+            element('text', { x, y: cy + 4, 'text-anchor': 'middle', fill: note.filled ? 'var(--pb-note-ink)' : tone, 'font-size': 11, 'font-weight': 500 }, mark, note.name);
+          });
+        });
+        root.querySelector('.pb-study-status').textContent = state.elapsed < 1 ? 'アルペジオが現在の装填対象です。' : state.elapsed < 2.3 ? 'アルペジオの受付は終了。残りの音が順番に発射時刻を迎え、コードが装填対象です。' : state.elapsed < 3.6 ? 'アルペジオの表示が終了し、コードが装填対象です。' : 'この例のすべての予告が終了しました。';
+      }
+      render();
+      const conductArea = root.querySelector('.pb-conducts');
+      function cycleConduct(direction) {
+        const index = conductOrder.indexOf(state.conduct);
+        state.conduct = conductOrder[(index + direction + conductOrder.length) % conductOrder.length];
+        render();
+      }
+      root.querySelectorAll('.pb-conduct').forEach(button => {
+        button.addEventListener('click', () => { state.conduct = button.dataset.conduct; render(); });
+      });
+      let wheelTotal = 0;
+      let lastWheelAt = 0;
+      let lastWheelDirection = 0;
+      conductArea.addEventListener('wheel', event => {
+        if (event.ctrlKey || !event.deltaY) return;
+        event.preventDefault();
+        const now = performance.now();
+        const direction = Math.sign(event.deltaY);
+        if (now - lastWheelAt > 200 || direction !== lastWheelDirection) wheelTotal = 0;
+        lastWheelAt = now;
+        lastWheelDirection = direction;
+        const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1;
+        wheelTotal += event.deltaY * scale;
+        if (Math.abs(wheelTotal) >= 40) { cycleConduct(direction); wheelTotal = 0; }
+      }, { passive: false });
+      conductArea.addEventListener('keydown', event => {
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        cycleConduct(event.key === 'ArrowDown' ? 1 : -1);
+      });
+      const observer = new ResizeObserver(render);
+      observer.observe(svg);
+      if (globalThis.Tweak) {
+        const tweak = new Tweak({ container: root, onChange: render });
+        tweak.addSlider(state, 'elapsed', { label: '経過時間（譜面の例）', min: 0, max: 3.7, step: .05, unit: '秒' });
+        tweak.addSelect(state, 'conduct', { label: '次回用Conduct', options: [{ label: '未選択', value: 'none' }, { label: 'ひろがり', value: 'spread' }, { label: 'やまびこ', value: 'echo' }] });
+      }
+    })();
+  </script>
+</div>
