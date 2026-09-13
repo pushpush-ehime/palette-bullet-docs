@@ -1201,6 +1201,8 @@ system pre-roll時間は調整可能なパラメータとし、具体値は現�
 
 Parry Slowは、この表へ新しい音楽runtime phaseを追加しません。Parry Slow開始前のphaseを維持したまま、BGM Audio、3時計、system pre-roll、およびAttackEventの進行を継続します。Parry Slowを理由として`Pause中`の行へ遷移してはいけません。
 
+ここでいう3時計は`Battle／Gameplay／MusicChart`の開始・停止関係であり、AttackEventの旧「Preview／Charge Close／Actual BGMの3 Progress」を残す意味ではありません。Normal AttackEventのCharge受付終了はActual BGMのFireと同じ音楽境界で配送します。Pause／ResumeやAudio同期補正で旧Close先行時刻を復活させず、同時刻のCharge判定順は[AttackEvent](/spec/bgm/bgm-attack-event)と[Allocation](/spec/draw-system/charge-allocation)に従います。
+
 ---
 
 ## 同期の基準

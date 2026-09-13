@@ -133,8 +133,7 @@ MusicChart
 │  └─ MinimumLeadTime
 │
 ├─ AttackEvent Timing Settings        [手動設定]
-│  ├─ Preview / Charge Start Offset
-│  └─ Charge Close Offset
+│  └─ Preview / Charge Start Offset
 │
 ├─ Attack Events                      [手動設定]
 │  ├─ Stable ID
@@ -444,11 +443,10 @@ MusicChartには、曲内のNormal AttackEventで使用する基本Timing値と�
 
 ```text
 AttackEvent Timing Settings
-├─ Preview / Charge Start Offset
-└─ Charge Close Offset
+└─ Preview / Charge Start Offset
 ```
 
-これらは、AttackEvent本来の発火位置を基準とした**曲共通のデフォルト値**です。
+これは、AttackEvent本来の発火位置を基準とした**曲共通のデフォルト値**です。Charge受付終了はFire位置に固定し、曲共通の旧`Charge Close Offset`は調整パラメータではありません。
 
 ### 基準BGM時間軸
 
@@ -465,13 +463,13 @@ Actual BGM Progress
 Preview / Charge Start Progress
 = Actual BGM Progress + Preview / Charge Start Offset
 
-Charge Close Progress
-= Actual BGM Progress + Charge Close Offset
+Charge Close境界
+= Actual BGM ProgressのFire境界
 ```
 
 とします。
 
-3つのProgressは、同じBGM時間軸を基準として同じ速度で進行します。
+予告用ProgressとActual BGMは同じBGM時間軸を基準として同じ速度で進行します。Charge Close用の独立した先行Progressは使用しません。
 
 system pre-roll中に発生するPreviewまたはCharge境界も、[system pre-rollとの対応](#system-pre-rollとの対応)を使用して同じBattle音楽runtime上の位置へ解決できる必要があります。BGM Audioがまだ再生されていないことを理由に、別のTiming値へ置き換えません。
 
@@ -491,29 +489,19 @@ Charge受付開始
 
 として扱える値を保存します。
 
-現行構造ではPreview開始とCharge受付開始に同じOffsetを使用するため、両者は同時刻になり得ます。ただし、validationでは「Preview開始」と「Charge受付開始」を別の意味境界として解決し、両方がBattle音楽runtime開始点以後に存在することを確認します。
+Preview開始とCharge受付開始には同じOffsetを使用し、両者は同時刻です。ただし、validationでは「Preview開始」と「Charge受付開始」を別の意味境界として解決し、両方がBattle音楽runtime開始点以後に存在することを確認します。
 
-### Charge Close Offset
+### Charge Close（Fireと同時刻）
 
-`Charge Close Offset`は、Charge受付終了に必要な時間差を表します。
-
-```text
-Charge Close ProgressがTへ到達
-↓
-Charge受付終了
-```
-
-として扱える値を保存します。
-
-最終的に、
+Charge受付終了は調整値ではなく、そのAttackEventの`Fire Music Position`と同時刻です。
 
 ```text
 Actual BGM ProgressがTへ到達
 ↓
-AttackEvent発火
+Charge受付終了 = AttackEvent発火
 ```
 
-となります。
+とします。Charge受付終了用の追加Offsetは保存・解決しません。
 
 このGameplay上の意味・判定規則は、[BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event)を正とします。
 
@@ -528,14 +516,12 @@ Preview開始
 ↓
 Charge受付開始
 ↓
-Charge Close
-↓
-Actual Fire
+Charge Close = Actual Fire
 ```
 
-の順で各境界へ到達できる設定とします。Preview開始とCharge受付開始を同じ境界として保存する現行構造では、この2つの同時成立を許可します。
+の順で各境界へ到達できる設定とします。Preview開始とCharge受付開始、およびCharge CloseとActual Fireは、それぞれ同一の音楽時刻です。
 
-この順序はMusicChart validationで必ず確認します。不正な順序を警告だけで黙認したり、RuntimeでOffsetを自動補正したりしません。具体的なEditor UIや検証コードの構成はプログラム設計へ委譲します。
+この順序と`Charge受付終了 = Fire`はMusicChart validationで必ず確認します。Previewの先行時間が負で受付期間を逆転させる設定、または旧Close値により早期終了する設定を警告だけで黙認したり、RuntimeでOffsetを自動補正したりしません。具体的なEditor UIや検証コードの構成はプログラム設計へ委譲します。
 
 ### Offsetのデータ単位
 
@@ -566,27 +552,34 @@ Offsetは、BGMの音楽時間と一意に接続できる形式で保持する�
 AttackEvent
 └─ Timing Override
    ├─ Use Override
-   ├─ Preview / Charge Start Offset
-   └─ Charge Close Offset
+   └─ Preview / Charge Start Offset
 ```
 
 のように表現します。
 
 実際のフィールド名やInspector UIは固定しません。
 
-値の解決順は、
+Preview／Charge開始値の解決順は、
 
 ```text
 AttackEvent個別Overrideあり
 ↓
-個別値を使用
+個別Preview値を使用
 
 Overrideなし
 ↓
-MusicChart曲共通値を使用
+MusicChart曲共通Preview値を使用
 ```
 
 とします。
+
+個別Overrideの有無にかかわらず、実効Charge受付終了はFire位置です。旧個別`Charge Close Offset`を使って受付期間を短くしません。
+
+### 旧Charge Close Offsetの移行
+
+現行Unity保存型には、曲共通`chargeCloseOffsetSeconds`（初期仮値0.5秒）とAttackEvent個別Override内の同名値があります。新契約では両方とも**受付終了時刻を決める権限を失い、実効先行時間は0**です。Preview／Charge開始の値とFire Music Position、Arpeggio Entry Timing、system pre-roll、Audioの同期補正はこの変更だけでは動かしません。旧Close値をPreview値へ加算・転記したり、Fireを前倒ししたりしません。
+
+プログラマー班は既存Chart（固定AttackEvent、Random Candidate、個別Overrideを含む）を列挙して旧値を確認し、保存型・Inspector・Workbench・Resolver・validation・snapshotを一貫して移行します。保存済みの非0値が残る場合は移行対象と明示し、変更前の値を確認できる形で**明示的に0へ移行するか旧フィールドを廃止**します。古い値を読み込みつつ黙って早期Closeとして使用したり、表示だけFireに重ねてRuntimeは旧値を使ったりしません。旧値の扱いと対象Assetを移行PRで記録します。新規・移行後の有効Chartでは実効`ChargeClose = Fire`を検証します。
 
 ### 最初のAttackEventとsystem pre-roll
 
@@ -605,13 +598,11 @@ MusicChartは、最初のNormal AttackEventについて、曲共通値またはA
 
 ```text
 Battle音楽runtime開始点
-<= 最初のPreview開始
-<= 最初のCharge受付開始
-<= 最初のCharge受付終了
-<= 最初のAttackEvent発火
+<= 最初のPreview開始 = 最初のCharge受付開始
+<= 最初のCharge受付終了 = 最初のAttackEvent発火
 ```
 
-現行構造では、最初のPreview開始とCharge受付開始が同時刻でも構いません。
+最初のPreview開始とCharge受付開始は同時刻です。
 
 最初のPreview開始またはCharge受付開始がBattle音楽runtime開始点より前へはみ出す場合、system pre-rollが必要な先行時間を確保できていないためvalidation errorとします。RuntimeでPreviewを途中から開始したり、Charge受付時間を暗黙に短縮したりして成立させません。
 
@@ -1195,7 +1186,7 @@ MusicChartに存在する値の決定元は、以下を基本とします。
 | `Harmony` | サウンド班が提示 |
 | AttackEventをGameplayとして採用するか | プランナー |
 | `Preview / Charge Start Offset` | プランナー |
-| `Charge Close Offset` | プランナー |
+| 旧`Charge Close Offset`保存値の移行確認 | プランナー／プログラマー |
 | AttackEvent個別`Timing Override` | 必要に応じてプランナー |
 | Random候補の音楽的内容 | サウンド班が提示 |
 | Random候補のGameplay上の採用 | プランナー |
@@ -1455,7 +1446,7 @@ Editorの`OnValidate`、保存前処理、Import後処理、専用validation com
 1. system pre-roll時間と、Battle音楽runtime開始点・pre-roll終了点の対応を一意に取得できる
 2. system pre-roll終了点が、BGM Audioの音源位置0および曲本編`Music Position 0`と一致する
 3. `TempoMap`を用いて、各AttackEventのPreview開始、Charge受付開始、Charge受付終了、発火を同じBattle音楽runtime上へ解決できる
-4. 各AttackEventで、`Preview開始 <= Charge受付開始 <= Charge受付終了 <= 発火`の順序が成立する
+4. 各AttackEventで、`Preview開始 = Charge受付開始 <= Charge受付終了 = 発火`が成立する。実効Preview先行時間は負にしない
 5. 各AttackEventのPreview開始がBattle音楽runtime開始点より前へはみ出さない。特に最初のAttackEventを必ず確認する
 6. 各AttackEventのCharge受付開始がBattle音楽runtime開始点より前へはみ出さない。特に最初のAttackEventを必ず確認する
 7. AttackEvent個別Overrideを使用する場合も、解決後の実効値で同じ条件を満たす
@@ -1464,7 +1455,7 @@ Editorの`OnValidate`、保存前処理、Import後処理、専用validation com
 10. 固定AttackEvent、Random Candidate、Random SectionのStable IDが、Definition種別をまたいで同一MusicChart内で重複していない
 11. Display CodeがAttackEventでは`ATK-xxx`、Random Sectionでは`RSEC-xxx`の採番契約を満たす
 
-Preview開始とCharge受付開始へ同じOffsetを使用する現行構造では、両者の同時成立を許可します。その他の境界についてもGameplay仕様が同時成立を許可する場合は等号を使用できますが、時間順を逆転させてはいけません。
+Preview開始とCharge受付開始は同時成立し、Charge受付終了と発火も必ず同時成立します。先行時間が0の場合は半開区間のCharge受付幅も0となるため、楽曲として意図した値か確認します。旧Close先行値による早期終了や不一致を有効データとしません。
 
 固定AttackEventだけでなく、最初のAttackEventになり得るRandom Candidateを含むすべてのNormal AttackEvent Definitionを検証対象とします。Runtime抽選によって選ばれない可能性があることを理由に、不正なCandidateを有効データとして残しません。
 
@@ -1474,8 +1465,8 @@ Preview開始とCharge受付開始へ同じOffsetを使用する現行構造で�
 
 ```text
 最初のAttackEvent Fire Music Position
-+ 有効なPreview / Charge Start Offset
-+ system pre-rollとの対応
+- 有効なPreview / Charge Start Offset
+（system pre-rollを含むBattle音楽runtimeへ対応付ける）
 ↓
 最初のPreview開始・Charge受付開始のRuntime位置
 ↓
@@ -1523,8 +1514,7 @@ Sync Settings
 AttackEvent Timing Settings
 =
 Gameplayとして意図的に
-予告開始・Charge受付終了等を
-発火位置より前へ配置するための時間差
+予告／Charge受付開始を発火位置より前へ配置するための時間差
 ```
 
 ```text
@@ -1534,7 +1524,7 @@ Sync Settings
 意図しない同期ズレを補正する値
 ```
 
-したがって、`Preview / Charge Start Offset`や`Charge Close Offset`を`Sync Settings`へ含めません。
+したがって、`Preview / Charge Start Offset`を`Sync Settings`へ含めません。旧`Charge Close Offset`も同期補正へ流用しません。
 
 ### 決定者
 
@@ -1596,7 +1586,7 @@ BGM上の再生位置
 - Normal AttackEventの`Fire Music Position`
 - Arpeggio EntryのTiming
 - Random Sectionの開始位置 / 終了位置
-- AttackEvent Timing Settingsによる3 Progress
+- AttackEvent Timing SettingsによるPreview／Charge開始と、Fire／Charge終了の共通境界
 - Weak Allocationで解決されるNoteEvent Timing
 
 BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection)を正とします。
@@ -1622,7 +1612,7 @@ BGMとGameplayの最終的な同期規則については、[BGMとGameplayの接
 | Sync Settings保存構造 | 本ページ |
 | DAW / FLAC / MIDIの制作・Export条件 | [BGM MIDIファイルの設定](/spec/bgm/bgm-midi-settings) |
 | サウンド班からUnityまでの制作・受け渡し工程 | [サウンド班制作フロー](/spec/bgm/sound-production-workflow) |
-| AttackEventの音楽的意味・3 ProgressのGameplay上の意味 | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) |
+| AttackEventの音楽的意味・Charge受付とFireのGameplay上の意味 | [BGM 攻撃イベント仕様](/spec/bgm/bgm-attack-event) |
 | Current Normal AttackEvent / Pitch Class照合 / Slot Allocation / Weak Allocation / Reserved | [Charge Allocation仕様](/spec/draw-system/charge-allocation) |
 | Complete / Incomplete / Zero Charge / Palette Bullet化 | [BGM 攻撃判定仕様](/spec/bgm/bgm-attack-judgement) |
 | 3時計の開始、system pre-rollのRuntime進行、BGM Audio再生開始、およびBGMとGameplayの発音・同期 | [BGMとGameplayの接続](/spec/bgm/bgm-gameplay-connection) |
@@ -1706,7 +1696,7 @@ system pre-rollの具体的な長さは未定です。最初のPreview／Charge 
 
 ### Offset型
 
-`Preview / Charge Start Offset`、`Charge Close Offset`を、
+`Preview / Charge Start Offset`を、
 
 - 秒
 - Tick

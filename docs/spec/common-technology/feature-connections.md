@@ -96,6 +96,8 @@ relatedTasks: []
 
 これは接続の受入例です。仮Ownerで合格しても、実Scene・実MusicChart・実Charge・実Enemyを接続した合格とは区別します。各機能の本番接続後に同じ例を繰り返します。
 
+C07／C08の追加境界：Normal occurrenceのCharge受付終了とFireは同一音楽時刻`T`です。判定時刻が`T`未満の同期commitはそのoccurrenceのFire snapshotに含め、`T`ちょうどのClick判定Event／Drag Releaseは旧occurrenceに割り当てず、同時刻に閉じる候補を除いたCurrentへ切り替えてから評価します。後続がなければ既存のWeak／Drag miss規則に従います。これは論理音楽時刻の判定であり、Frame終端で新規Chargeを閉じる調整役の`ChargeClosed`段階と同義ではありません。同一frameの予約優先・自然破裂順も、締切後の旧Eventへの予約を許可しません。
+
 ## 値と状態の正本 {#owners}
 
 | 情報 | 唯一の変更Owner／参照側 | 根拠・注意 |

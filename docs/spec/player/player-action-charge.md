@@ -764,6 +764,8 @@ Charge判定Eventが発生した時点で、Press時から保持しているShao
 
 重要なのは、AttackEventやSlotをPress時・Click判定時・ClickCharging開始時には固定せず、**Charge判定Event発生時点の状態**を使用することです。
 
+Normal AttackEventの受付はその発火時刻を含みません。Pressが発火前でもClick判定Eventが発火時刻ちょうどなら旧AttackEventへは割り当てず、その判定時刻のCurrent（またはNormalなし）を使用します。すでに発火前に確定したCharge結果を、後から同じframeでFireへ到達したことだけを理由に取り消しません。境界とCurrent切替は[AttackEvent](/spec/bgm/bgm-attack-event)と[Allocation](/spec/draw-system/charge-allocation)を正とします。
+
 ```text
 Charge Press
 ↓
@@ -1289,6 +1291,8 @@ Charge入力Releaseによる判定は、DragChargingの正常終了として扱�
 ## DragChargingの判定
 
 Release時に使用する判定対象は、**Release時点のCurrent Normal AttackEvent 1つだけ**です。
+
+Releaseが旧AttackEventのFire時刻ちょうどなら、その旧EventはCurrent候補から外れます。Press／Drag選択が発火前だったことを理由に旧Eventへ遡及しません。後続Currentが存在しない場合のDrag全体miss規則は維持します。
 
 Current Normal AttackEventの決定自体は`docs/spec/draw-system/charge-allocation.md`を正とします。
 

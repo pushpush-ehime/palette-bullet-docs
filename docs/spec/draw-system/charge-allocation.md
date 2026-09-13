@@ -393,6 +393,8 @@ Charge受付期間を終了した過去のAttackEventは、その後再びCurren
 
 Charge受付期間そのものの時間情報は、`bgm/bgm-attack-event.md` を正とします。
 
+この終了境界は当該occurrenceのFire時刻`T`と同じです。ClickのCharge判定Event／DragのReleaseが`T`ちょうどなら、Aを候補から外してからCurrentを再決定します。後続Bがすでに予告／受付開始済みで、`Fire(B) > T`かつ未充填ならBを対象とし、なければ既存のNormalなし規則（Clickは適法なWeakの試行、Dragは全体miss）に従います。Aと同時発火する別Definitionも同時に閉じます。Aの空きSlotへ遡及してcommitせず、BのSlotが不一致でもさらに後続を検索しません。Aが`T`未満にcommit済みのReservedはAの発火解決へ残し、同じUnity frameの処理順だけで取り消しません。
+
 ---
 
 ## Currentとなる通常AttackEventが存在しない場合

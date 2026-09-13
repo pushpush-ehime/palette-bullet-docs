@@ -32,6 +32,10 @@ relatedTasks:
 
 世界内のシャオンダマ・Enemy・Markerによる表示と、画面に固定するHUDの分担をラフで検討します。画面上の情報から勝敗・Charge成功・発火・Mode適用をUIが独自に判定する構成にはしません。
 
+AttackEvent予告の時間・移動方向は確定です。対象occurrenceの予告／Charge受付開始と同時にHUDへ出現し、右から左へ流れ、発火位置への到達時にそのoccurrenceのCharge受付が終了します。発火位置はActual BGMの`Fire Music Position`に対応し、表示が先に到達したことや描画frameの丸めをGameplayの締切にしません。Pause中は音楽時間と一緒に進行を止め、Resume後も同じoccurrenceの残り時間を表します。予告時刻や移動の時間対応は[AttackEvent](/spec/bgm/bgm-attack-event)を正とします。
+
+Chordは同じFire境界で受付を閉じて発火し、Arpeggioは**AttackEvent全体**をFireで閉じます。後続Entryの発音・発射まで新たなCharge受付を延ばしません。Arpeggioの各音をHUD上でいつ・どう表示終了するかは未決です。発火位置到達と各音の表示消去を同義にせず、個別音のフェード・残置・順次消去等をここでは確定しません。
+
 Modeの切替入力をした直後と、小節頭で実際に適用された後を同じ表示にするかは、Playerが状態を誤認しないよう検討します。Conductも、次回用の選択を変えたことが進行中Chargeの内容変更に見えないようにします。具体的な見せ方はこのページで後続決定します。
 
 ## 比較する表示状態
@@ -66,7 +70,7 @@ Charge成功はAttackEvent occurrenceへの割り当て・Reserved化であり�
 
 - **常時表示・必要時表示・世界内表示の分担、配置・大きさ**。確認先：UI設計・Camera・各情報を提供する機能担当。決定が必要な時点：ラフから詳細設計へ渡す前。
 
-- **Charge中・成功・不成立・ReservedとAttackEvent予告の読み取り方**。確認先：UI設計・Charge／Allocation・BGM担当。決定が必要な時点：ラフから詳細設計へ渡す前。通知内容はUI実装前。
+- **Charge中・成功・不成立・ReservedとAttackEvent予告の読み取り方、およびArpeggio各音の表示終了方法**。予告開始／右から左への移動／発火位置での受付終了は決定済み。確認先：UI設計・Charge／Allocation・BGM担当。決定が必要な時点：ラフから詳細設計へ渡す前。通知内容はUI実装前。
 
 - **Modeの現在値・適用待ち・使用不可、Conductの次回選択と進行中Chargeの区別**。確認先：UI設計・Player機能担当。決定が必要な時点：Mode／Conduct追加段階の詳細設計前。
 
